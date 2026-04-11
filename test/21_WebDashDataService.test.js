@@ -262,7 +262,7 @@ describe('DataService.getGrievanceStats', () => {
       ['G012', 'l@test.com', 'Active', 'Step II', '', '2025-12-01', 'steward@test.com', 'Unit C', 'medium', '', 'Pay', '', ''],
     ];
     const data = [headers, ...rows];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -326,7 +326,7 @@ describe('DataService.getGrievanceHotSpots', () => {
       ['G1', 'Hot Unit'], ['G2', 'Hot Unit'], ['G3', 'Hot Unit'],
       ['G4', 'Cold Unit'], ['G5', 'Cold Unit'],
     ];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -341,7 +341,7 @@ describe('DataService.getGrievanceHotSpots', () => {
     DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers, ['G1', 'A'], ['G2', 'B']];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -363,7 +363,7 @@ describe('DataService.getStewardDirectory', () => {
       ['a@test.com', 'Alice', 'Steward', 'Office A', 'Mon-Wed', '555-0002', 'Unit 2'],
       ['m@test.com', 'Mike', 'Member', 'Office A', 'Mon-Fri', '555-0003', 'Unit 1'],
     ];
-    const memberSheet = createMockSheet('Member Directory', data);
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR, data);
     const mockSS = createMockSpreadsheet([memberSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
 
@@ -460,7 +460,7 @@ describe('dataGetBroadcastFilterOptions', () => {
       ['b@test.com', 'Bob', 'Office B', 'Thu-Fri', 'Inactive', 'Member', 'steward@test.com'],
       ['c@test.com', 'Carol', 'Office A', 'Mon-Fri', 'Active', 'Member', 'steward@test.com'],
     ];
-    const memberSheet = createMockSheet('Member Directory', data);
+    const memberSheet = createMockSheet(SHEETS.MEMBER_DIR, data);
     const mockSS = createMockSpreadsheet([memberSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
 
@@ -661,7 +661,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
       DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS, ...rows];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -673,7 +673,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
       DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS, ...rows];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -720,7 +720,7 @@ describe('Deadline boundary conditions (_buildGrievanceRecord auto-detect)', () 
       'GR-A', 'member@test.com', 'Open', 'Step I', deadline,
       new Date('2026-01-01'), 'steward@test.com', 'Unit A', 'Medium', '', 'Safety', '', '',
     ]];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -818,7 +818,7 @@ describe('KPI computation parity (batch vs individual)', () => {
       ['GR-4', 'other@test.com', 'Open', 'Step I', new Date(now + 20 * 86400000), new Date('2026-02-01'), 'steward@test.com', 'Unit B', 'Med', '', 'Pay', '', ''],
     ];
     const data = [HEADERS, ...rows];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -888,7 +888,7 @@ describe('getGrievanceStats error resilience', () => {
       ['GR-SHORT'],  // malformed — only 1 column
       ['GR-ALSO-GOOD', 'b@test.com', 'Won', 'Step II', '', new Date('2025-06-01'), 'steward@test.com', 'Unit B', 'Med', '', 'Pay', 'Won', '2025-07-01'],
     ];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -908,7 +908,7 @@ describe('getGrievanceStats error resilience', () => {
       ['GR-1', 'a@test.com', 'Open', 'Step I', null, null, 'steward@test.com', 'Unit A', 'High', '', 'Safety', '', ''],
       ['GR-2', 'b@test.com', 'Open', 'Step I', undefined, undefined, 'steward@test.com', 'Unit B', 'Med', '', 'Pay', '', ''],
     ];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -928,7 +928,7 @@ describe('getGrievanceStats error resilience', () => {
       ['GR-1', 'a@test.com', 'Open', 'Step I', 'not-a-date', new Date('2026-01-01'), 'steward@test.com', 'Unit A', 'High', '', 'Safety', '', ''],
       ['GR-2', 'b@test.com', 'Open', 'Step I', new Date(Date.now() + 86400000), new Date('2026-01-01'), 'steward@test.com', 'Unit A', 'Med', '', 'Pay', '', ''],
     ];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -944,7 +944,7 @@ describe('getGrievanceStats error resilience', () => {
       DataService._invalidateSheetCache(SHEETS.GRIEVANCE_LOG);
     }
     const data = [HEADERS]; // header only, no data rows
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
@@ -984,7 +984,7 @@ describe('getGrievanceStats return shape contract', () => {
       'Resolution', 'Date Closed',
     ];
     const data = [headers, ['GR-1', 'a@test.com', 'Open', 'Step I', '', '', 'steward@test.com', 'Unit A', 'Med', '', 'Pay', '', '']];
-    const grievSheet = createMockSheet('Grievance Log', data);
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
     const memberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
     const mockSS = createMockSpreadsheet([memberSheet, grievSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);

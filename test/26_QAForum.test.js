@@ -1121,3 +1121,201 @@ describe('Lock failure handling', () => {
     expect(result.message).toContain('busy');
   });
 });
+
+// ============================================================================
+// v4.55.2 RAY-UX-02: editQuestion (owner-only question editing)
+// ============================================================================
+
+describe('editQuestion (RAY-UX-02)', () => {
+  var successLock;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    successLock = { tryLock: jest.fn(() => true), releaseLock: jest.fn() };
+    LockService.getScriptLock.mockReturnValue(successLock);
+    // Fresh cache between tests so rate-limit state doesn't leak.
+    CacheService.getScriptCache = jest.fn(() => ({
+      get: jest.fn(() => null),
+      put: jest.fn(),
+      remove: jest.fn()
+    }));
+  });
+
+  function setupForumWithQuestion(questionRow) {
+    var sheet = createMockSheet(SHEETS.QA_FORUM, [FORUM_HEADERS, questionRow]);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+    return sheet;
+  }
+
+  test('rejects missing email', () => {
+    var result = QAForum.editQuestion('', 'QA_1', 'New text');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/missing/i);
+  });
+
+  test('rejects missing questionId', () => {
+    var result = QAForum.editQuestion('user@test.com', '', 'New text');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/missing/i);
+  });
+
+  test('rejects empty newText', () => {
+    var result = QAForum.editQuestion('user@test.com', 'QA_1', '');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/missing/i);
+  });
+
+  test('rejects whitespace-only newText', () => {
+    var result = QAForum.editQuestion('user@test.com', 'QA_1', '   ');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/missing/i);
+  });
+
+  test('returns error when question not found', () => {
+    setupForumWithQuestion(['QA_OTHER', 'alice@test.com', 'Alice', false, 'Some question',
+                           'active', 0, '', 0, new Date(), new Date()]);
+    var result = QAForum.editQuestion('alice@test.com', 'QA_MISSING', 'New text');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/not found/i);
+  });
+
+  test('rejects non-owner edit attempt (horizontal priv-esc guard)', () => {
+    setupForumWithQuestion(['QA_1', 'alice@test.com', 'Alice', false, 'Original question',
+                           'active', 0, '', 0, new Date(), new Date()]);
+    var result = QAForum.editQuestion('mallory@test.com', 'QA_1', 'Malicious edit');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/only edit your own/i);
+  });
+
+  test('owner edit succeeds and writes new text + lastUpdated', () => {
+    var sheet = setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original question',
+      'active', 0, '', 0, new Date('2026-01-01'), new Date('2026-01-01')
+    ]);
+    var setValueCalls = [];
+    sheet.getRange = jest.fn(function(row, col) {
+      return {
+        setValue: jest.fn(function(v) { setValueCalls.push({ row: row, col: col, val: v }); })
+      };
+    });
+
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', 'Edited question text');
+    expect(result.success).toBe(true);
+    // Row 2 (header is row 1), column 5 = question text (0-indexed col 4 → 1-indexed col 5)
+    var textWrite = setValueCalls.find(c => c.row === 2 && c.col === 5);
+    expect(textWrite).toBeDefined();
+    expect(String(textWrite.val)).toContain('Edited question text');
+    // Column 11 = lastUpdated
+    var updateWrite = setValueCalls.find(c => c.row === 2 && c.col === 11);
+    expect(updateWrite).toBeDefined();
+    expect(updateWrite.val instanceof Date).toBe(true);
+  });
+
+  test('case-insensitive email comparison (Alice vs alice)', () => {
+    setupForumWithQuestion([
+      'QA_1', 'Alice@Test.COM', 'Alice', false, 'Original question',
+      'active', 0, '', 0, new Date(), new Date()
+    ]);
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', 'Edited text');
+    expect(result.success).toBe(true);
+  });
+
+  test('rejects edit on deleted question', () => {
+    setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original question',
+      'deleted', 0, '', 0, new Date(), new Date()
+    ]);
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', 'Attempted edit');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/deleted questions cannot be edited/i);
+  });
+
+  test('allows edit on resolved question (author may want to clarify)', () => {
+    setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original',
+      'resolved', 0, '', 1, new Date(), new Date()
+    ]);
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', 'Clarified');
+    expect(result.success).toBe(true);
+  });
+
+  test('rate limit: rejects after 5 edits in the hour window', () => {
+    setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original',
+      'active', 0, '', 0, new Date(), new Date()
+    ]);
+    CacheService.getScriptCache = jest.fn(() => ({
+      get: jest.fn(() => '5'), // already at limit
+      put: jest.fn(),
+      remove: jest.fn()
+    }));
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', 'Sixth edit');
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/rate limit/i);
+  });
+
+  test('editQuestion sanitizes newText (length limit enforced)', () => {
+    var sheet = setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original',
+      'active', 0, '', 0, new Date(), new Date()
+    ]);
+    var setValueCalls = [];
+    sheet.getRange = jest.fn(function(row, col) {
+      return {
+        setValue: jest.fn(function(v) { setValueCalls.push({ row: row, col: col, val: v }); })
+      };
+    });
+
+    var longText = 'A'.repeat(3000); // exceeds 2000 cap
+    var result = QAForum.editQuestion('alice@test.com', 'QA_1', longText);
+    expect(result.success).toBe(true);
+    var textWrite = setValueCalls.find(c => c.row === 2 && c.col === 5);
+    expect(textWrite).toBeDefined();
+    // escapeForFormula may prepend chars but the body length is capped at 2000
+    expect(String(textWrite.val).length).toBeLessThanOrEqual(2001);
+  });
+
+  test('editQuestion logs a QA_QUESTION_EDITED audit event', () => {
+    setupForumWithQuestion([
+      'QA_1', 'alice@test.com', 'Alice', false, 'Original',
+      'active', 0, '', 0, new Date(), new Date()
+    ]);
+    global.logAuditEvent = jest.fn();
+    QAForum.editQuestion('alice@test.com', 'QA_1', 'Edited');
+    expect(global.logAuditEvent).toHaveBeenCalledWith(
+      'QA_QUESTION_EDITED',
+      expect.any(String)
+    );
+  });
+});
+
+// ============================================================================
+// v4.55.2 qaEditQuestion wrapper (client-callable)
+// ============================================================================
+
+describe('qaEditQuestion wrapper (client-callable)', () => {
+  test('rejects unauthenticated caller with authError flag', () => {
+    global._resolveCallerEmail = jest.fn(() => null);
+    var result = qaEditQuestion('bad-token', 'QA_1', 'Edited');
+    expect(result.success).toBe(false);
+    expect(result.authError).toBe(true);
+    expect(result.message).toMatch(/not authenticated/i);
+  });
+
+  test('delegates to QAForum.editQuestion with resolved email', () => {
+    global._resolveCallerEmail = jest.fn(() => 'alice@test.com');
+    var origEdit = QAForum.editQuestion;
+    QAForum.editQuestion = jest.fn(() => ({ success: true }));
+    try {
+      var result = qaEditQuestion('alice-token', 'QA_1', 'New text');
+      expect(QAForum.editQuestion).toHaveBeenCalledWith(
+        'alice@test.com',
+        'QA_1',
+        'New text'
+      );
+      expect(result.success).toBe(true);
+    } finally {
+      QAForum.editQuestion = origEdit;
+    }
+  });
+});

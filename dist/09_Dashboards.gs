@@ -1200,9 +1200,12 @@ function computeAverage_(row, startIdx, endIdx) {
   var values = [];
   for (var i = startIdx; i <= endIdx; i++) {
     var val = row[i];
-    if (typeof val === 'number' && !isNaN(val)) {
-      values.push(val);
-    }
+    if (val === '' || val == null) continue;
+    // Accept numeric cells AND string-numeric cells. Form submissions can
+    // import numeric answers as text; the previous typeof-only check
+    // silently dropped every string "5" and undercounted averages.
+    var n = (typeof val === 'number') ? val : Number(val);
+    if (!isNaN(n)) values.push(n);
   }
 
   if (values.length === 0) return '';
@@ -2395,7 +2398,10 @@ function _computeGrievanceMetrics_(grievanceData, today, thisMonthStart, lastMon
     var gRow = grievanceData[g];
     if (!col_(gRow, GRIEVANCE_COLS.GRIEVANCE_ID)) continue;
 
-    var status = col_(gRow, GRIEVANCE_COLS.STATUS);
+    // Normalize status for comparison so case/whitespace variants from CSV
+    // imports or legacy data don't silently drop from every counter.
+    var status = String(col_(gRow, GRIEVANCE_COLS.STATUS) || '').trim();
+    var statusLc = status.toLowerCase();
     var steward = col_(gRow, GRIEVANCE_COLS.STEWARD);
     var category = col_(gRow, GRIEVANCE_COLS.ISSUE_CATEGORY);
     var location = col_(gRow, GRIEVANCE_COLS.LOCATION);
@@ -2404,16 +2410,16 @@ function _computeGrievanceMetrics_(grievanceData, today, thisMonthStart, lastMon
     var daysOpen = col_(gRow, GRIEVANCE_COLS.DAYS_OPEN);
     var daysToDeadline = col_(gRow, GRIEVANCE_COLS.DAYS_TO_DEADLINE);
 
-    // Status counts
-    if (status === GRIEVANCE_STATUS.OPEN) result.open++;
-    else if (status === GRIEVANCE_STATUS.PENDING) result.pendingInfo++;
-    else if (status === GRIEVANCE_STATUS.SETTLED) result.settled++;
-    else if (status === GRIEVANCE_STATUS.WON) result.won++;
-    else if (status === GRIEVANCE_STATUS.DENIED) result.denied++;
-    else if (status === GRIEVANCE_STATUS.WITHDRAWN) result.withdrawn++;
+    // Status counts (case-insensitive so 'open' matches 'Open')
+    if (statusLc === String(GRIEVANCE_STATUS.OPEN).toLowerCase()) result.open++;
+    else if (statusLc === String(GRIEVANCE_STATUS.PENDING).toLowerCase()) result.pendingInfo++;
+    else if (statusLc === String(GRIEVANCE_STATUS.SETTLED).toLowerCase()) result.settled++;
+    else if (statusLc === String(GRIEVANCE_STATUS.WON).toLowerCase()) result.won++;
+    else if (statusLc === String(GRIEVANCE_STATUS.DENIED).toLowerCase()) result.denied++;
+    else if (statusLc === String(GRIEVANCE_STATUS.WITHDRAWN).toLowerCase()) result.withdrawn++;
 
-    // Active grievances
-    if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING) {
+    // Active grievances = anything not in the closed-status set.
+    if (status && typeof GRIEVANCE_CLOSED_STATUSES !== 'undefined' && GRIEVANCE_CLOSED_STATUSES.indexOf(status) === -1) {
       result.activeGrievances++;
     }
 

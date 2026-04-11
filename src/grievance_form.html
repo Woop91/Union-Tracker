@@ -321,7 +321,7 @@ body.dark .tbtn.go:hover{background:#a00000;}
         </select>
       </div>
       <div style="text-align:left;">
-        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong>509</strong>
+        <span class="lbl">BARGAINING UNIT:&nbsp;</span><strong id="bargainingUnit">—</strong>
       </div>
     </div>
   </div>
@@ -345,8 +345,6 @@ body.dark .tbtn.go:hover{background:#a00000;}
     <span class="lbl" style="margin-left:6px;">REGION:</span>
     <select id="region" class="fi" style="width:1.3in;" onchange="autoFillLocation()">
       <option value=""></option>
-      <option value="Everett">Everett</option>
-      <option value="Worcester">Worcester</option>
     </select>
     <span class="lbl" style="margin-left:6px;">WORK LOCATION:</span>
     <input id="workloc" class="fi" type="text" style="flex:1;" readonly placeholder="Auto-filled from Region">
@@ -356,23 +354,9 @@ body.dark .tbtn.go:hover{background:#a00000;}
     <span class="lbl">DIRECTOR(S):</span>
     <select id="managers" class="fi" style="flex:1;" onchange="syncManagers()">
       <option value="">— Primary —</option>
-      <option>Timothy Dunphy</option>
-      <option>Aja James</option>
-      <option>Majdeline Hage</option>
-      <option>Kelly Forss</option>
-      <option>Lisa Maddox-Mason</option>
-      <option>Maryalice McGough</option>
-      <option>Matthew Dichard</option>
     </select>
     <select id="managers2" class="fi" style="flex:1;" onchange="syncManagers()">
       <option value="">— 2nd (optional) —</option>
-      <option>Timothy Dunphy</option>
-      <option>Aja James</option>
-      <option>Majdeline Hage</option>
-      <option>Kelly Forss</option>
-      <option>Lisa Maddox-Mason</option>
-      <option>Maryalice McGough</option>
-      <option>Matthew Dichard</option>
     </select>
   </div>
 
@@ -541,13 +525,20 @@ function buildBody(){
 function doEmail(){
   const to=prompt("Recipient email address:");
   if(!to)return;
+  // Validate email format before building the mailto URL. An invalid address
+  // could include newlines that inject additional mailto headers.
+  if(!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to.trim())){
+    showToast("Please enter a valid email address.");
+    return;
+  }
+  const safeTo = to.trim();
   const subText="Grievance Report \u2014 "+(v("grievant")||"Grievant");
   const body=buildBody();
-  const mailtoUrl="mailto:"+to+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent(body);
+  const mailtoUrl="mailto:"+encodeURIComponent(safeTo)+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent(body);
   if(mailtoUrl.length>1900){
     // mailto: URLs have a ~2000 char browser limit — copy body to clipboard and open with short body
     try{navigator.clipboard.writeText(body);}catch(_){}
-    window.location.href="mailto:"+to+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent("[Full grievance text copied to clipboard — paste here]\n\n(Text was too long for mailto: link)");
+    window.location.href="mailto:"+encodeURIComponent(safeTo)+"?subject="+encodeURIComponent(subText)+"&body="+encodeURIComponent("[Full grievance text copied to clipboard — paste here]\n\n(Text was too long for mailto: link)");
     showToast("Text copied to clipboard \u2014 paste into email body");
   }else{
     window.location.href=mailtoUrl;
@@ -585,14 +576,10 @@ function toggleDark(){
   document.getElementById('dmBtn').textContent=d?'☀ Light':'🌙 Dark';
 }
 
-// Defaults — overridden by server data on DOMContentLoaded
-var MANAGERS = ['Timothy Dunphy','Aja James','Majdeline Hage','Kelly Forss','Lisa Maddox-Mason','Maryalice McGough','Matthew Dichard'];
-
-// Address lookup (union-specific — values from Config sheet, addresses here)
-var LOCATION_ADDRESSES = {
-  'Everett':   '135 Santilli Hwy, Everett, MA 02149',
-  'Worcester': '324R Clark St, Worcester, MA 01606'
-};
+// Empty defaults — populated by getGrievanceFormOptions() from the Config sheet.
+// Hardcoded real names + addresses used to leak to SolidBase during sync.
+var MANAGERS = [];
+var LOCATION_ADDRESSES = {};
 
 function _rebuildManagerSelects(){
   var sel1 = document.getElementById('managers');
@@ -637,12 +624,17 @@ function autoFillLocation(){
   wl.value = LOCATION_ADDRESSES[region] || '';
 }
 
-// Fetch live data from Config sheet (falls back to hardcoded defaults for PDF rendering)
+// Fetch live data from Config sheet
 if(typeof google !== 'undefined' && google.script && google.script.run){
   google.script.run.withSuccessHandler(function(opts){
     if(!opts) return;
     if(opts.managers && opts.managers.length) { MANAGERS = opts.managers; _rebuildManagerSelects(); }
     if(opts.officeLocations && opts.officeLocations.length) _rebuildRegionSelect(opts.officeLocations);
+    if(opts.locationAddresses) LOCATION_ADDRESSES = opts.locationAddresses;
+    if(opts.bargainingUnit){
+      var buEl = document.getElementById('bargainingUnit');
+      if(buEl) buEl.textContent = opts.bargainingUnit;
+    }
   }).withFailureHandler(function(){}).getGrievanceFormOptions();
 }
 

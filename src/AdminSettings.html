@@ -677,8 +677,11 @@
         if (_listDirty[key]) {
           listSaves.push(key);
         } else {
-          // Read current value from the input
-          var input = document.querySelector('[data-key="' + key + '"]');
+          // Read current value from the input. Escape the key so a future
+          // Config field containing quotes or brackets doesn't break the
+          // attribute selector or enable selector injection.
+          var _safeKey = (window.CSS && CSS.escape) ? CSS.escape(key) : String(key).replace(/["\\]/g, '\\$&');
+          var input = document.querySelector('[data-key="' + _safeKey + '"]');
           if (input) {
             singleChanges[key] = input.value;
           }

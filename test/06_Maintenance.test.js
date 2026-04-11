@@ -614,7 +614,7 @@ describe('logAuditEvent Email Hash column', () => {
     global.computeAuditRowHash_ = jest.fn(() => 'integrity_hash_value');
   });
 
-  test('appends Email Hash as 12th column', () => {
+  test('writes Email Hash (SHA-256) to its resolved column', () => {
     var headers = ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column',
       'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type',
       'Integrity Hash', 'Email Hash'];
@@ -626,12 +626,21 @@ describe('logAuditEvent Email Hash column', () => {
 
     logAuditEvent('TEST_EVENT', { detail: 'test' });
 
+    // Append is the 10 canonical cols; Integrity Hash + Email Hash are written
+    // to their resolved columns via setValue so reorders don't misplace them.
     expect(sheet.appendRow).toHaveBeenCalledTimes(1);
     var appendedRow = sheet.appendRow.mock.calls[0][0];
+    expect(appendedRow.length).toBe(10);
 
-    // Column 12 (index 11) should be a 64-char hex SHA-256 hash
-    expect(appendedRow.length).toBe(12);
-    expect(appendedRow[11]).toMatch(/^[0-9a-f]{64}$/);
+    // The setValue calls for the hash columns should include at least one 64-char hex string.
+    var setValueCalls = sheet.getRange.mock.results
+      .map(function(r) { return r.value && r.value.setValue && r.value.setValue.mock && r.value.setValue.mock.calls; })
+      .filter(Boolean)
+      .reduce(function(a, b) { return a.concat(b); }, []);
+    var sawEmailHash = setValueCalls.some(function(args) {
+      return typeof args[0] === 'string' && /^[0-9a-f]{64}$/.test(args[0]);
+    });
+    expect(sawEmailHash).toBe(true);
   });
 
   test('adds Email Hash header when upgrading existing sheet', () => {

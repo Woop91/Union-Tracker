@@ -1152,9 +1152,6 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataGetGrievanceForSigning',      // delegates to getGrievanceForSigning() (sigToken-based auth)
     'dataSubmitGrievanceSignature',    // delegates to submitGrievanceSignature() (sigToken-based auth)
     'dataGetGrievanceFormOptions',     // delegates to getGrievanceFormOptions() directly
-    'dataUndoToIndex',                 // delegates to undoToIndex() (undo system, 06_Maintenance.gs)
-    'dataExportUndoHistory',           // delegates to exportUndoHistoryToSheet() (undo system)
-    'dataGetUndoHistory',              // delegates to getUndoHistory() (undo system)
     'dataWebCheckInMember',            // delegates to webCheckInMember() (14_MeetingCheckIn.gs)
     'dataGetDeadlineCalendarData',     // delegates to getDeadlineCalendarData() (05_Integrations.gs)
     'dataGetCorrelationAlerts',        // delegates to getCorrelationAlerts() (17_CorrelationEngine.gs)
@@ -1164,7 +1161,6 @@ describe('A18: dataXxx wrapper functions call DataService (not orphaned)', () =>
     'dataBulkUpdateStatus',            // bulk action: writes directly to Grievance Log sheet
     'dataBulkExportCsv',               // bulk action: reads directly from Grievance Log sheet
     'dataBulkCreateFolders',           // bulk action: delegates to setupDriveFolderForGrievance()
-    'dataBulkSendEmail',               // bulk action: sends emails directly via safeSendEmail_()
     'dataGetCaseActivityLog',          // reads _Audit_Log sheet directly for case-level activity (Feature 5)
     'dataGetAuditLog',                 // reads _Audit_Log sheet directly for Access Log Viewer (v4.36.0)
     'dataInitiateGrievance',           // delegates to initiateGrievance() via withScriptLock_ (05_Integrations.gs)

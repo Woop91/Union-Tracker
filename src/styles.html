@@ -63,14 +63,54 @@ button:focus-visible, [role="button"]:focus-visible {
   overflow-y: auto;
 }
 .sidebar-header {
-  padding: 12px 20px 20px;
+  /* v4.55.6 sub-project D Zone 1: more vertical space for the larger org name */
+  padding: 16px 20px 24px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
 }
+
+/* v4.55.7 sub-project C Zone 1: Survey CTA banner responsive layout.
+   Desktop: horizontal row with text + button side-by-side.
+   Mobile (<= 480px): column stack so text has full width to wrap. */
+.survey-cta-banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .survey-cta-banner {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  .survey-cta-banner .survey-cta-button {
+    align-self: stretch;
+  }
+}
+
+/* v4.55.7 sub-project C Zone 2: Access Log table mobile column hiding.
+   On screens <= 640px the Sheet + Field columns are hidden so the
+   remaining 4 columns (Time, Event, User, Details) fit without
+   horizontal scroll. */
+@media (max-width: 640px) {
+  .access-log-table .alc-hide-mobile {
+    display: none;
+  }
+  .access-log-table .alc-details {
+    max-width: none;
+    white-space: normal;
+    word-break: break-word;
+  }
+}
 .sidebar-header-title {
   font-family: var(--fontDisplay);
-  font-size: 1rem;
-  font-weight: 700;
+  /* v4.55.6 sub-project D Zone 1: bumped 1rem -> 1.375rem for more presence */
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   background: linear-gradient(90deg, #1f4a43, #2a7c6f, #3db8a4, #6ec6d8, #a78bfa, #e879a8, #f0a050, #3db8a4, #1f4a43);
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -91,9 +131,10 @@ button:focus-visible, [role="button"]:focus-visible {
 }
 .sidebar-header-sub {
   font-family: var(--fontBody);
-  font-size: 0.6875rem;
+  /* v4.55.6 sub-project D Zone 1: bumped to match larger title */
+  font-size: 0.75rem;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .sidebar-item {
   display: flex;
@@ -4449,8 +4490,9 @@ button:focus-visible, [role="button"]:focus-visible {
   .card { border-radius: 8px; }
 
   /* Stack calendar grid tighter */
-  .calendar-cell { min-height: 40px; padding: 2px; }
-  .deadline-dot { width: 6px; height: 6px; min-width: 0; min-height: 0; }
+  .calendar-cell { min-height: 44px; padding: 2px; }
+  /* v4.55.1 T06-BUG-07: dot stays visually small (8px) but parent calendar-cell is the 44px tap target */
+  .deadline-dot { width: 8px; height: 8px; min-width: 0; min-height: 0; }
   .filter-tab { min-height: 44px; padding: 10px 16px; }
 
   /* BUG-6-002: prevent iOS auto-zoom on msg-textarea (16px minimum) */

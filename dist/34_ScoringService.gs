@@ -1,4 +1,19 @@
 /* exported ScoringService */
+/**
+ * ScoringService — 3-dimension member scoring used by the Org Health Tree.
+ *
+ * Dimensions: engagement (default 70%), profile (20%), grievance (10%).
+ * Configurable via Config sheet scoreWeightEngagement / scoreWeightProfile /
+ * scoreWeightGrievance. Weights are normalized in calculateCompositeScore.
+ *
+ * NOTE (v4.55.1 T12-BUG-02): this service is intentionally distinct from
+ * EngagementService (30_EngagementService.gs). The two services use different
+ * dimensions and different weights and target different UIs:
+ *   - ScoringService → Org Health Tree (high-level org health overview)
+ *   - EngagementService → Member Report Card + Steward Scoreboard (activity detail)
+ * A future version may consolidate them, but for now they coexist. If you edit
+ * weights or add dimensions, update BOTH services and their documentation.
+ */
 var ScoringService = (function() {
   'use strict';
 
@@ -28,9 +43,13 @@ var ScoringService = (function() {
     }
     if (!hasOpenGrievance) return 100;
     var days = Number(daysToDeadline) || 0;
+    // v4.55.1 A08-BUG-01: progressive scaling above 7 days so 8-day and 60-day grievances
+    // do not both return 70. Past deadline: 0. 0-7 days: 30-40. 7-30: 50-70. 30-90: 70-85. 90+: 90.
     if (days < 0) return 0;
-    if (days < 7) return 40;
-    return 70;
+    if (days <= 7) return 30 + Math.round((days / 7) * 10);
+    if (days <= 30) return 50 + Math.round(((days - 7) / 23) * 20);
+    if (days <= 90) return 70 + Math.round(((days - 30) / 60) * 15);
+    return 90;
   }
 
   function calculateCompositeScore(engagement, profile, grievance) {
@@ -38,6 +57,13 @@ var ScoringService = (function() {
     var wE = (Number(config.scoreWeightEngagement) || 70) / 100;
     var wP = (Number(config.scoreWeightProfile) || 20) / 100;
     var wG = (Number(config.scoreWeightGrievance) || 10) / 100;
+    // v4.55.1: normalize weights if they don't sum to 1 so composite is always 0-100
+    var sum = wE + wP + wG;
+    if (sum > 0 && Math.abs(sum - 1) > 0.001) {
+      wE = wE / sum;
+      wP = wP / sum;
+      wG = wG / sum;
+    }
     return Math.round(engagement * wE + profile * wP + grievance * wG);
   }
 

@@ -393,14 +393,14 @@ describe('G5: No unescaped apostrophes in single-quoted JS strings', () => {
 describe('G6: dist/ files are in sync with src/', () => {
 
   test('dist/ does not contain dev-only files (must be built with --prod)', () => {
-    // SolidBase excludes 4 files from prod build
-    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs'];
+    // Test runner included in prod — tab gated by IS_DEV_MODE, endpoints by steward auth
+    const DEV_ONLY = ['07_DevTools.gs', 'DevMenu.gs'];
     const found = DEV_ONLY.filter(f => fs.existsSync(path.join(DIST_DIR, f)));
     expect(found).toEqual([]);
   });
 
   test('every src .gs file has identical copy in dist', () => {
-    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build (SolidBase: 4 files)
+    const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // excluded by --prod build (last 2 are SolidBase-only exclusions)
     const gsFiles = fs.readdirSync(SRC_DIR).filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
     const stale = [];
 
@@ -614,16 +614,65 @@ describe('G10: Lazy-loaded views have matching server functions', () => {
 
 
 // ============================================================================
-// G11: poms_reference.html — SolidBase: excluded (DDS-only feature)
+// G11: poms_reference.html is self-contained and parseable
 // ============================================================================
-// poms_reference.html is a DDS-specific file that is not included in SolidBase.
-// This test verifies it does NOT exist in SolidBase (exclusion guard).
+// Reason: poms_reference.html is loaded via HtmlService.createHtmlOutputFromFile
+// and injected into the SPA. If its <script> block has syntax errors, the entire
+// POMS tab fails silently.
 
-describe('G11: poms_reference.html excluded from SolidBase', () => {
+// SolidBase: poms_reference.html is excluded from SolidBase (DDS-only feature).
+// The G11 describe block is skipped here — it runs in DDS but not SB.
+describe.skip('G11: poms_reference.html integrity', () => {
   const pomsPath = path.join(SRC_DIR, 'poms_reference.html');
 
-  test('poms_reference.html does NOT exist in SolidBase src/', () => {
-    expect(fs.existsSync(pomsPath)).toBe(false);
+  test('poms_reference.html exists', () => {
+    expect(fs.existsSync(pomsPath)).toBe(true);
+  });
+
+  test('POMS_DATA is available (lazy-loaded from server or inline)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    // POMS_DATA may be inline (const POMS_DATA = [...]) or lazy-loaded (var POMS_DATA = [])
+    const match = code.match(/POMS_DATA\s*=\s*\[/);
+    expect(match).not.toBeNull();
+    // If lazy-loaded, data lives in 21_WebDashDataService.gs or 21d_WebDashDataWrappers.gs
+    const clientEntries = (code.match(/\{id:/g) || []).length;
+    if (clientEntries < 78) {
+      const svcPath = path.join(SRC_DIR, '21_WebDashDataService.gs');
+      const wrapperPath = path.join(SRC_DIR, '21d_WebDashDataWrappers.gs');
+      const svcCode = fs.readFileSync(svcPath, 'utf8') + '\n' + fs.readFileSync(wrapperPath, 'utf8');
+      const serverEntries = (svcCode.match(/\{id:"/g) || []).length;
+      expect(serverEntries).toBeGreaterThanOrEqual(78);
+    }
+  });
+
+  test('contains FLOWS object with flowcharts', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const match = code.match(/FLOWS\s*=\s*\{/);
+    expect(match).not.toBeNull();
+    // Count flowcharts (title: entries)
+    const charts = (code.match(/title:"/g) || []).length;
+    expect(charts).toBeGreaterThanOrEqual(17);
+  });
+
+  test('all 4 tabs are handled (search, bookmarks, rated, stats)', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    ['search', 'bookmarks', 'rated', 'stats'].forEach(tab => {
+      expect(code).toContain(`P.tab==='${tab}'`);
+    });
+  });
+
+  test('<script> block parses without syntax errors', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    const scriptMatch = code.match(/<script>([\s\S]*)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => {
+      new vm.Script(scriptMatch[1], { filename: 'poms_reference.html' });
+    }).not.toThrow();
+  });
+
+  test('no DDS Apps Script ID present', () => {
+    const code = fs.readFileSync(pomsPath, 'utf8');
+    expect(code).not.toContain('18hHHX');
   });
 });
 
@@ -631,7 +680,7 @@ describe('G11: poms_reference.html excluded from SolidBase', () => {
 // ============================================================================
 // G12: No sensitive IDs leaked in source files
 // ============================================================================
-// Reason: DDS-Dashboard Apps Script ID (18hHHX...) must never appear in source
+// Reason: SolidBase Apps Script ID (18hHHX...) must never appear in source
 // files that get synced to the public Union-Tracker repo.
 
 describe('G12: No sensitive ID leaks', () => {
@@ -902,7 +951,7 @@ function countTopLevelArgs(str) {
 // quick-action HTML — causing "Script function not found" in production.
 
 describe('G15: Menu .addItem() function references exist in prod files', () => {
-  const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs', '30_TestRunner.gs', '31_WebAppTests.gs']; // SolidBase: 4 files
+  const PROD_EXCLUDED = ['07_DevTools.gs', 'DevMenu.gs'];
   const prodGsFiles = fs.readdirSync(SRC_DIR)
     .filter(f => f.endsWith('.gs') && !PROD_EXCLUDED.includes(f));
 

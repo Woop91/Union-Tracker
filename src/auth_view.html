@@ -256,10 +256,17 @@ function renderAuth(container) {
   // (*.googleusercontent.com), so window.top.location.hash throws SecurityError.
   // Use google.script.url.getLocation() — the GAS-sanctioned API for reading URL
   // fragments from within the iframe sandbox.
+  // AUTH_DEBUG gates auth-flow console logs. Default off so prod devtools
+  // don't reveal auth internals. Set window.AUTH_DEBUG=true in the console
+  // to troubleshoot.
+  var _authLog = (window.AUTH_DEBUG === true) ? function() { console.log.apply(console, arguments); } : function() {};
+  var _authWarn = (window.AUTH_DEBUG === true) ? function() { console.warn.apply(console, arguments); } : function() {};
+  var _authErr = (window.AUTH_DEBUG === true) ? function() { console.error.apply(console, arguments); } : function() {};
+
   if (typeof google !== 'undefined' && google.script && google.script.url) {
-    console.log('[Auth] Using google.script.url.getLocation() for fragment extraction');
+    _authLog('[Auth] Using google.script.url.getLocation() for fragment extraction');
     google.script.url.getLocation(function(_location) {
-      console.log('[Auth] getLocation callback — hash:', _location.hash ? '(present, length=' + _location.hash.length + ')' : '(empty)');
+      _authLog('[Auth] getLocation callback — hash:', _location.hash ? '(present, length=' + _location.hash.length + ')' : '(empty)');
       var _fragToken = null;
       var _fragRemember = false;
       if (_location.hash) {
@@ -270,17 +277,17 @@ function renderAuth(container) {
           if (_kv[0] === 'remember' && _kv[1] === '1') _fragRemember = true;
         }
       }
-      console.log('[Auth] Fragment token:', _fragToken ? '(found)' : '(none)', 'remember:', _fragRemember);
+      _authLog('[Auth] Fragment token:', _fragToken ? '(found)' : '(none)', 'remember:', _fragRemember);
       _renderAuthWithFragment(container, _fragToken, _fragRemember);
     });
   } else {
     // Fallback for test/dev environments where google.script.url is unavailable
-    console.warn('[Auth] google.script.url unavailable — falling back to window.top.location.hash');
+    _authWarn('[Auth] google.script.url unavailable — falling back to window.top.location.hash');
     var _fragToken = null;
     var _fragRemember = false;
     try {
       var _hash = window.top.location.hash || window.location.hash || '';
-      console.log('[Auth] Fallback hash:', _hash ? '(present)' : '(empty)');
+      _authLog('[Auth] Fallback hash:', _hash ? '(present)' : '(empty)');
       if (_hash) {
         var _fragParts = _hash.substring(1).split('&');
         for (var _fi = 0; _fi < _fragParts.length; _fi++) {
@@ -290,7 +297,7 @@ function renderAuth(container) {
         }
       }
     } catch (_fragErr) {
-      console.error('[Auth] Cross-origin hash read failed:', _fragErr.message);
+      _authErr('[Auth] Cross-origin hash read failed:', _fragErr.message);
     }
     _renderAuthWithFragment(container, _fragToken, _fragRemember);
   }
@@ -301,6 +308,10 @@ function renderAuth(container) {
  * Separated from renderAuth because google.script.url.getLocation() is async.
  */
 function _renderAuthWithFragment(container, _fragToken, _fragRemember) {
+  var _authLog = (window.AUTH_DEBUG === true) ? function() { console.log.apply(console, arguments); } : function() {};
+  var _authWarn = (window.AUTH_DEBUG === true) ? function() { console.warn.apply(console, arguments); } : function() {};
+  var _authErr = (window.AUTH_DEBUG === true) ? function() { console.error.apply(console, arguments); } : function() {};
+
   // Clean fragment from URL (security: prevent token lingering in address bar)
   try {
     if (window.top.history && window.top.history.replaceState) {
@@ -309,7 +320,7 @@ function _renderAuthWithFragment(container, _fragToken, _fragRemember) {
   } catch (_) { /* cross-origin iframe */ }
 
   if (_fragToken) {
-    console.log('[Auth] Magic link token found — showing spinner and validating server-side');
+    _authLog('[Auth] Magic link token found — showing spinner and validating server-side');
     // Show a loading state while validating the magic link token
     container.innerHTML = '';
     var _mlWrap = el('div', { className: 'auth-container fade-in' });
@@ -321,29 +332,29 @@ function _renderAuthWithFragment(container, _fragToken, _fragRemember) {
 
     google.script.run
       .withSuccessHandler(function(result) {
-        console.log('[Auth] authValidateMagicToken response:', result ? 'success=' + result.success + ', hasToken=' + !!(result.sessionToken) : '(null)');
+        _authLog('[Auth] authValidateMagicToken response:', result ? 'success=' + result.success + ', hasToken=' + !!(result.sessionToken) : '(null)');
         if (result && result.success && result.sessionToken) {
           if (WEB_APP_URL) {
-            console.log('[Auth] Redirecting to dashboard with session token');
+            _authLog('[Auth] Redirecting to dashboard with session token');
             window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(result.sessionToken);
           } else {
-            console.error('[Auth] WEB_APP_URL is empty — cannot redirect');
+            _authErr('[Auth] WEB_APP_URL is empty — cannot redirect');
             showAuthError(container, 'No app URL available. Contact admin.');
           }
         } else {
-          console.warn('[Auth] Token validation failed:', result && result.message);
+          _authWarn('[Auth] Token validation failed:', result && result.message);
           showAuthError(container, (result && result.message) || 'This link has expired or was already used. Please request a new one.');
         }
       })
       .withFailureHandler(function(err) {
-        console.error('[Auth] authValidateMagicToken server error:', err && err.message);
+        _authErr('[Auth] authValidateMagicToken server error:', err && err.message);
         showAuthError(container, (err && err.message) || 'Could not verify sign-in link. Please try again.');
       })
       .authValidateMagicToken(_fragToken, _fragRemember);
     return; // Don't show the login form while validating
   }
 
-  console.log('[Auth] No magic link token — showing login form');
+  _authLog('[Auth] No magic link token — showing login form');
   showAuthChoose(container);
 }
 

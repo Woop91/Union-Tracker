@@ -73,13 +73,23 @@ function createMeeting(meetingData) {
     sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
   }
 
+  // Validate the date string before building the Meeting ID and Date object.
+  // A malformed meetingData.date like "notadate" produced Invalid Date and
+  // a nonsense MTG- id, and every downstream date comparison broke silently.
+  if (!meetingData.date || !/^\d{4}-\d{2}-\d{2}$/.test(String(meetingData.date))) {
+    return errorResponse('Meeting date must be in YYYY-MM-DD format', 'createMeeting');
+  }
+  var meetingDate = new Date(meetingData.date + 'T00:00:00');
+  if (isNaN(meetingDate.getTime())) {
+    return errorResponse('Meeting date is not a valid calendar date', 'createMeeting');
+  }
+
   // Generate meeting ID: MTG-YYYYMMDD-NNN
   var dateStr = meetingData.date.replace(/-/g, '');
   var meetingId = generateMeetingId_(sheet, dateStr);
 
   var meetingName = String(meetingData.name).substring(0, 200);
   var meetingType = meetingData.type || 'In-Person';
-  var meetingDate = new Date(meetingData.date + 'T00:00:00');
   var meetingTime = meetingData.time || '09:00';
   var meetingDuration = parseFloat(meetingData.duration) || 1;
   var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
@@ -105,17 +115,24 @@ function createMeeting(meetingData) {
   eventDay.setHours(0, 0, 0, 0);
   var initialStatus = (eventDay.getTime() === today.getTime()) ? MEETING_STATUS.ACTIVE : MEETING_STATUS.SCHEDULED;
 
-  // Create Meeting Notes and Agenda Google Docs
+  // Create Meeting Notes and Agenda Google Docs. Wrap in try/catch so a
+  // Drive-quota failure or Docs permission error doesn't abort the whole
+  // meeting creation and leave half-written state. Same isolation pattern
+  // as the QR block below.
   var notesDocUrl = '';
   var agendaDocUrl = '';
   if (typeof createMeetingDocs === 'function') {
-    var docs = createMeetingDocs({
-      meetingId: meetingId,
-      name: meetingName,
-      date: meetingData.date
-    });
-    notesDocUrl = docs.notesUrl || '';
-    agendaDocUrl = docs.agendaUrl || '';
+    try {
+      var docs = createMeetingDocs({
+        meetingId: meetingId,
+        name: meetingName,
+        date: meetingData.date
+      });
+      notesDocUrl = (docs && docs.notesUrl) || '';
+      agendaDocUrl = (docs && docs.agendaUrl) || '';
+    } catch (_docsErr) {
+      log_('createMeeting', 'createMeetingDocs failed: ' + _docsErr.message);
+    }
   }
 
   // Add a placeholder row so the meeting exists in the sheet
@@ -279,7 +296,7 @@ function getCheckInEligibleMeetings() {
     var startMin = parseInt(timeParts[1], 10) || 0;
 
     var endTime = new Date(d);
-    endTime.setHours(startHour + Math.floor(durationHours), startMin + (durationHours % 1) * 60, 0, 0);
+    endTime.setHours(startHour + Math.floor(durationHours), startMin + Math.round((durationHours % 1) * 60), 0, 0);
 
     var deactivateTime = new Date(endTime.getTime() + deactivateHours * 60 * 60 * 1000);
 
@@ -441,12 +458,16 @@ function processMeetingCheckIn(meetingId, email, pin) {
       escapeForFormula(email)
     ]);
 
-    // If this is a Scheduled meeting getting its first check-in, mark as Active
+    // If this is a Scheduled meeting getting its first check-in, mark as Active.
+    // Re-read the status cell from the sheet (instead of trusting the stale
+    // checkInData snapshot) so concurrent updateMeetingStatuses transitions
+    // to COMPLETED aren't silently reverted to ACTIVE.
     for (var m = 1; m < checkInData.length; m++) {
       if (String(col_(checkInData[m], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
-        var currentStatus = String(col_(checkInData[m], MEETING_CHECKIN_COLS.EVENT_STATUS) || '');
-        if (currentStatus === MEETING_STATUS.SCHEDULED) {
-          checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+        var _statusRange = checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS);
+        var freshStatus = String(_statusRange.getValue() || '');
+        if (freshStatus === MEETING_STATUS.SCHEDULED) {
+          _statusRange.setValue(MEETING_STATUS.ACTIVE);
         }
         break;
       }
@@ -557,6 +578,9 @@ function updateMeetingStatuses() {
     if (eventStatus === MEETING_STATUS.SCHEDULED && d.getTime() === today.getTime()) {
       sheet.getRange(i + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
       activated++;
+      // Update local copy too so the deactivate-block below doesn't
+      // reprocess this same row against a stale SCHEDULED snapshot.
+      eventStatus = MEETING_STATUS.ACTIVE;
     }
 
     // Deactivate: Active (or Scheduled past-date) meetings that have expired
@@ -568,7 +592,7 @@ function updateMeetingStatuses() {
       var startMin = parseInt(timeParts[1], 10) || 0;
 
       var endTime = new Date(d);
-      endTime.setHours(startHour + Math.floor(durationHours), startMin + (durationHours % 1) * 60, 0, 0);
+      endTime.setHours(startHour + Math.floor(durationHours), startMin + Math.round((durationHours % 1) * 60), 0, 0);
       var deactivateTime = new Date(endTime.getTime() + deactivateHours * 60 * 60 * 1000);
 
       if (now >= deactivateTime) {
@@ -1474,12 +1498,12 @@ function saveAttendanceToDriveFolder_(meetingId, meetingRow) {
 
   doc.saveAndClose();
 
-  // Move the doc into the Event Check-In/ folder
+  // Move the doc into the Event Check-In/ folder. Use moveTo() (the modern
+  // DriveApp API) instead of addFile/removeFile which Google has deprecated.
   try {
     var docFile = DriveApp.getFileById(doc.getId());
     var folder  = DriveApp.getFolderById(folderId);
-    folder.addFile(docFile);
-    DriveApp.getRootFolder().removeFile(docFile);
+    docFile.moveTo(folder);
     log_('saveAttendanceToDriveFolder_', 'saved "' + docTitle + '" to Event Check-In/ folder');
   } catch (moveErr) {
     log_('saveAttendanceToDriveFolder_', 'could not move doc to Event Check-In/ folder: ' + moveErr.message);

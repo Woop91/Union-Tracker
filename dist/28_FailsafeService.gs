@@ -247,6 +247,27 @@ var FailsafeService = (function () {
         }
       } catch (err) {
         secureLog('processScheduledDigests', 'Digest send error', { email: email, error: err.message });
+        // Consecutive-failure backoff: track failed sends in a ScriptProperties
+        // counter and disable the digest after 5 consecutive failures. Without
+        // this a permanently-bad email (bounce, typo, closed account) would
+        // burn MailApp quota on every run and eventually starve the rest of
+        // the dashboard's email features.
+        try {
+          var failKey = 'DIGEST_FAIL_' + email;
+          var failProps = PropertiesService.getScriptProperties();
+          var failCount = parseInt(failProps.getProperty(failKey) || '0', 10) + 1;
+          if (failCount >= 5) {
+            sheet.getRange(i + 1, 2).setValue(false); // flip enabled → false
+            failProps.deleteProperty(failKey);
+            log_('processScheduledDigests', 'disabled digest for ' + maskEmail(email) + ' after 5 consecutive failures');
+          } else {
+            failProps.setProperty(failKey, String(failCount));
+          }
+        } catch (_fErr) { /* non-critical */ }
+      }
+      // On successful send, clear any accumulated failure count.
+      if (lastSent instanceof Date) {
+        try { PropertiesService.getScriptProperties().deleteProperty('DIGEST_FAIL_' + email); } catch (_cfErr) {}
       }
     }
 
@@ -339,6 +360,38 @@ var FailsafeService = (function () {
 
   /**
    * Exports critical sheets as CSV files to the Drive backup folder and prunes old backups.
+   *
+   * SECURITY NOTE (D10-BUG-05, v4.55.2): These CSV files contain PII in
+   * plaintext — member names, email addresses, phone numbers, addresses,
+   * grievance content, contact logs, and internal IDs. They are written
+   * unencrypted to the Drive backup folder the admin configured, and
+   * Drive-native encryption (encryption at rest) is the ONLY control on
+   * them. There is no application-layer encryption, no password, and no
+   * key rotation.
+   *
+   * Admin guidance (BEFORE enabling backups):
+   *   1. Ensure the backup folder is scoped to admins only. Do NOT share
+   *      it with the whole workspace; do not enable link-sharing; do not
+   *      publish it. The folder inherits Drive ACLs; nothing here enforces
+   *      least-privilege automatically.
+   *   2. Treat backup files as a PII export under whatever privacy policy
+   *      your local's compliance / bargaining unit is subject to.
+   *   3. If you are subject to data-minimization rules (GDPR, HIPAA-adjacent,
+   *      or internal union data-retention policy), consider either:
+   *        a) shortening AUDIT_ARCHIVE_DAYS / GRIEVANCE_ARCHIVE_DAYS so the
+   *           backed-up CSVs contain a smaller window of live data, or
+   *        b) disabling the Drive backup entirely and relying on Google
+   *           Sheets' native version history + the HMAC-chained audit log
+   *           for forensics.
+   *   4. If you want application-layer encryption, open a ticket — this
+   *      requires key management (KMS or ScriptProperties-stored key,
+   *      both with their own tradeoffs) that we haven't committed to a
+   *      design for yet.
+   *
+   * The backupCriticalSheets call itself logs a PII_BACKUP_WRITTEN audit
+   * event so the HMAC-chained audit log records every backup run for
+   * after-the-fact review.
+   *
    * @returns {{success: boolean, backedUp?: number, folderName?: string, message?: string}}
    */
   function backupCriticalSheets() {
@@ -376,6 +429,21 @@ var FailsafeService = (function () {
         log_('backupCriticalSheets', 'Backup error for ' + sheetName + ': ' + e.message);
       }
     }
+
+    // v4.55.2 D10-BUG-05: emit an audit event so the HMAC-chained audit log
+    // records every PII-bearing backup run. Paired with the security note
+    // above so admins have both documentation AND forensic traceability.
+    try {
+      if (typeof logAuditEvent === 'function' && backedUp > 0) {
+        logAuditEvent('PII_BACKUP_WRITTEN', {
+          folder: folder && folder.getName ? folder.getName() : '(unknown)',
+          sheets: sheetsToBackup,
+          count: backedUp,
+          dateStr: dateStr,
+          note: 'Unencrypted CSVs — admin review required per D10-BUG-05 guidance'
+        });
+      }
+    } catch (_auditErr) { /* non-fatal */ }
 
     // Prune old backups — keep most recent MAX_BACKUP_FILES per sheet
     _pruneOldBackups(folder, sheetsToBackup);
@@ -532,7 +600,8 @@ var FailsafeService = (function () {
     try {
       file = DriveApp.getFileById(fileId);
     } catch (e) {
-      return { success: false, message: 'Could not access file: ' + e.message };
+      log_('fsRestoreFromBackup', 'file access failed: ' + e.message);
+      return { success: false, message: 'Could not access the backup file. Verify the Drive file ID is correct and the Apps Script service account has access.' };
     }
     var csv = file.getBlob().getDataAsString();
     var rows = Utilities.parseCsv(csv);
@@ -688,6 +757,22 @@ function fsInitSheets(sessionToken) {
 function fsRestoreFromBackup(sessionToken, fileId, sheetName, confirmed) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Not authorized.' };
+  // v4.55.1 D10-BUG-03: restore is a destructive operation — restrict to spreadsheet owner
+  // so that an ordinary steward cannot overwrite prod sheets from a stale backup.
+  try {
+    var ownerEmail = '';
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) {
+      var owner = ss.getOwner();
+      ownerEmail = owner ? String(owner.getEmail() || '').toLowerCase() : '';
+    }
+    if (ownerEmail && ownerEmail !== String(e).toLowerCase()) {
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('FAILSAFE_RESTORE_DENIED', { caller: e, reason: 'not_owner' });
+      }
+      return { success: false, message: 'Only the spreadsheet owner can restore from backup.' };
+    }
+  } catch (_ownErr) { /* if owner lookup fails, fall through and allow steward path */ }
   return FailsafeService.restoreFromDriveBackup(fileId, sheetName, confirmed);
 }
 

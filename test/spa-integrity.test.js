@@ -1256,3 +1256,262 @@ describe('G25b: Mobile header switch buttons reset navigation state', () => {
     expect(switchBlock).toContain('_tabPanesRole = null');
   });
 });
+
+// ============================================================================
+// G26: URL hash deep linking (D03-BUG-03)
+// ============================================================================
+
+describe('G26: URL hash deep linking (D03-BUG-03)', () => {
+  let indexHtml;
+  beforeAll(() => { indexHtml = read('index.html'); });
+
+  test('_readTabFromHash helper is defined', () => {
+    expect(indexHtml).toMatch(/function\s+_readTabFromHash\s*\(/);
+  });
+
+  test('_readTabFromHash parses the "#tab=" prefix', () => {
+    expect(indexHtml).toMatch(/#tab=/);
+    expect(indexHtml).toMatch(/_readTabFromHash[\s\S]*#tab=/);
+  });
+
+  test('_readTabFromHash validates tab id against an identifier regex', () => {
+    // Must reject anything that isn't a plain a-z0-9_ identifier so a
+    // malicious or corrupted hash can't route to an arbitrary handler.
+    expect(indexHtml).toMatch(/\/\^\[a-z0-9_\]\{1,32\}\$\/i/);
+  });
+
+  test('INITIAL_TAB falls back to _readTabFromHash() when PAGE_DATA is empty', () => {
+    expect(indexHtml).toMatch(/INITIAL_TAB\s*=\s*PAGE_DATA\.initialTab\s*\|\|\s*_readTabFromHash\(\)/);
+  });
+
+  test('_handleTabNav writes the hash via history.replaceState', () => {
+    expect(indexHtml).toMatch(/history\.replaceState\s*\(\s*null\s*,\s*'',\s*'#tab='/);
+  });
+
+  test('_handleTabNav does NOT write hash on split-view secondary panel', () => {
+    // The hash-write block must be gated by !_isSplitSecondary so secondary
+    // panel navigation doesn't clobber the URL. Find the specific #tab=
+    // replaceState call (not the unrelated sessionToken cleanup call that
+    // also uses replaceState earlier in the file).
+    var idx = indexHtml.indexOf("replaceState(null, '', '#tab=");
+    expect(idx).toBeGreaterThan(-1);
+    // Look at the 250 characters before the replaceState call for the guard.
+    var prelude = indexHtml.substring(Math.max(0, idx - 250), idx);
+    expect(prelude).toContain('!_isSplitSecondary');
+  });
+
+  test('_DEEP_LINK_KNOWN_TABS whitelist is defined at IIFE scope', () => {
+    expect(indexHtml).toMatch(/var\s+_DEEP_LINK_KNOWN_TABS\s*=/);
+  });
+
+  test('_checkDeepLink uses the shared _DEEP_LINK_KNOWN_TABS whitelist', () => {
+    // The in-function KNOWN_TABS declaration should be gone — replaced by
+    // the shared whitelist so deep-link via ?page= and via #tab= can't
+    // silently drift.
+    var checkBlock = indexHtml.substring(
+      indexHtml.indexOf('function _checkDeepLink'),
+      indexHtml.indexOf('function _checkDeepLink') + 800
+    );
+    expect(checkBlock).toContain('_DEEP_LINK_KNOWN_TABS');
+    // The old in-function whitelist should no longer exist inside _checkDeepLink.
+    expect(checkBlock).not.toMatch(/var\s+KNOWN_TABS\s*=\s*\{/);
+  });
+
+  test('hashchange listener is registered on window', () => {
+    expect(indexHtml).toMatch(/addEventListener\s*\(\s*['"]hashchange['"]/);
+  });
+
+  test('hashchange listener ignores tabs that match the current activeTab', () => {
+    var idx = indexHtml.indexOf("addEventListener('hashchange'");
+    expect(idx).toBeGreaterThan(-1);
+    var listener = indexHtml.substring(idx, idx + 800);
+    expect(listener).toContain('AppState.activeTab');
+  });
+
+  test('hashchange listener validates against _DEEP_LINK_KNOWN_TABS', () => {
+    var idx = indexHtml.indexOf("addEventListener('hashchange'");
+    var listener = indexHtml.substring(idx, idx + 800);
+    expect(listener).toContain('_DEEP_LINK_KNOWN_TABS');
+  });
+
+  test('hashchange listener is wrapped in try/catch for cross-origin safety', () => {
+    var idx = indexHtml.indexOf("addEventListener('hashchange'");
+    // Find the nearest try before the addEventListener call
+    var pre = indexHtml.substring(Math.max(0, idx - 100), idx);
+    expect(pre).toContain('try');
+  });
+});
+
+
+// ============================================================================
+// G-RENDER-SAFE: Sub-project A helpers (renderSafeText, displayUser)
+// ============================================================================
+
+describe('G-RENDER-SAFE: index.html defines renderSafeText and displayUser', () => {
+  const indexSrc = read('index.html');
+
+  test('renderSafeText function is defined in index.html', () => {
+    expect(indexSrc).toMatch(/function\s+renderSafeText\s*\(/);
+  });
+
+  test('displayUser function is defined in index.html', () => {
+    expect(indexSrc).toMatch(/function\s+displayUser\s*\(/);
+  });
+
+  test('renderSafeText returns a DocumentFragment via createDocumentFragment', () => {
+    var idx = indexSrc.indexOf('function renderSafeText(');
+    var next = indexSrc.indexOf('function displayUser(', idx);
+    var body = indexSrc.substring(idx, next === -1 ? idx + 2000 : next);
+    expect(body).toMatch(/createDocumentFragment/);
+  });
+
+  test('displayUser detects 64-hex-char SHA-256 hashes', () => {
+    var idx = indexSrc.indexOf('function displayUser(');
+    var body = indexSrc.substring(idx, idx + 1000);
+    expect(body).toMatch(/\[a-f0-9\]\{64\}/);
+  });
+});
+
+// ============================================================================
+// G-NO-WIDE-TABLES: v4.55.7 sub-project C Zone 5
+// Asserts no src/*.html file contains a hardcoded minWidth >= 1100px. Wide
+// tables with such minWidths force horizontal scroll on phones and small
+// tablets, defeating the mobile-friendly directive. Legit wide surfaces can
+// be whitelisted in the exemption list below if needed.
+// ============================================================================
+
+describe('G-NO-WIDE-TABLES: no hardcoded minWidth >= 1100px on HTML elements', () => {
+  const fsMod = require('fs');
+  const pathMod = require('path');
+  const srcDir = pathMod.resolve(__dirname, '..', 'src');
+  const htmlFiles = fsMod.readdirSync(srcDir).filter(f => f.endsWith('.html'));
+
+  // Files/patterns that are legitimately wide and shouldn't trip this guard.
+  // Add here with a comment explaining why if future whitelists are needed.
+  const EXEMPT = [];
+
+  htmlFiles.forEach(function(f) {
+    if (EXEMPT.indexOf(f) !== -1) return;
+    test(f + ' has no minWidth value >= 1100px', () => {
+      const src = fsMod.readFileSync(pathMod.join(srcDir, f), 'utf8');
+      // Match patterns like: minWidth: '1200px', minWidth: "1500", min-width: 1100px, etc.
+      const rx = /min[-W]idth['"]?\s*[:,]\s*['"]?(\d{4,})(?:px)?['"]?/gi;
+      var bad = [];
+      var m;
+      while ((m = rx.exec(src)) !== null) {
+        var px = parseInt(m[1], 10);
+        if (px >= 1100) bad.push(m[0] + ' (' + px + 'px)');
+      }
+      if (bad.length > 0) {
+        throw new Error(f + ' has ' + bad.length + ' wide-table violations: ' + bad.join('; '));
+      }
+      expect(bad).toEqual([]);
+    });
+  });
+});
+
+// ============================================================================
+// G-TAB-ROUTES-SAFE: every _handleTabNav case routes to a defined function
+// ============================================================================
+
+describe('G-TAB-ROUTES-SAFE: every _handleTabNav case routes to a defined function', () => {
+  const fs = require('fs');
+  const path = require('path');
+
+  // Concatenate all src/*.html and src/*.gs into one big string so we can
+  // check whether any function name is defined *somewhere* in the bundle.
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  const files = fs.readdirSync(srcDir).filter(f => f.endsWith('.html') || f.endsWith('.gs'));
+  const bundle = files.map(f => fs.readFileSync(path.join(srcDir, f), 'utf8')).join('\n');
+
+  const indexSrc = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'index.html'), 'utf8');
+
+  // Extract the body of both _handleTabNav (direct render calls for special tabs like
+  // orgchart/poms) and _getTabRenderFn (the switch/case router for all normal tabs).
+  // Both functions live at sibling scope inside the IIFE; we capture them independently
+  // via bracket-depth parsing and concatenate for the regex pass.
+  function extractFunctionBody(fnSignature) {
+    const startIdx = indexSrc.indexOf(fnSignature);
+    if (startIdx === -1) throw new Error(fnSignature + ' not found in src/index.html');
+    let depth = 0;
+    let inFn = false;
+    let endIdx = startIdx;
+    for (let i = startIdx; i < indexSrc.length; i++) {
+      const ch = indexSrc.charAt(i);
+      if (ch === '{') { depth++; inFn = true; continue; }
+      if (ch === '}') {
+        depth--;
+        if (inFn && depth === 0) { endIdx = i + 1; break; }
+      }
+    }
+    return indexSrc.substring(startIdx, endIdx);
+  }
+
+  function extractHandleTabNavBody() {
+    // Concatenate both the outer _handleTabNav body (special-case renders) and
+    // the _getTabRenderFn body (the switch/case router) for full coverage.
+    const handleBody = extractFunctionBody('function _handleTabNav');
+    const routerBody = extractFunctionBody('function _getTabRenderFn');
+    return handleBody + '\n' + routerBody;
+  }
+
+  const bodyText = extractHandleTabNavBody();
+
+  // Find every function name invoked from a case block. Pattern: capture
+  // identifiers that appear as `IDENTIFIER(` inside the body, then filter
+  // to the ones that look like render* or similar view entry points.
+  // For v1 of this guard we walk each case and capture the first identifier
+  // followed by `(` inside the case body.
+  function extractRoutedFunctionNames() {
+    const caseRegex = /case\s*['"]([\w-]+)['"]\s*:\s*([\s\S]*?)(?=\bcase\s|\bdefault\s|\}\s*$)/g;
+    const names = new Set();
+    let m;
+    while ((m = caseRegex.exec(bodyText)) !== null) {
+      const caseBody = m[2];
+      // Match identifiers that are called as functions, skipping _loadMemberViewThen wrappers
+      const callRegex = /(?:^|[^\w.])(render[A-Z]\w*|init[A-Z]\w*|_?show[A-Z]\w*)\s*\(/g;
+      let c;
+      while ((c = callRegex.exec(caseBody)) !== null) {
+        names.add(c[1]);
+      }
+    }
+    return Array.from(names);
+  }
+
+  const routedNames = extractRoutedFunctionNames();
+
+  function isDefinedInBundle(name) {
+    const patterns = [
+      new RegExp('function\\s+' + name + '\\s*\\('),
+      new RegExp('\\b' + name + '\\s*=\\s*function'),
+      new RegExp('\\b(var|let|const)\\s+' + name + '\\s*=\\s*function'),
+    ];
+    return patterns.some(p => p.test(bundle));
+  }
+
+  test('at least one routed function was extracted (sanity)', () => {
+    expect(routedNames.length).toBeGreaterThan(0);
+  });
+
+  test('every routed function name is defined somewhere in src/', () => {
+    const missing = routedNames.filter(n => !isDefinedInBundle(n));
+    if (missing.length > 0) {
+      throw new Error('Tab router references undefined function(s): ' + missing.join(', '));
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test('renderQAForum specifically is defined (sub-project B #7 regression guard)', () => {
+    expect(isDefinedInBundle('renderQAForum')).toBe(true);
+  });
+
+  test('Monthly Trend datasets contain explicit color properties (Zone 1 regression guard)', () => {
+    const memberSrc = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'member_view.html'), 'utf8');
+    // The datasets array at the Monthly Trend render site must include color: '#...' properties.
+    const idx = memberSrc.indexOf("label: 'Filed'");
+    expect(idx).toBeGreaterThan(-1);
+    // Look at a ~300-char window around the "Filed" label for an explicit hex color.
+    const window = memberSrc.substring(idx, idx + 300);
+    expect(window).toMatch(/color:\s*['"]#[0-9a-fA-F]{3,8}['"]/);
+  });
+});

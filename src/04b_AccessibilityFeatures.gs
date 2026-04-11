@@ -218,192 +218,12 @@ function getCommonStyles() {
  * - Preventing tab-switching distractions
  */
 
-// ==================== POMODORO TIMER ====================
-
-/**
- * Starts a simple Pomodoro timer using Google Sheets toast notifications
- * Shows a 25-minute work session reminder
- */
-function startPomodoroTimer() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Show starting message
-  ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
-
-  // Store the start time
-  PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
-
-  // For immediate feedback, show a modal with timer info
-  var html = HtmlService.createHtmlOutput(
-    `<!DOCTYPE html><html><head><base target="_top">${getMobileOptimizedHead()}<style>
-body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}
-.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}
-.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}
-.tip{background:rgba(255,255,255,0.2);padding:15px;border-radius:8px;margin-top:20px;color:white}
-button{background:white;color:#ee5a24;border:none;padding:12px 24px;border-radius:25px;font-size:16px;cursor:pointer;margin-top:20px}
-</style></head><body>
-<div class="timer" id="time">25:00</div>
-<div class="label">🍅 Focus Time Remaining</div>
-<div class="tip">💡 Tip: Close this window and focus on your task.<br>A toast notification will remind you when time is up.</div>
-<button onclick="google.script.host.close()">Start Focusing</button>
-<script>
-var seconds = 25 * 60;
-var timer = setInterval(function(){
-  seconds--;
-  if(seconds <= 0){clearInterval(timer);document.getElementById("time").innerHTML="Done!";return;}
-  var m = Math.floor(seconds/60);
-  var s = seconds % 60;
-  document.getElementById("time").innerHTML = m + ":" + (s < 10 ? "0" : "") + s;
-},1000);
-</script></body></html>`
-  ).setWidth(350).setHeight(350);
-
-  ui.showModelessDialog(html, '🍅 Pomodoro Timer');
-}
-// ==================== QUICK CAPTURE NOTEPAD ====================
-
-/**
- * Quick Capture Notepad - Fast note-taking without losing focus
- * Notes are stored per-user in Script Properties
- */
-
-/**
- * Gets the current user's quick capture notes
- * @returns {string} The saved notes or empty string
- */
-function getQuickCaptureNotes() {
-  var userProps = PropertiesService.getUserProperties();
-  return userProps.getProperty('quickCaptureNotes') || '';
-}
-
-/**
- * Saves quick capture notes for the current user
- * @param {string} notes - The notes to save
- * @returns {Object} Result object with success status
- */
-function saveQuickCaptureNotes(notes) {
-  try {
-    var userProps = PropertiesService.getUserProperties();
-    var sanitized = typeof escapeForFormula === 'function' ? escapeForFormula(notes || '') : (notes || '');
-    userProps.setProperty('quickCaptureNotes', sanitized);
-    userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
-    return { success: true, message: 'Notes saved' };
-  } catch (e) {
-    return errorResponse(e.message);
-  }
-}
-
-/**
- * Clears the quick capture notes
- * @returns {Object} Result object with success status
- */
-function clearQuickCaptureNotes() {
-  try {
-    var userProps = PropertiesService.getUserProperties();
-    userProps.deleteProperty('quickCaptureNotes');
-    userProps.deleteProperty('quickCaptureLastSaved');
-    return { success: true, message: 'Notes cleared' };
-  } catch (e) {
-    return errorResponse(e.message);
-  }
-}
-/**
- * Shows the Quick Capture Notepad dialog
- * A fast notepad for capturing thoughts without losing focus
- */
-function showQuickCaptureNotepad() {
-  showDialog_(
-    '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
-    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 16px; color: #F8FAFC; }' +
-    '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
-    'h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; }' +
-    '.meta { font-size: 12px; color: #64748B; }' +
-    'textarea { width: 100%; height: 280px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; font-family: inherit; resize: none; outline: none; }' +
-    'textarea:focus { border-color: #7C3AED; }' +
-    'textarea::placeholder { color: #64748B; }' +
-    '.btn-row { display: flex; gap: 8px; margin-top: 12px; }' +
-    'button { flex: 1; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }' +
-    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
-    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
-    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
-    '.btn-danger { background: #DC2626; color: white; }' +
-    '.status { margin-top: 8px; font-size: 12px; color: #10B981; text-align: center; opacity: 0; transition: opacity 0.3s; }' +
-    '.status.show { opacity: 1; }' +
-    '</style>' +
-    '<div class="header">' +
-    '  <h3>📝 Quick Capture</h3>' +
-    '  <span class="meta" id="meta"></span>' +
-    '</div>' +
-    '<textarea id="notes" placeholder="Capture your thoughts quickly...\\n\\nUse this notepad to jot down ideas, reminders, or notes without losing focus on your current task.\\n\\nYour notes are auto-saved when you click Save."></textarea>' +
-    '<div class="btn-row">' +
-    '  <button class="btn-primary" onclick="saveNotes()">💾 Save</button>' +
-    '  <button class="btn-secondary" onclick="copyNotes()">📋 Copy</button>' +
-    '  <button class="btn-danger" onclick="clearNotes()">🗑️ Clear</button>' +
-    '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
-    '</div>' +
-    '<div class="status" id="status"></div>' +
-    '<script>' +
-    getClientSideEscapeHtml() +
-    'var notesEl = document.getElementById("notes");' +
-    'var statusEl = document.getElementById("status");' +
-    'var metaEl = document.getElementById("meta");' +
-    '' +
-    'google.script.run.withSuccessHandler(function(notes) {' +
-    '  notesEl.value = notes || "";' +
-    '  updateMeta();' +
-    '}).getQuickCaptureNotes();' +
-    '' +
-    'notesEl.addEventListener("input", updateMeta);' +
-    '' +
-    'function updateMeta() {' +
-    '  var text = notesEl.value;' +
-    '  var words = text.trim() ? text.trim().split(/\\s+/).length : 0;' +
-    '  metaEl.textContent = words + " words, " + text.length + " chars";' +
-    '}' +
-    '' +
-    'function showStatus(msg, isError) {' +
-    '  statusEl.textContent = msg;' +
-    '  statusEl.style.color = isError ? "#EF4444" : "#10B981";' +
-    '  statusEl.classList.add("show");' +
-    '  setTimeout(function() { statusEl.classList.remove("show"); }, 2000);' +
-    '}' +
-    '' +
-    'function saveNotes() {' +
-    '  google.script.run.withSuccessHandler(function(result) {' +
-    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + escapeHtml(result.message), !result.success);' +
-    '  }).saveQuickCaptureNotes(notesEl.value);' +
-    '}' +
-    '' +
-    'function copyNotes() {' +
-    '  navigator.clipboard.writeText(notesEl.value).then(function() {' +
-    '    showStatus("📋 Copied to clipboard!");' +
-    '  }).catch(function() {' +
-    '    showStatus("❌ Failed to copy", true);' +
-    '  });' +
-    '}' +
-    '' +
-    'function clearNotes() {' +
-    '  if (confirm("Clear all notes? This cannot be undone.")) {' +
-    '    notesEl.value = "";' +
-    '    google.script.run.withSuccessHandler(function(result) {' +
-    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + escapeHtml(result.message), !result.success);' +
-    '      updateMeta();' +
-    '    }).clearQuickCaptureNotes();' +
-    '  }' +
-    '}' +
-    '' +
-    'notesEl.addEventListener("keydown", function(e) {' +
-    '  if ((e.ctrlKey || e.metaKey) && e.key === "s") {' +
-    '    e.preventDefault();' +
-    '    saveNotes();' +
-    '  }' +
-    '});' +
-    '</script></body></html>',
-    '📝 Quick Capture Notepad', 500, 450);
-}
-// Dead code removed: getImportDialogHtml_() — zero callers in src
+// Dead code removed (v4.55.2): Pomodoro Timer (startPomodoroTimer) and Quick
+// Capture Notepad (getQuickCaptureNotes / saveQuickCaptureNotes /
+// clearQuickCaptureNotes / showQuickCaptureNotepad). Neither was wired to a
+// menu, neither had HTML callers, and the Pomodoro dialog promised a
+// server-side notification that was never implemented.
+// Dead code removed earlier: getImportDialogHtml_() — zero callers in src
 
 /**
  * Processes member import from CSV data
@@ -452,8 +272,11 @@ function processMemberImport(csvData) {
       setCol_(rowData, MEMBER_COLS.UNIT, columnMap.unit !== undefined ? _eff(values[columnMap.unit] || '') : '');
       setCol_(rowData, MEMBER_COLS.WORK_LOCATION, columnMap.workLocation !== undefined ? _eff(values[columnMap.workLocation] || '') : '');
       setCol_(rowData, MEMBER_COLS.SUPERVISOR, columnMap.supervisor !== undefined ? _eff(values[columnMap.supervisor] || '') : '');
-      setCol_(rowData, MEMBER_COLS.IS_STEWARD, columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No');
-      setCol_(rowData, MEMBER_COLS.DUES_STATUS, columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes');
+      // Use isTruthyValue so CSV imports with 'Y', 'TRUE', '1' etc. map to 'Yes'
+      // instead of silently becoming 'No' (matches the behavior everywhere else).
+      var _isSt = (typeof isTruthyValue === 'function') ? isTruthyValue : function(v) { return String(v || '').toLowerCase() === 'yes'; };
+      setCol_(rowData, MEMBER_COLS.IS_STEWARD, columnMap.isSteward !== undefined ? (_isSt(values[columnMap.isSteward]) ? 'Yes' : 'No') : 'No');
+      setCol_(rowData, MEMBER_COLS.DUES_STATUS, columnMap.duesPaying !== undefined ? (_isSt(values[columnMap.duesPaying]) ? 'Yes' : 'No') : 'Yes');
 
       // Fill empty cells
       while (rowData.length < numCols) {

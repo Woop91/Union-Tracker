@@ -232,9 +232,10 @@ describe('Survey archive folder security', () => {
     var ss = createMockSpreadsheet([periodSheet, satisfactionSheet, configSheet]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
 
-    if (typeof archiveSurveyPeriod_ === 'function') {
-      try { archiveSurveyPeriod_('SP-001'); } catch (_e) { /* may fail on other mocks */ }
-    }
+    // Assert existence first so a deletion fails the test instead of silently
+    // passing through a no-op `if` branch.
+    expect(typeof archiveSurveyPeriod_).toBe('function');
+    try { archiveSurveyPeriod_('SP-001'); } catch (_e) { /* may fail on other mocks */ }
 
     expect(mockParentFolder.setSharing).toHaveBeenCalledWith(
       DriveApp.Access.PRIVATE,

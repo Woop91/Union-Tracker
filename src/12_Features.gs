@@ -1517,17 +1517,10 @@ function setupMemberLeaderRole() {
  * Member Directory sheet. Called during sheet setup and repair flows.
  * @param {Sheet} sheet - The Member Directory sheet
  */
-function applyShareAddressUnionValidation_(sheet) {
-  if (!sheet) return;
-  var shareAddrCol = MEMBER_COLS.SHARE_ADDRESS_UNION;
-  if (shareAddrCol && shareAddrCol <= sheet.getLastColumn()) {
-    sheet.getRange(2, shareAddrCol, Math.max(sheet.getLastRow() - 1, 1), 1)
-      .setDataValidation(SpreadsheetApp.newDataValidation()
-        .requireValueInList(['Yes', 'No'], true)
-        .setAllowInvalid(false)
-        .build());
-  }
-}
+// Dead code removed (v4.55.2): applyShareAddressUnionValidation_() — had zero
+// callers despite a docstring claim of being called from sheet setup. The
+// Share-Address-Union column is still validated via the _applyYesNoValidation
+// wiring in 10a_SheetCreation.gs.
 
 // ============================================================================
 // TRIGGERS & AUTOMATION

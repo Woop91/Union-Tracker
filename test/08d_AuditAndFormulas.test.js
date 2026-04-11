@@ -28,7 +28,7 @@ describe('08d function existence', () => {
     'setupCalcDeadlinesSheet', 'setupCalcStatsSheet',
     'setupCalcSyncSheet', 'setupCalcFormulasSheet',
     'setupSurveyTrackingSheet', 'setupSurveyVaultSheet',
-    'getVaultDataMap_', 'getVaultDataFull_',
+    'getVaultDataMap_',
     'supersedePreviousVaultEntry_',
     'hashForVault_', 'hashForVaultLegacy_',
     'computeHmacSha256_', 'computeAuditRowHash_',
@@ -135,6 +135,18 @@ describe('setupAuditLogSheet (behavioral)', () => {
 // ============================================================================
 
 describe('onEditAudit (behavioral)', () => {
+  // v4.55.2 Wave 27 / Auditor-Beta B-09: centralize logAuditEvent save/restore
+  // so the manual save/restore-on-each-test pattern (which leaks a jest.fn()
+  // into later tests if any assertion before the restore line throws) is gone.
+  var _origLogAuditEvent;
+  beforeEach(() => {
+    _origLogAuditEvent = global.logAuditEvent;
+    global.logAuditEvent = jest.fn();
+  });
+  afterEach(() => {
+    global.logAuditEvent = _origLogAuditEvent;
+  });
+
   test('returns silently for null event', () => {
     expect(() => onEditAudit(null)).not.toThrow();
   });
@@ -144,10 +156,8 @@ describe('onEditAudit (behavioral)', () => {
   });
 
   test('skips header row edits (row < 2)', () => {
-    // logAuditEvent should NOT be called for header edits
-    var origLog = global.logAuditEvent;
-    global.logAuditEvent = jest.fn();
-
+    // logAuditEvent should NOT be called for header edits.
+    // Global logAuditEvent is already replaced with jest.fn() in beforeEach.
     var mockSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header']]);
     var mockRange = {
       getSheet: jest.fn(() => mockSheet),
@@ -163,13 +173,9 @@ describe('onEditAudit (behavioral)', () => {
     onEditAudit({ range: mockRange, oldValue: 'a', value: 'b' });
 
     expect(global.logAuditEvent).not.toHaveBeenCalled();
-    global.logAuditEvent = origLog;
   });
 
   test('skips edits on non-tracked sheets', () => {
-    var origLog = global.logAuditEvent;
-    global.logAuditEvent = jest.fn();
-
     var mockSheet = createMockSheet('Random Sheet', [['Header']]);
     var mockRange = {
       getSheet: jest.fn(() => mockSheet),
@@ -185,13 +191,9 @@ describe('onEditAudit (behavioral)', () => {
     onEditAudit({ range: mockRange, oldValue: 'a', value: 'b' });
 
     expect(global.logAuditEvent).not.toHaveBeenCalled();
-    global.logAuditEvent = origLog;
   });
 
   test('logs audit event for a valid edit on Member Directory', () => {
-    var origLog = global.logAuditEvent;
-    global.logAuditEvent = jest.fn();
-
     var memberData = [
       ['Member ID', 'First Name', 'Last Name'],
       ['M-001', 'John', 'Doe']
@@ -221,14 +223,9 @@ describe('onEditAudit (behavioral)', () => {
     // Second argument contains field details
     expect(callArgs[1]).toHaveProperty('oldValue', 'John');
     expect(callArgs[1]).toHaveProperty('newValue', 'Jane');
-
-    global.logAuditEvent = origLog;
   });
 
   test('skips audit when old and new values are identical', () => {
-    var origLog = global.logAuditEvent;
-    global.logAuditEvent = jest.fn();
-
     var mockSheet = createMockSheet(SHEETS.MEMBER_DIR, [['Header'], ['val']]);
     var mockRange = {
       getSheet: jest.fn(() => mockSheet),
@@ -248,7 +245,6 @@ describe('onEditAudit (behavioral)', () => {
     });
 
     expect(global.logAuditEvent).not.toHaveBeenCalled();
-    global.logAuditEvent = origLog;
   });
 });
 

@@ -84,6 +84,15 @@ var ConfigReader = (function () {
       return row3[col - 1];
     }
 
+    // Number(x) || default silently overrides a legitimately configured 0 because
+    // 0 is falsy. Use this helper wherever a zero is a valid admin choice.
+    function _numOrDefault(col, defaultVal) {
+      var raw = _readRow(col);
+      if (raw === '' || raw == null) return defaultVal;
+      var n = Number(raw);
+      return isNaN(n) ? defaultVal : n;
+    }
+
     var orgName = _readRow(CONFIG_COLS.ORG_NAME) || 'My Organization';
 
     var config = {
@@ -91,25 +100,25 @@ var ConfigReader = (function () {
       orgAbbrev:           _readRow(CONFIG_COLS.ORG_ABBREV) || _deriveAbbrev(orgName),
       logoInitials:        _readRow(CONFIG_COLS.LOGO_INITIALS) || _deriveInitials(orgName),
       accentHue:           _readRow(CONFIG_COLS.ACCENT_HUE) !== '' ? Number(_readRow(CONFIG_COLS.ACCENT_HUE)) : 250,
-      magicLinkExpiryDays: Number(_readRow(CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS)) || 7,
-      cookieDurationDays:  Number(_readRow(CONFIG_COLS.COOKIE_DURATION_DAYS)) || 30,
+      magicLinkExpiryDays: _numOrDefault(CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, 7),
+      cookieDurationDays:  _numOrDefault(CONFIG_COLS.COOKIE_DURATION_DAYS, 30),
       stewardLabel:        _readRow(CONFIG_COLS.STEWARD_LABEL) || 'Steward',
       memberLabel:         _readRow(CONFIG_COLS.MEMBER_LABEL) || 'Member',
       // Insights cache TTL in minutes (default 5). Admins can override via Config tab.
-      insightsCacheTTLMin: Number(_readRow(CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN) || 5) || 5,
+      insightsCacheTTLMin: _numOrDefault(CONFIG_COLS.INSIGHTS_CACHE_TTL_MIN, 5),
       // Broadcast scope: 'yes' = stewards can send to all members, 'no' (default) = assigned only
       broadcastScopeAll:   _readRow(CONFIG_COLS.BROADCAST_SCOPE_ALL) || 'no',
       // Blocked email domains for contact validation (comma-separated, e.g. '.gov,.us,.ma')
       blockedEmailDomains: (_readRow(CONFIG_COLS.BLOCKED_EMAIL_DOMAINS) || '.gov,.us,.ma')
         .split(',').map(function(d) { return d.trim().toLowerCase(); }).filter(Boolean),
       // Scoring engine config (v4.54.0)
-      scoreWeightEngagement:   Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_ENGAGEMENT)) || 70,
-      scoreWeightProfile:      Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_PROFILE)) || 20,
-      scoreWeightGrievance:    Number(_readRow(CONFIG_COLS.SCORE_WEIGHT_GRIEVANCE)) || 10,
-      scoreThresholdGreen:     Number(_readRow(CONFIG_COLS.SCORE_THRESHOLD_GREEN)) || 70,
-      scoreThresholdYellow:    Number(_readRow(CONFIG_COLS.SCORE_THRESHOLD_YELLOW)) || 40,
+      scoreWeightEngagement:   _numOrDefault(CONFIG_COLS.SCORE_WEIGHT_ENGAGEMENT, 70),
+      scoreWeightProfile:      _numOrDefault(CONFIG_COLS.SCORE_WEIGHT_PROFILE, 20),
+      scoreWeightGrievance:    _numOrDefault(CONFIG_COLS.SCORE_WEIGHT_GRIEVANCE, 10),
+      scoreThresholdGreen:     _numOrDefault(CONFIG_COLS.SCORE_THRESHOLD_GREEN, 70),
+      scoreThresholdYellow:    _numOrDefault(CONFIG_COLS.SCORE_THRESHOLD_YELLOW, 40),
       grievanceScoreDirection: _readRow(CONFIG_COLS.GRIEVANCE_SCORE_DIRECTION) || 'Negative',
-      maxVolunteerHours:       Number(_readRow(CONFIG_COLS.MAX_VOLUNTEER_HOURS)) || 20,
+      maxVolunteerHours:       _numOrDefault(CONFIG_COLS.MAX_VOLUNTEER_HOURS, 20),
       // Org Health Tree config (v4.54.0)
       enableOrgHealthTree:     (_readRow(CONFIG_COLS.ENABLE_ORG_HEALTH_TREE) || 'yes').toLowerCase() !== 'no',
       memberBranchAssignment:  _readRow(CONFIG_COLS.MEMBER_BRANCH_ASSIGNMENT) || 'Manual',

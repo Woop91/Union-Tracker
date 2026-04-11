@@ -37,29 +37,31 @@ var TimelineService = (function () {
 
   var DEFAULT_CATEGORIES = ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'];
 
-  // ── In-memory cache (2-min TTL) ──────────────────────────────────────
-  var _tlCache = {};
-  var _TL_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+  // ── Cache via CacheService (2-min TTL) ───────────────────────────────
+  // The previous in-memory _tlCache was scoped to one GAS execution, so it
+  // provided zero benefit across separate google.script.run calls from the
+  // SPA. CacheService actually persists across requests.
+  var _TL_CACHE_TTL = 120; // seconds
+  var _TL_CACHE_PREFIX = 'tl_';
 
-  /**
-   * Retrieves a value from the in-memory cache if it has not expired.
-   * @param {string} key - Cache key to look up.
-   * @returns {*|undefined} Cached value or undefined if missing/expired.
-   */
   function _cacheGet(key) {
-    var entry = _tlCache[key];
-    if (entry && (Date.now() - entry.ts) < _TL_CACHE_TTL) return entry.val;
-    delete _tlCache[key];
-    return undefined;
+    try {
+      var raw = CacheService.getScriptCache().get(_TL_CACHE_PREFIX + key);
+      return raw ? JSON.parse(raw) : undefined;
+    } catch (_e) { return undefined; }
   }
-  /**
-   * Stores a value in the in-memory cache with a timestamp.
-   * @param {string} key - Cache key.
-   * @param {*} val - Value to cache.
-   */
-  function _cacheSet(key, val) { _tlCache[key] = { val: val, ts: Date.now() }; }
-  /** Clears all entries from the in-memory cache. */
-  function _cacheInvalidate() { _tlCache = {}; }
+  function _cacheSet(key, val) {
+    try {
+      var json = JSON.stringify(val);
+      if (json.length < 95000) { // CacheService per-value limit is 100KB
+        CacheService.getScriptCache().put(_TL_CACHE_PREFIX + key, json, _TL_CACHE_TTL);
+      }
+    } catch (_e) { /* non-critical */ }
+  }
+  function _cacheInvalidate() {
+    // Best-effort bulk invalidate — we don't track keys individually.
+    try { CacheService.getScriptCache().removeAll([_TL_CACHE_PREFIX + 'events', _TL_CACHE_PREFIX + 'cats']); } catch (_e) {}
+  }
   // ─────────────────────────────────────────────────────────────────────
 
   /**
@@ -258,7 +260,8 @@ var TimelineService = (function () {
     var lock = LockService.getScriptLock();
     if (!lock.tryLock(10000)) return { success: false, message: 'System busy. Please try again in a moment.' };
     try {
-      var id = 'TL_' + Date.now().toString(36);
+      // v4.55.1 R04-BUG-03: append a UUID suffix so same-millisecond writes cannot collide
+      var id = 'TL_' + Date.now().toString(36) + '_' + Utilities.getUuid().substring(0, 8);
       var now = new Date();
       var eventDate = data.eventDate ? new Date(data.eventDate) : now;
       var driveIds   = String(data.driveFileIds   || '').trim();

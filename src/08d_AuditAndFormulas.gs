@@ -1574,30 +1574,8 @@ function getVaultDataMap_() {
  * @returns {Array} Array of vault row objects (emailHash and memberIdHash are non-reversible)
  * @private
  */
-function getVaultDataFull_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
-  if (!vault || vault.getLastRow() < 2) return [];
-
-  var data = vault.getDataRange().getValues();
-  var rows = [];
-  for (var i = 1; i < data.length; i++) {
-    rows.push({
-      vaultRow: i + 1,
-      responseRow: col_(data[i], SURVEY_VAULT_COLS.RESPONSE_ROW),
-      emailHash: col_(data[i], SURVEY_VAULT_COLS.EMAIL) || '',
-      verified: col_(data[i], SURVEY_VAULT_COLS.VERIFIED) || '',
-      memberIdHash: col_(data[i], SURVEY_VAULT_COLS.MATCHED_MEMBER_ID) || '',
-      quarter: col_(data[i], SURVEY_VAULT_COLS.QUARTER) || '',
-      isLatest: col_(data[i], SURVEY_VAULT_COLS.IS_LATEST) || '',
-      supersededBy: col_(data[i], SURVEY_VAULT_COLS.SUPERSEDED_BY) || '',
-      reviewerNotes: col_(data[i], SURVEY_VAULT_COLS.REVIEWER_NOTES) || ''
-    });
-  }
-  return rows;
-}
-
-// Dead code removed: writeVaultEntry_() — zero callers in src
+// Dead code removed (v4.55.2): getVaultDataFull_() — zero callers. Matches
+// the earlier removal of writeVaultEntry_() in the same file.
 
 /**
  * Marks an existing vault entry as superseded by a newer response.
@@ -1827,15 +1805,26 @@ function verifyAuditLogIntegrity() {
     return { valid: true, totalRows: data.length - 1, invalidRows: [], message: 'No integrity hashes found — log predates hash chain feature' };
   }
 
+  // The audit log uses the 10-col AUDIT_LOG_HEADER_MAP_ schema, NOT the 5-col
+  // EVENT_AUDIT_COLS layout. logAuditEvent() writes:
+  //   col 1 Timestamp · col 2 User Email (masked) · col 8 New Value (detailsJson)
+  //   col 9 Record ID (sessionId) · col 10 Action Type (eventType)
+  // Reading through EVENT_AUDIT_COLS returned the wrong cells and every hash
+  // check returned false, so the verifier always reported 100% tampering.
+  var _A = (typeof AUDIT_LOG_COLS === 'object' && AUDIT_LOG_COLS) ? AUDIT_LOG_COLS : null;
+  function _c(row, logical, fallbackIndex) {
+    if (_A && _A[logical]) return row[_A[logical] - 1];
+    return row[fallbackIndex];
+  }
   for (var i = 1; i < data.length; i++) {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      col_(data[i], EVENT_AUDIT_COLS.TIMESTAMP),
-      col_(data[i], EVENT_AUDIT_COLS.EVENT_TYPE),
-      col_(data[i], EVENT_AUDIT_COLS.USER),
-      col_(data[i], EVENT_AUDIT_COLS.DETAILS),
-      col_(data[i], EVENT_AUDIT_COLS.SESSION_ID)
+      _c(data[i], 'TIMESTAMP', 0),
+      _c(data[i], 'ACTION_TYPE', 9),
+      _c(data[i], 'USER_EMAIL', 1),
+      _c(data[i], 'NEW_VALUE', 7),
+      _c(data[i], 'RECORD_ID', 8)
     );
 
     if (storedHash && storedHash !== computed) {

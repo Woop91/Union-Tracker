@@ -3,7 +3,6 @@
  * Tests for 04_UIService (split into 04a-04e modules)
  *
  * Covers: parseCSVLine_, mapImportColumns_, getCommonStyles,
- * getQuickCaptureNotes, saveQuickCaptureNotes, clearQuickCaptureNotes,
  * getDashboardStats, showVisualControlPanel,
  * and HTML generator smoke tests.
  */
@@ -205,67 +204,8 @@ describe('getCommonStyles', () => {
   });
 });
 
-// ============================================================================
-// Quick Capture Notes (PropertiesService-based)
-// ============================================================================
-
-describe('getQuickCaptureNotes', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('returns empty string when no notes are saved', () => {
-    setupUserPropertiesMock({});
-    const result = getQuickCaptureNotes();
-    expect(result).toBe('');
-  });
-
-  test('returns saved notes from PropertiesService', () => {
-    setupUserPropertiesMock({ quickCaptureNotes: 'My important note' });
-    const result = getQuickCaptureNotes();
-    expect(result).toBe('My important note');
-  });
-});
-
-describe('saveQuickCaptureNotes', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('saves notes to PropertiesService and returns success', () => {
-    const mockProps = setupUserPropertiesMock({});
-    const result = saveQuickCaptureNotes('New notes here');
-    expect(result.success).toBe(true);
-    expect(mockProps.setProperty).toHaveBeenCalledWith('quickCaptureNotes', 'New notes here');
-  });
-
-  test('saves last-saved timestamp', () => {
-    const mockProps = setupUserPropertiesMock({});
-    saveQuickCaptureNotes('Test');
-    expect(mockProps.setProperty).toHaveBeenCalledWith(
-      'quickCaptureLastSaved',
-      expect.any(String)
-    );
-  });
-
-  test('saves empty string when notes is null or undefined', () => {
-    const mockProps = setupUserPropertiesMock({});
-    const result = saveQuickCaptureNotes(null);
-    expect(result.success).toBe(true);
-    expect(mockProps.setProperty).toHaveBeenCalledWith('quickCaptureNotes', '');
-  });
-});
-
-describe('clearQuickCaptureNotes', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  test('deletes notes properties and returns success', () => {
-    const mockProps = setupUserPropertiesMock({
-      quickCaptureNotes: 'Some notes',
-      quickCaptureLastSaved: '2025-01-01'
-    });
-    const result = clearQuickCaptureNotes();
-    expect(result.success).toBe(true);
-    expect(mockProps.deleteProperty).toHaveBeenCalledWith('quickCaptureNotes');
-    expect(mockProps.deleteProperty).toHaveBeenCalledWith('quickCaptureLastSaved');
-  });
-});
+// Quick Capture Notes and Pomodoro Timer were removed in v4.55.2 — dead code
+// with no menu entry and no HTML callers. Their tests were deleted here too.
 
 // ============================================================================
 // getDashboardStats (04_UIService version)
@@ -369,11 +309,11 @@ describe('HTML generator functions (smoke tests)', () => {
   });
 
   test('getMultiSelectHtml returns HTML string', () => {
-    if (typeof getMultiSelectHtml === 'function') {
-      const items = [{ id: 'a', label: 'Item A', selected: false }];
-      const html = getMultiSelectHtml(items, 'applyMultiSelectValue');
-      expect(typeof html).toBe('string');
-      expect(html).toContain('<!DOCTYPE html>');
-    }
+    // Assert existence first so deleting the function doesn't silently pass.
+    expect(typeof getMultiSelectHtml).toBe('function');
+    const items = [{ id: 'a', label: 'Item A', selected: false }];
+    const html = getMultiSelectHtml(items, 'applyMultiSelectValue');
+    expect(typeof html).toBe('string');
+    expect(html).toContain('<!DOCTYPE html>');
   });
 });

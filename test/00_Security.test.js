@@ -401,3 +401,336 @@ describe('escapeForFormulaPreserveNewlines', () => {
   });
 });
 
+// ============================================================================
+// checkWebAppAuthorization — Auditor-Alpha AA-01
+// ============================================================================
+//
+// The central RBAC gate for every webapp endpoint had zero dedicated unit
+// tests in the pre-v4.55.2 suite. Every test file that referenced it
+// mocked it to always return { isAuthorized: true } or { isAuthorized: false },
+// so the real role hierarchy, fail-secure behavior, owner-is-admin detection,
+// and error-path swallowing were unverified.
+//
+// These tests exercise the actual implementation. We stub external globals
+// (Auth, DataService, ACCESS_CONTROL, SHEETS, log_) at the top of each test
+// and restore on teardown so the rest of the file stays unaffected.
+// ============================================================================
+
+describe('checkWebAppAuthorization (AA-01)', () => {
+  var _origAccessControl, _origAuth, _origDataService, _origSHEETS, _origLog;
+  var _origSessionGetActiveUser, _origSSgetActiveSpreadsheet;
+  var _origCache;
+
+  beforeEach(() => {
+    _origAccessControl = global.ACCESS_CONTROL;
+    _origAuth = global.Auth;
+    _origDataService = global.DataService;
+    _origSHEETS = global.SHEETS;
+    _origLog = global.log_;
+    _origSessionGetActiveUser = global.Session.getActiveUser;
+    _origSSgetActiveSpreadsheet = global.SpreadsheetApp.getActiveSpreadsheet;
+    _origCache = global.CacheService.getScriptCache;
+
+    global.ACCESS_CONTROL = { ENABLED: true, AUTH_CACHE_DURATION: 300 };
+    global.SHEETS = { MEMBER_DIR: 'Member Directory' };
+    global.log_ = jest.fn();
+    global.CacheService.getScriptCache = jest.fn(() => ({
+      get: jest.fn(() => null),
+      put: jest.fn(),
+      remove: jest.fn()
+    }));
+  });
+
+  afterEach(() => {
+    global.ACCESS_CONTROL = _origAccessControl;
+    global.Auth = _origAuth;
+    global.DataService = _origDataService;
+    global.SHEETS = _origSHEETS;
+    global.log_ = _origLog;
+    global.Session.getActiveUser = _origSessionGetActiveUser;
+    global.SpreadsheetApp.getActiveSpreadsheet = _origSSgetActiveSpreadsheet;
+    global.CacheService.getScriptCache = _origCache;
+  });
+
+  function mockOwner(email) {
+    global.SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ({
+      getOwner: jest.fn(() => ({ getEmail: jest.fn(() => email) })),
+      getSheetByName: jest.fn(() => null)
+    }));
+  }
+
+  function mockActiveUser(email) {
+    global.Session.getActiveUser = jest.fn(() => ({
+      getEmail: jest.fn(() => email)
+    }));
+  }
+
+  function mockDataServiceRole(role) {
+    global.DataService = { getUserRole: jest.fn(() => role) };
+  }
+
+  test('returns Authentication required when no email and no token', () => {
+    mockActiveUser('');
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(false);
+    expect(res.message).toMatch(/Authentication required/i);
+    expect(res.email).toBeNull();
+    expect(res.role).toBe('anonymous');
+  });
+
+  test('fail-secure: denies when ACCESS_CONTROL.ENABLED is false', () => {
+    mockActiveUser('alice@example.com');
+    mockOwner('admin@example.com');
+    global.ACCESS_CONTROL = { ENABLED: false, AUTH_CACHE_DURATION: 300 };
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(false);
+    expect(res.message).toMatch(/Access control is currently disabled/i);
+    expect(res.email).toBe('alice@example.com');
+    expect(global.log_).toHaveBeenCalled();
+  });
+
+  test('spreadsheet owner is treated as admin regardless of directory role', () => {
+    mockActiveUser('owner@example.com');
+    mockOwner('owner@example.com');
+    var res = checkWebAppAuthorization('admin', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('admin');
+  });
+
+  test('admin role satisfies requiredRole=admin', () => {
+    mockActiveUser('admin@example.com');
+    mockOwner('admin@example.com'); // owner → admin path
+    var res = checkWebAppAuthorization('admin', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('admin');
+  });
+
+  test('member role denied for requiredRole=admin with clear message', () => {
+    mockActiveUser('member@example.com');
+    mockOwner('someone-else@example.com');
+    mockDataServiceRole('member');
+    var res = checkWebAppAuthorization('admin', null);
+    expect(res.isAuthorized).toBe(false);
+    expect(res.message).toMatch(/Administrator access required/i);
+    expect(res.role).toBe('member');
+  });
+
+  test('steward role satisfies requiredRole=steward', () => {
+    mockActiveUser('steward@example.com');
+    mockOwner('someone-else@example.com');
+    mockDataServiceRole('steward');
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('steward');
+  });
+
+  test('member role denied for requiredRole=steward with clear message', () => {
+    mockActiveUser('member@example.com');
+    mockOwner('someone-else@example.com');
+    mockDataServiceRole('member');
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(false);
+    expect(res.message).toMatch(/Steward access required/i);
+  });
+
+  test('admin role can perform steward actions (hierarchy)', () => {
+    mockActiveUser('admin@example.com');
+    mockOwner('admin@example.com'); // owner → admin
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('admin');
+  });
+
+  test('dual-role user (both) satisfies requiredRole=steward', () => {
+    mockActiveUser('dual@example.com');
+    mockOwner('owner@example.com');
+    mockDataServiceRole('both');
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('both');
+  });
+
+  test('no requiredRole: any authenticated user passes', () => {
+    mockActiveUser('anyone@example.com');
+    mockOwner('owner@example.com');
+    mockDataServiceRole('member');
+    var res = checkWebAppAuthorization(null, null);
+    expect(res.isAuthorized).toBe(true);
+  });
+
+  test('session token path: resolves email via Auth.resolveEmailFromToken', () => {
+    mockOwner('owner@example.com');
+    mockDataServiceRole('steward');
+    global.Auth = {
+      resolveEmailFromToken: jest.fn(() => 'tokenuser@example.com')
+    };
+    // Deliberately no active user — test that token is used
+    mockActiveUser('');
+    var res = checkWebAppAuthorization('steward', 'fake-token');
+    expect(global.Auth.resolveEmailFromToken).toHaveBeenCalledWith('fake-token');
+    expect(res.email).toBe('tokenuser@example.com');
+    expect(res.isAuthorized).toBe(true);
+  });
+
+  test('error path: catches exceptions and returns generic message (no leak)', () => {
+    // Force getActiveUser to throw
+    global.Session.getActiveUser = jest.fn(() => {
+      throw new Error('sheet "Member Directory!A1:Z" error with stack trace');
+    });
+    var res = checkWebAppAuthorization('steward', null);
+    expect(res.isAuthorized).toBe(false);
+    expect(res.message).toMatch(/Authorization check failed/i);
+    // Critical: internal details MUST NOT be in the returned message
+    expect(res.message).not.toContain('Member Directory');
+    expect(res.message).not.toContain('sheet');
+    expect(global.log_).toHaveBeenCalled();
+  });
+
+  test('owner email comparison is case-insensitive', () => {
+    mockActiveUser('Owner@Example.COM');
+    mockOwner('owner@example.com');
+    var res = checkWebAppAuthorization('admin', null);
+    expect(res.isAuthorized).toBe(true);
+    expect(res.role).toBe('admin');
+  });
+});
+
+// ============================================================================
+// getUserRole_ — Auditor-Alpha AA-02 / AA-11
+// ============================================================================
+//
+// AA-02: getUserRole_ is never tested against real sheet data.
+// AA-11: getUserRole_ CacheService caching is untested — no verification that
+// a cache hit short-circuits sheet access, no verification that a cache miss
+// populates the cache, no verification of cache-failure fallthrough.
+// ============================================================================
+
+describe('getUserRole_ cache behavior (AA-02/AA-11)', () => {
+  var _origAccessControl, _origDataService, _origSHEETS, _origLog;
+  var _origCacheGetScriptCache, _origSSgetActiveSpreadsheet, _origMemberCols;
+
+  var mockCache;
+  var cachePut;
+  var cacheGet;
+
+  beforeEach(() => {
+    _origAccessControl = global.ACCESS_CONTROL;
+    _origDataService = global.DataService;
+    _origSHEETS = global.SHEETS;
+    _origLog = global.log_;
+    _origCacheGetScriptCache = global.CacheService.getScriptCache;
+    _origSSgetActiveSpreadsheet = global.SpreadsheetApp.getActiveSpreadsheet;
+    _origMemberCols = global.MEMBER_COLS;
+
+    global.ACCESS_CONTROL = { ENABLED: true, AUTH_CACHE_DURATION: 300 };
+    global.SHEETS = { MEMBER_DIR: 'Member Directory' };
+    global.log_ = jest.fn();
+
+    cacheGet = jest.fn(() => null); // default: cache miss
+    cachePut = jest.fn();
+    mockCache = { get: cacheGet, put: cachePut, remove: jest.fn() };
+    global.CacheService.getScriptCache = jest.fn(() => mockCache);
+  });
+
+  afterEach(() => {
+    global.ACCESS_CONTROL = _origAccessControl;
+    global.DataService = _origDataService;
+    global.SHEETS = _origSHEETS;
+    global.log_ = _origLog;
+    global.CacheService.getScriptCache = _origCacheGetScriptCache;
+    global.SpreadsheetApp.getActiveSpreadsheet = _origSSgetActiveSpreadsheet;
+    global.MEMBER_COLS = _origMemberCols;
+  });
+
+  function mockOwner(email) {
+    var ownerEmail = email;
+    global.SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ({
+      getOwner: jest.fn(() => ({ getEmail: jest.fn(() => ownerEmail) })),
+      getSheetByName: jest.fn(() => null)
+    }));
+  }
+
+  test('returns anonymous immediately for empty email without touching cache', () => {
+    expect(getUserRole_('')).toBe('anonymous');
+    expect(cacheGet).not.toHaveBeenCalled();
+  });
+
+  test('returns anonymous for null email', () => {
+    expect(getUserRole_(null)).toBe('anonymous');
+    expect(cacheGet).not.toHaveBeenCalled();
+  });
+
+  test('cache HIT: returns cached role without calling SpreadsheetApp', () => {
+    cacheGet.mockReturnValue('steward');
+    var ssGetActive = jest.fn();
+    global.SpreadsheetApp.getActiveSpreadsheet = ssGetActive;
+    expect(getUserRole_('user@example.com')).toBe('steward');
+    expect(cacheGet).toHaveBeenCalledWith('user_role_user@example.com');
+    expect(ssGetActive).not.toHaveBeenCalled();
+    expect(cachePut).not.toHaveBeenCalled();
+  });
+
+  test('cache MISS with owner path: populates cache with "admin"', () => {
+    cacheGet.mockReturnValue(null);
+    mockOwner('owner@example.com');
+    expect(getUserRole_('owner@example.com')).toBe('admin');
+    expect(cachePut).toHaveBeenCalledWith(
+      'user_role_owner@example.com',
+      'admin',
+      300
+    );
+  });
+
+  test('cache MISS with DataService: populates cache with delegated role', () => {
+    cacheGet.mockReturnValue(null);
+    mockOwner('someone-else@example.com');
+    global.DataService = {
+      getUserRole: jest.fn(() => 'steward')
+    };
+    expect(getUserRole_('steward@example.com')).toBe('steward');
+    expect(global.DataService.getUserRole).toHaveBeenCalledWith('steward@example.com');
+    expect(cachePut).toHaveBeenCalledWith(
+      'user_role_steward@example.com',
+      'steward',
+      300
+    );
+  });
+
+  test('DataService returns null → anonymous, cache NOT populated', () => {
+    cacheGet.mockReturnValue(null);
+    mockOwner('someone-else@example.com');
+    global.DataService = {
+      getUserRole: jest.fn(() => null)
+    };
+    expect(getUserRole_('ghost@example.com')).toBe('anonymous');
+    // anonymous is NOT cached — a user who later joins should be detected.
+    expect(cachePut).not.toHaveBeenCalled();
+  });
+
+  test('cache get failure (throws) → falls through to sheet scan', () => {
+    cacheGet.mockImplementation(() => { throw new Error('Cache unavailable'); });
+    mockOwner('owner@example.com');
+    expect(getUserRole_('owner@example.com')).toBe('admin');
+  });
+
+  test('cache put failure is swallowed (role still returned)', () => {
+    cacheGet.mockReturnValue(null);
+    cachePut.mockImplementation(() => { throw new Error('Quota'); });
+    mockOwner('owner@example.com');
+    expect(() => getUserRole_('owner@example.com')).not.toThrow();
+    expect(getUserRole_('owner@example.com')).toBe('admin');
+  });
+
+  test('cache key is email-lowercased (case-insensitive lookup)', () => {
+    cacheGet.mockReturnValue('steward');
+    getUserRole_('Mixed.Case@Example.COM');
+    expect(cacheGet).toHaveBeenCalledWith('user_role_mixed.case@example.com');
+  });
+
+  test('no active spreadsheet (web app context) → anonymous', () => {
+    cacheGet.mockReturnValue(null);
+    global.SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => null);
+    expect(getUserRole_('anyone@example.com')).toBe('anonymous');
+  });
+});
+

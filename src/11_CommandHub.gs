@@ -731,7 +731,7 @@ function createGrievancePDF(folder, data) {
   var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
 
   if (!templateId) {
-    throw new Error('PDF Template ID not configured. Set it in Config sheet column AV.');
+    throw new Error('PDF Template ID not configured. Set it in the Config sheet under the "Template ID" column.');
   }
 
   // Make a copy of the template
@@ -1169,9 +1169,9 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     if (text.length > 500) ocrNote += '...';
 
     if (existingResolution) {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(existingResolution + '\n\n' + ocrNote));
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormulaPreserveNewlines(existingResolution + '\n\n' + ocrNote));
     } else {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(ocrNote));
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormulaPreserveNewlines(ocrNote));
     }
     fieldsPopulated.push('Resolution Notes (OCR text)');
 
@@ -1927,10 +1927,13 @@ function searchPrecedentsData(query, outcomeFilter) {
     var resolution = col_(row, GRIEVANCE_COLS.RESOLUTION) || '';
     var dateResolved = '';
 
-    // Try to get resolution date from Step III received or last updated field
-    var step3Rcvd = col_(row, GRIEVANCE_COLS.STEP3_RCVD);
-    if (step3Rcvd) {
-      dateResolved = Utilities.formatDate(new Date(step3Rcvd), Session.getScriptTimeZone(), 'MMM yyyy');
+    // v4.55.1 H07-BUG-03: GRIEVANCE_COLS.STEP3_RCVD does not exist in the header map.
+    // Fall back to Date Closed, then Last Updated for the resolution date display.
+    var resolvedDateRaw = col_(row, GRIEVANCE_COLS.DATE_CLOSED) || col_(row, GRIEVANCE_COLS.LAST_UPDATED);
+    if (resolvedDateRaw) {
+      try {
+        dateResolved = Utilities.formatDate(new Date(resolvedDateRaw), Session.getScriptTimeZone(), 'MMM yyyy');
+      } catch (_dErr) { dateResolved = ''; }
     }
 
     // Determine outcome class for styling

@@ -168,24 +168,29 @@ var MentorshipService = (function () {
       return { success: false, message: 'Mentor and mentee cannot be the same person.' };
     }
 
-    // Check for duplicate active pairing
-    var existing = getPairings();
-    for (var i = 0; i < existing.length; i++) {
-      if (existing[i].mentorEmail.toLowerCase() === mentorEmail.toLowerCase().trim() &&
-          existing[i].menteeEmail.toLowerCase() === menteeEmail.toLowerCase().trim()) {
-        return { success: false, message: 'This pairing already exists.' };
+    // v4.55.1 K11-BUG-06: wrap duplicate check + append in a script lock to prevent
+    // duplicate pairings under concurrent create requests
+    var runner = (typeof withScriptLock_ === 'function') ? withScriptLock_ : function (fn) { return fn(); };
+    return runner(function () {
+      var existing = getPairings();
+      for (var i = 0; i < existing.length; i++) {
+        if (existing[i].mentorEmail.toLowerCase() === mentorEmail.toLowerCase().trim() &&
+            existing[i].menteeEmail.toLowerCase() === menteeEmail.toLowerCase().trim()) {
+          return { success: false, message: 'This pairing already exists.' };
+        }
       }
-    }
-
-    var sheet = initSheet();
-    var id = Utilities.getUuid();
-    var now = new Date();
-    var esc = typeof escapeForFormula === 'function' ? escapeForFormula : function (v) { return v; };
-    sheet.appendRow([id, esc(mentorEmail.trim()), esc(menteeEmail.trim()), esc(caseTypes || ''), 'active', now, '']);
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('MENTORSHIP_CREATED', { mentor: mentorEmail, mentee: menteeEmail });
-    }
-    return { success: true, id: id };
+      var sheet = initSheet();
+      var id = Utilities.getUuid();
+      var now = new Date();
+      var esc = typeof escapeForFormula === 'function' ? escapeForFormula : function (v) { return v; };
+      sheet.appendRow([id, esc(mentorEmail.trim()), esc(menteeEmail.trim()), esc(caseTypes || ''), 'active', now, '']);
+      if (typeof logAuditEvent === 'function') {
+        // v4.55.1 K11-BUG-08: mask emails in audit log
+        var maskFn = (typeof maskEmail === 'function') ? maskEmail : function (e) { return e; };
+        logAuditEvent('MENTORSHIP_CREATED', { mentor: maskFn(mentorEmail), mentee: maskFn(menteeEmail) });
+      }
+      return { success: true, id: id };
+    });
   }
 
   function updatePairingNotes(pairingId, notes) {
@@ -230,26 +235,31 @@ var MentorshipService = (function () {
     var data = memberSheet.getDataRange().getValues();
     if (data.length < 2) return [];
 
-    var headers = data[0];
-    var roleCol = -1, emailCol = -1, joinedCol = -1;
-    for (var c = 0; c < headers.length; c++) {
-      var h = String(headers[c]).toLowerCase().trim();
-      if (h === 'role') roleCol = c;
-      if (h === 'email' || h === 'email address') emailCol = c;
-      if (h === 'joined' || h === 'date joined') joinedCol = c;
-    }
-    if (roleCol === -1 || emailCol === -1) return [];
+    // v4.55.1 K11-BUG-02: use MEMBER_COLS constants instead of fragile header-name lookups.
+    // Column indices are 1-based in MEMBER_COLS; convert to 0-based for raw row access.
+    if (typeof MEMBER_COLS === 'undefined' ||
+        !MEMBER_COLS.IS_STEWARD || !MEMBER_COLS.EMAIL) return [];
+    var stewardCol = MEMBER_COLS.IS_STEWARD - 1;
+    var emailCol   = MEMBER_COLS.EMAIL - 1;
+    var joinedCol  = MEMBER_COLS.DATE_ADDED ? (MEMBER_COLS.DATE_ADDED - 1) : -1;
+    // v4.55.2 K11-BUG-07: resolve first/last name so suggestion cards show
+    // real display names instead of raw email addresses.
+    var firstNameCol = MEMBER_COLS.FIRST_NAME ? (MEMBER_COLS.FIRST_NAME - 1) : -1;
+    var lastNameCol  = MEMBER_COLS.LAST_NAME  ? (MEMBER_COLS.LAST_NAME  - 1) : -1;
 
     var stewards = [];
     var sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     for (var i = 1; i < data.length; i++) {
-      var role = String(data[i][roleCol]).toLowerCase().trim();
-      if (role === 'steward' || role === 'both') {
+      if (isTruthyValue(data[i][stewardCol])) {
         var joined = joinedCol >= 0 ? new Date(data[i][joinedCol]) : null;
+        var fName = firstNameCol >= 0 ? String(data[i][firstNameCol] || '').trim() : '';
+        var lName = lastNameCol  >= 0 ? String(data[i][lastNameCol]  || '').trim() : '';
+        var fullName = (fName + ' ' + lName).trim();
         stewards.push({
           email: String(data[i][emailCol]).trim().toLowerCase(),
+          displayName: fullName || String(data[i][emailCol] || '').split('@')[0],
           isNew: joined && joined > sixMonthsAgo,
           joined: joined
         });
@@ -288,6 +298,11 @@ var MentorshipService = (function () {
         suggestions.push({
           mentorEmail: bestMentor.email,
           menteeEmail: mentee.email,
+          // v4.55.2 K11-BUG-07: resolved display names so the suggestion card
+          // doesn't show raw emails. Client falls back to email if these are
+          // missing (old cached clients).
+          mentorName: bestMentor.displayName,
+          menteeName: mentee.displayName,
           reason: 'New steward (joined ' + (mentee.joined ? Utilities.formatDate(mentee.joined, Session.getScriptTimeZone(), 'MM/dd/yyyy') : 'recently') + ')'
         });
       }
@@ -330,9 +345,10 @@ var CommunicationLogService = (function () {
     var sheet = initSheet();
     var id = Utilities.getUuid();
     var now = new Date();
-    var safeSubject = typeof escapeForFormula === 'function' ? escapeForFormula(subject || '') : (subject || '');
-    var safeNotes = typeof escapeForFormula === 'function' ? escapeForFormula(notes || '') : (notes || '');
-    sheet.appendRow([id, escapeForFormula(memberEmail), escapeForFormula(stewardEmail), type || 'other', safeSubject, safeNotes, now]);
+    // v4.55.1 K11-BUG-04: guard every escapeForFormula call; previously memberEmail and
+    // stewardEmail were escaped without the typeof guard that the other fields had.
+    var esc = typeof escapeForFormula === 'function' ? escapeForFormula : function (v) { return String(v == null ? '' : v); };
+    sheet.appendRow([id, esc(memberEmail), esc(stewardEmail), type || 'other', esc(subject || ''), esc(notes || ''), now]);
     return { success: true, id: id };
   }
 
@@ -615,8 +631,8 @@ var DigestService = (function () {
         return { success: true };
       }
     }
-    // New entry
-    sheet.appendRow([email, freq, safeTypes, '']);
+    // New entry — escape user-controlled email to block formula injection
+    sheet.appendRow([escapeForFormula(email), freq, safeTypes, '']);
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('DIGEST_PREFS_UPDATED', { email: email, frequency: freq, types: safeTypes });
     }
@@ -1111,8 +1127,37 @@ var TwoFactorService = (function () {
    * @returns {string} 6-digit code
    */
   function _generateCode() {
-    var code = String(parseInt(Utilities.getUuid().replace(/[^0-9]/g, '').substring(0, 6), 10)).padStart(6, '0');
+    // Rejection sampling from UUID bytes so every digit maps uniformly to 0-9.
+    // The previous parseInt trick was biased and could produce leading-zero
+    // collisions when the UUID happened to start with few digits.
+    var code = '';
+    while (code.length < 6) {
+      var hex = Utilities.getUuid().replace(/-/g, '');
+      for (var j = 0; j + 1 < hex.length && code.length < 6; j += 2) {
+        var byte = parseInt(hex.charAt(j) + hex.charAt(j + 1), 16);
+        if (byte < 250) code += (byte % 10).toString();
+      }
+    }
     return code;
+  }
+
+  /**
+   * Constant-time string equality. JavaScript string !== short-circuits on the
+   * first differing character, enabling a timing attack on progressive
+   * character discovery of the stored hash.
+   * @param {string} a
+   * @param {string} b
+   * @returns {boolean}
+   */
+  function _constantTimeEquals(a, b) {
+    a = String(a || '');
+    b = String(b || '');
+    if (a.length !== b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= (a.charCodeAt(i) ^ b.charCodeAt(i));
+    }
+    return diff === 0;
   }
 
   /**
@@ -1242,7 +1287,7 @@ var TwoFactorService = (function () {
     }
 
     var inputHash = _hashCode(String(code).trim(), email);
-    if (inputHash !== storedHash) {
+    if (!_constantTimeEquals(inputHash, storedHash)) {
       cache.put(failKey, String(failures + 1), CODE_TTL_SECONDS);
       if (failures + 1 >= 3 && typeof recordSecurityEvent === 'function') {
         recordSecurityEvent('2FA_FAILED', SECURITY_SEVERITY.HIGH,
@@ -1472,7 +1517,11 @@ var SMSService = (function () {
     }
 
     // Rate limit: max 5 SMS per recipient per day
-    var cacheKey = 'sms_count_' + recipientEmail.toLowerCase().trim() + '_' + new Date().toISOString().substring(0, 10);
+    // Use the script timezone (not UTC) so the per-day window aligns with
+    // the admin's local calendar day. toISOString() is UTC, which shifts the
+    // rollover by up to ~14 hours and lets attackers double their daily allowance.
+    var _smsDayKey = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var cacheKey = 'sms_count_' + recipientEmail.toLowerCase().trim() + '_' + _smsDayKey;
     var cache = CacheService.getScriptCache();
     var count = parseInt(cache.get(cacheKey) || '0', 10);
     if (count >= 5) {
@@ -1608,29 +1657,41 @@ var RSVPService = (function () {
    */
   function _generateToken(meetingId, email) {
     var token = Utilities.getUuid().replace(/-/g, '').substring(0, 16);
-    var cache = CacheService.getScriptCache();
     var key = 'rsvp_' + token;
-    cache.put(key, JSON.stringify({
+    var payload = JSON.stringify({
       meetingId: meetingId,
       email: email.toLowerCase().trim(),
-      created: Date.now()
-    }), 86400); // 24h TTL
+      created: Date.now(),
+      // v4.55.1 T12-BUG-04: 60-day expiry for meetings scheduled weeks in advance
+      expiresAt: Date.now() + (60 * 86400 * 1000)
+    });
+    // Persist in ScriptProperties (no TTL limit), mirror in CacheService for fast reads
+    try { PropertiesService.getScriptProperties().setProperty(key, payload); }
+    catch (_pErr) { log_('RSVP._generateToken', 'ScriptProperties write failed: ' + (_pErr.message || _pErr)); }
+    try { CacheService.getScriptCache().put(key, payload, 21600); } catch (_cErr) {}
     return token;
   }
 
   /**
    * Validates an RSVP token. Returns token data if valid, null if expired/invalid.
+   * v4.55.1 T12-BUG-04: reads from ScriptProperties (60-day expiry) with cache fast-path.
    * @param {string} token - RSVP token
    * @returns {Object|null} { meetingId, email } or null
    */
   function _validateToken(token) {
     if (!token || token.length !== 16) return null;
-    var cache = CacheService.getScriptCache();
     var key = 'rsvp_' + token;
-    var raw = cache.get(key);
-    if (!raw) return null;
+    var raw = null;
+    try { raw = CacheService.getScriptCache().get(key); } catch (_cErr) {}
+    if (!raw) {
+      try { raw = PropertiesService.getScriptProperties().getProperty(key); } catch (_pErr) { return null; }
+      if (!raw) return null;
+      try { CacheService.getScriptCache().put(key, raw, 21600); } catch (_cPutErr) {}
+    }
     try {
-      return JSON.parse(raw);
+      var data = JSON.parse(raw);
+      if (data.expiresAt && Date.now() > data.expiresAt) return null;
+      return data;
     } catch (_) {
       return null;
     }
@@ -1826,34 +1887,41 @@ var RSVPService = (function () {
     if (!sheet || sheet.getLastRow() < 2) return { success: false, message: 'RSVP record not found.' };
 
     var data = sheet.getDataRange().getValues();
+    // v4.55.2 T12-BUG-07: keep Meeting ID and Meeting Name in separate
+    // variables so a failed lookup doesn't leak the raw ID into the response
+    // message. Initialize meetingName empty; it stays empty if the lookup
+    // misses and we substitute a neutral label below.
+    var rsvpMeetingId = '';
     var meetingName = '';
     var memberName = '';
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][6]) === token) {
         sheet.getRange(i + 1, 5).setValue(newStatus); // RSVP Status
         sheet.getRange(i + 1, 6).setValue(new Date()); // RSVP Time
-        meetingName = data[i][1]; // Meeting ID — we'll look up the name
+        rsvpMeetingId = String(data[i][1] || '');
         memberName = data[i][3];
         break;
       }
     }
 
-    // Look up meeting name
-    if (meetingName) {
+    // Look up meeting name from the check-in log; do NOT fall back to the ID.
+    if (rsvpMeetingId) {
       var meetingSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
       if (meetingSheet && meetingSheet.getLastRow() >= 2) {
         var mData = meetingSheet.getDataRange().getValues();
         for (var mi = 1; mi < mData.length; mi++) {
           if (String(mData[mi][0]) === String(tokenData.meetingId)) {
-            meetingName = mData[mi][1];
+            meetingName = String(mData[mi][1] || '');
             break;
           }
         }
       }
     }
+    if (!meetingName) meetingName = 'the meeting';
 
-    // Delete token to prevent reuse
-    CacheService.getScriptCache().remove('rsvp_' + token);
+    // v4.55.1 T12-BUG-04: delete from both caches to prevent reuse
+    try { CacheService.getScriptCache().remove('rsvp_' + token); } catch (_cErr) {}
+    try { PropertiesService.getScriptProperties().deleteProperty('rsvp_' + token); } catch (_pErr) {}
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('RSVP_RESPONSE', {
@@ -1863,9 +1931,11 @@ var RSVPService = (function () {
       });
     }
 
+    // v4.55.1 T12-BUG-07: when meeting lookup fails, don't leak the raw meeting ID as the name.
+    // Use a generic placeholder so the confirmation UI doesn't display "MTG-abc123" to members.
     return {
       success: true,
-      meetingName: meetingName || tokenData.meetingId,
+      meetingName: meetingName || 'the meeting',
       memberName: memberName,
       rsvpStatus: newStatus
     };

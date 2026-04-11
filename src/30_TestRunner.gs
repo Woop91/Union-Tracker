@@ -1553,7 +1553,7 @@ function test_authsweep_memberEndpointsRejectNull() {
     { fn: 'dataGetSurveyStatus', safeEmpty: null },
     { fn: 'dataGetMemberTasks', safeEmpty: [] },
     { fn: 'dataGetMemberMeetings', safeEmpty: [] },
-    { fn: 'dataGetMyFeedback', safeEmpty: [] },
+    // dataGetMyFeedback removed v4.55.1 (feedback feature removed v4.52.0)
   ];
   for (var i = 0; i < memberEndpoints.length; i++) {
     var ep = memberEndpoints[i];

@@ -426,7 +426,10 @@
    listSaves.push(key);
   } else {
    
-   var input = document.querySelector('[data-key="' + key + '"]');
+   // Config field containing quotes or brackets doesn't break the
+   
+   var _safeKey = (window.CSS && CSS.escape) ? CSS.escape(key) : String(key).replace(/["\\]/g, '\\$&');
+   var input = document.querySelector('[data-key="' + _safeKey + '"]');
    if (input) {
    singleChanges[key] = input.value;
    }

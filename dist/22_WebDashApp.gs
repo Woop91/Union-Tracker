@@ -292,10 +292,17 @@ function _serveAuth(config, e, authError) {
   var template = HtmlService.createTemplateFromFile('index');
   template.view = 'auth';
 
+  // Validate e.parameter.authError against a known allowlist so an attacker
+  // can't craft a URL like ?authError=<arbitrary string> and have it echo
+  // into the auth page's pageData JSON.
+  var _ALLOWED_AUTH_ERRORS = ['sso_failed', 'loggedout', 'token_expired', 'invalid_link', 'not_found', 'rate_limited', 'magic_sent', 'magic_failed'];
+  var _rawAuthErr = e.parameter.authError;
+  var _safeAuthErr = (_rawAuthErr && _ALLOWED_AUTH_ERRORS.indexOf(String(_rawAuthErr)) !== -1) ? _rawAuthErr : null;
+
   template.pageData = JSON.stringify({
     view: 'auth',
     config: _sanitizeConfig(config),
-    error: e.parameter.authError || authError || null,
+    error: _safeAuthErr || authError || null,
     webAppUrl: _getWebAppUrlSafe(),
     tokenChecked: !!(e.parameter.sessionToken),
     isDevMode: !isProductionMode(),

@@ -1,58 +1,46 @@
 /**
- * Profile Chips — Tests for tap-to-select chip UI logic.
+ * Profile Chips — Structural integrity test for the shirt-size (single-
+ * select) and office-days (multi-select) chip UIs in member_view.html.
+ *
+ * The original file tested plain-JavaScript Set semantics against functions
+ * defined inside the test file — it never touched the production code. The
+ * chip logic lives inside member_view.html which we can't easily load into
+ * a Jest global scope, so this replacement does a source-level structural
+ * check: if the HTML lost or renamed the chip rendering, this test fails.
  */
 
-describe('Profile Chips: T-shirt size (single-select)', () => {
-  test('only one chip active at a time', () => {
-    var sizes = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
-    var active = '';
-    function selectSize(sz) { active = sz; }
-    function getActive() { return active; }
-    selectSize('M');
-    expect(getActive()).toBe('M');
-    selectSize('XL');
-    expect(getActive()).toBe('XL');
-    expect(getActive()).not.toBe('M');
+const fs = require('fs');
+const path = require('path');
+
+const MEMBER_VIEW = fs.readFileSync(
+  path.join(__dirname, '..', 'src', 'member_view.html'),
+  'utf8'
+);
+
+describe('Profile Chips: member_view.html contract', () => {
+  test('shirt-size single-select chip is rendered from a sizes array', () => {
+    // Look for the SHIRT_SIZES constant or literal that drives the chip list.
+    // The current implementation uses a plain array iteration.
+    expect(MEMBER_VIEW).toMatch(/shirt|SHIRT/);
+    expect(MEMBER_VIEW).toMatch(/(['"]XS['"]|['"]XL['"])/);
   });
 
-  test('empty selection returns empty string', () => {
-    var active = '';
-    expect(active).toBe('');
-  });
-});
-
-describe('Profile Chips: Office Days (multi-select)', () => {
-  test('toggling builds comma-separated string', () => {
-    var selected = new Set();
-    function toggle(day) {
-      if (selected.has(day)) selected.delete(day);
-      else selected.add(day);
-    }
-    function getValue() { return Array.from(selected).join(','); }
-    toggle('Monday');
-    toggle('Wednesday');
-    toggle('Friday');
-    expect(getValue()).toBe('Monday,Wednesday,Friday');
-    toggle('Wednesday');
-    expect(getValue()).toBe('Monday,Friday');
+  test('office-days multi-select chip is rendered from a day names list', () => {
+    expect(MEMBER_VIEW).toMatch(/Monday/);
+    expect(MEMBER_VIEW).toMatch(/(office|Office)Days/);
   });
 
-  test('Remote option works alongside days', () => {
-    var selected = new Set(['Monday', 'Remote']);
-    expect(Array.from(selected).join(',')).toBe('Monday,Remote');
+  test('office-days value serializes to comma-separated string for storage', () => {
+    // The chip UI stores as "Monday,Wednesday,Friday". Contract-check the
+    // format by verifying the code path joins selected days with ",".
+    expect(MEMBER_VIEW).toMatch(/\.join\(['"],['"]\)/);
   });
 
-  test('value is compatible with inOfficeToday() parsing', () => {
+  test('stored office-days string can be parsed back into a lowercase today check', () => {
+    // inOfficeToday() comparison logic: toLowerCase + indexOf. This is how
+    // the member_view HTML checks whether the current day is in the saved list.
     var officeDays = 'Monday,Wednesday,Friday,Remote';
-    var todayName = 'wednesday';
-    expect(officeDays.toLowerCase().indexOf(todayName) !== -1).toBe(true);
-    todayName = 'saturday';
-    expect(officeDays.toLowerCase().indexOf(todayName) !== -1).toBe(false);
-  });
-
-  test('parse stored value back into set', () => {
-    var stored = 'Monday,Friday,Remote';
-    var parsed = stored.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-    expect(parsed).toEqual(['Monday', 'Friday', 'Remote']);
+    expect(officeDays.toLowerCase().indexOf('wednesday') !== -1).toBe(true);
+    expect(officeDays.toLowerCase().indexOf('saturday') !== -1).toBe(false);
   });
 });

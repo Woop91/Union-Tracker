@@ -1311,10 +1311,12 @@ function seedContactLogData() {
 
   for (var i = 1; i < memberData.length; i++) {
     var email = String(col_(memberData[i], MEMBER_COLS.EMAIL)).trim().toLowerCase();
-    var isSteward = String(col_(memberData[i], MEMBER_COLS.IS_STEWARD)).trim().toLowerCase();
+    var isStewardRaw = col_(memberData[i], MEMBER_COLS.IS_STEWARD);
     var assignedSteward = String(col_(memberData[i], MEMBER_COLS.ASSIGNED_STEWARD)).trim().toLowerCase();
 
-    if (isSteward === 'yes') {
+    // Use the centralized truthy check so 'yes' / 'true' / '1' / boolean true
+    // all map to "is a steward" consistently with the rest of the codebase.
+    if (typeof isTruthyValue === 'function' ? isTruthyValue(isStewardRaw) : String(isStewardRaw).trim().toLowerCase() === 'yes') {
       stewardEmailList.push(email);
     }
     if (assignedSteward && email) {
@@ -1701,7 +1703,7 @@ function seedUnionStatsData() {
 
 /**
  * Seeds additional educational resources beyond the 8 starter entries created
- * by createResourcesSheet(). Adds DDS/SEIU 509-specific content including
+ * by createResourcesSheet(). Adds DDS/the union-specific content including
  * FMLA, ADA, overtime, workplace safety, and contract-specific guides.
  * Only adds rows beyond existing data to avoid duplicates.
  */
@@ -1720,7 +1722,7 @@ function seedResourcesData() {
   }
 
   // Check how many resources already exist
-  var existingRows = sheet.getLastRow() - 1; // minus header
+  var existingRows = Math.max(0, sheet.getLastRow() - 1);
   if (existingRows >= 15) {
     log_('seedResourcesData', 'Resources sheet already has ' + existingRows + ' entries. Skipping seed.');
     return;
@@ -1734,43 +1736,43 @@ function seedResourcesData() {
   var additionalResources = [
     ['RES-' + String(nextId++).padStart(3, '0'), 'FMLA: Your Rights to Medical Leave', 'Know Your Rights',
       'The Family and Medical Leave Act protects your right to take unpaid leave for medical reasons.',
-      'FMLA provides up to 12 weeks of unpaid, job-protected leave per year for:\\n- Your own serious health condition\\n- Caring for a spouse, child, or parent with a serious health condition\\n- Birth or adoption of a child\\n- Qualifying military family needs\\n\\nYour employer cannot retaliate against you for taking FMLA leave. You must be restored to the same or equivalent position.\\n\\nTo request FMLA: notify your supervisor and HR at least 30 days in advance when possible. Your steward can help if your request is denied.',
+      'FMLA provides up to 12 weeks of unpaid, job-protected leave per year for:\n- Your own serious health condition\n- Caring for a spouse, child, or parent with a serious health condition\n- Birth or adoption of a child\n- Qualifying military family needs\n\nYour employer cannot retaliate against you for taking FMLA leave. You must be restored to the same or equivalent position.\n\nTo request FMLA: notify your supervisor and HR at least 30 days in advance when possible. Your steward can help if your request is denied.',
       '', '🏥', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'ADA Reasonable Accommodations', 'Know Your Rights',
       'You have the right to reasonable accommodations for disabilities under the ADA.',
-      'The Americans with Disabilities Act requires your employer to provide reasonable accommodations unless it causes undue hardship.\\n\\nExamples of accommodations:\\n- Modified work schedule\\n- Ergonomic equipment\\n- Reassignment to a vacant position\\n- Leave for medical treatment\\n- Telework arrangements\\n\\nThe process: request an accommodation in writing, engage in the "interactive process" with HR, and document everything. Contact your steward immediately if your accommodation is denied or delayed.',
+      'The Americans with Disabilities Act requires your employer to provide reasonable accommodations unless it causes undue hardship.\n\nExamples of accommodations:\n- Modified work schedule\n- Ergonomic equipment\n- Reassignment to a vacant position\n- Leave for medical treatment\n- Telework arrangements\n\nThe process: request an accommodation in writing, engage in the "interactive process" with HR, and document everything. Contact your steward immediately if your accommodation is denied or delayed.',
       '', '♿', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Overtime Rules & Comp Time', 'Contract Article',
       'Know your rights regarding overtime pay, mandatory overtime, and compensatory time.',
-      'Under the collective bargaining agreement:\\n- Overtime is paid at 1.5x your regular rate for hours over 40/week\\n- Mandatory overtime must follow contract provisions for notice and rotation\\n- Comp time may be offered in lieu of overtime pay in some classifications\\n- You cannot be disciplined for declining overtime that violates the contract\\n\\nIf you believe overtime is being distributed unfairly or mandatory OT violates the contract, document the specifics and contact your steward.',
+      'Under the collective bargaining agreement:\n- Overtime is paid at 1.5x your regular rate for hours over 40/week\n- Mandatory overtime must follow contract provisions for notice and rotation\n- Comp time may be offered in lieu of overtime pay in some classifications\n- You cannot be disciplined for declining overtime that violates the contract\n\nIf you believe overtime is being distributed unfairly or mandatory OT violates the contract, document the specifics and contact your steward.',
       '', '⏰', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Workplace Safety: Reporting Hazards', 'Know Your Rights',
       'You have the right to a safe workplace and cannot be retaliated against for reporting hazards.',
-      'OSHA protects your right to:\\n- Report unsafe conditions without retaliation\\n- Request an OSHA inspection\\n- Receive safety training in a language you understand\\n- Access injury and illness records\\n- Refuse dangerous work under specific conditions\\n\\nTo report a hazard:\\n1. Notify your supervisor immediately\\n2. Document the hazard (photos, dates, witnesses)\\n3. File a report with the Health & Safety Committee\\n4. Contact your steward if management does not respond\\n\\nIf there is immediate danger, you may refuse work — contact your steward first if time permits.',
+      'OSHA protects your right to:\n- Report unsafe conditions without retaliation\n- Request an OSHA inspection\n- Receive safety training in a language you understand\n- Access injury and illness records\n- Refuse dangerous work under specific conditions\n\nTo report a hazard:\n1. Notify your supervisor immediately\n2. Document the hazard (photos, dates, witnesses)\n3. File a report with the Health & Safety Committee\n4. Contact your steward if management does not respond\n\nIf there is immediate danger, you may refuse work — contact your steward first if time permits.',
       '', '⚠️', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Anti-Retaliation Protections', 'Know Your Rights',
       'It is illegal for management to retaliate against you for union activity.',
-      'Protected activities include:\\n- Filing or supporting a grievance\\n- Attending union meetings\\n- Talking to coworkers about working conditions\\n- Reporting safety violations\\n- Requesting union representation (Weingarten rights)\\n- Participating in lawful pickets or actions\\n\\nSigns of retaliation:\\n- Sudden negative performance reviews\\n- Schedule changes or undesirable assignments\\n- Increased scrutiny or micromanagement\\n- Denial of previously approved requests\\n\\nIf you suspect retaliation, document everything and contact your steward immediately. Retaliation is an unfair labor practice and can be challenged.',
+      'Protected activities include:\n- Filing or supporting a grievance\n- Attending union meetings\n- Talking to coworkers about working conditions\n- Reporting safety violations\n- Requesting union representation (Weingarten rights)\n- Participating in lawful pickets or actions\n\nSigns of retaliation:\n- Sudden negative performance reviews\n- Schedule changes or undesirable assignments\n- Increased scrutiny or micromanagement\n- Denial of previously approved requests\n\nIf you suspect retaliation, document everything and contact your steward immediately. Retaliation is an unfair labor practice and can be challenged.',
       '', '🛡️', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Understanding Your Pay Stub', 'Guide',
       'A guide to understanding deductions, union dues, and benefits on your pay stub.',
-      'Your pay stub includes:\\n- Gross pay: your total earnings before deductions\\n- Union dues: typically a percentage of gross pay, deducted automatically\\n- Health insurance: your share of premium costs\\n- Retirement contributions: pension or 401k deductions\\n- Taxes: federal, state, and local withholdings\\n\\nCommon issues to watch for:\\n- Incorrect classification (hourly vs salaried)\\n- Missing overtime or differential pay\\n- Unauthorized deductions\\n\\nIf your pay stub seems wrong, contact payroll first. If the issue is not resolved, contact your steward to file a grievance.',
+      'Your pay stub includes:\n- Gross pay: your total earnings before deductions\n- Union dues: typically a percentage of gross pay, deducted automatically\n- Health insurance: your share of premium costs\n- Retirement contributions: pension or 401k deductions\n- Taxes: federal, state, and local withholdings\n\nCommon issues to watch for:\n- Incorrect classification (hourly vs salaried)\n- Missing overtime or differential pay\n- Unauthorized deductions\n\nIf your pay stub seems wrong, contact payroll first. If the issue is not resolved, contact your steward to file a grievance.',
       '', '💰', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Steward Quick Reference Card', 'Guide',
       'Essential reference for stewards: key contract articles, timelines, and procedures.',
-      'Key timelines:\\n- Incident to Step I filing: check contract (typically 15-30 days)\\n- Step I response: per contract\\n- Step II appeal: per contract from Step I response\\n- Step III / arbitration: per contract\\n\\nInvestigatory interview checklist:\\n1. Member requests representation\\n2. Meet privately with member first\\n3. Take notes during the meeting\\n4. Advise member of rights before questions\\n5. Object to improper questions\\n6. Request caucus if needed\\n\\nDocumentation: always get who, what, when, where, witnesses.',
+      'Key timelines:\n- Incident to Step I filing: check contract (typically 15-30 days)\n- Step I response: per contract\n- Step II appeal: per contract from Step I response\n- Step III / arbitration: per contract\n\nInvestigatory interview checklist:\n1. Member requests representation\n2. Meet privately with member first\n3. Take notes during the meeting\n4. Advise member of rights before questions\n5. Object to improper questions\n6. Request caucus if needed\n\nDocumentation: always get who, what, when, where, witnesses.',
       '', '📋', nextId - 1, 'Yes', 'Stewards', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'New Employee Rights Checklist', 'Guide',
       'New to the bargaining unit? Here is what you need to know about your rights and benefits.',
-      'As a new bargaining unit member you should:\\n\\n1. Know your steward — check the dashboard for contact info\\n2. Read your contract — ask your steward for a copy\\n3. Understand your probation period and what it means\\n4. Set up your PIN for the union dashboard\\n5. Attend new member orientation\\n6. Know your Weingarten rights from day one\\n7. Understand the grievance process\\n8. Complete your workload tracker weekly\\n9. Attend union meetings when possible\\n10. Report any contract violations to your steward\\n\\nYour union is here for you from day one.',
+      'As a new bargaining unit member you should:\n\n1. Know your steward — check the dashboard for contact info\n2. Read your contract — ask your steward for a copy\n3. Understand your probation period and what it means\n4. Set up your PIN for the union dashboard\n5. Attend new member orientation\n6. Know your Weingarten rights from day one\n7. Understand the grievance process\n8. Complete your workload tracker weekly\n9. Attend union meetings when possible\n10. Report any contract violations to your steward\n\nYour union is here for you from day one.',
       '', '✅', nextId - 1, 'Yes', 'Members', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'DDS Collective Bargaining Agreement Summary', 'Contract Article',
-      'Key provisions of the current collective bargaining agreement between SEIU 509 and DDS.',
-      'The CBA covers:\\n- Wages and step increases\\n- Health insurance and benefits\\n- Work schedules and overtime\\n- Grievance and arbitration procedures\\n- Seniority rights\\n- Transfers and promotions\\n- Discipline and discharge (just cause)\\n- Leave policies (sick, personal, vacation)\\n- Workplace safety\\n- Union rights and representation\\n\\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
+      'Key provisions of the current collective bargaining agreement between the union.',
+      'The CBA covers:\n- Wages and step increases\n- Health insurance and benefits\n- Work schedules and overtime\n- Grievance and arbitration procedures\n- Seniority rights\n- Transfers and promotions\n- Discipline and discharge (just cause)\n- Leave policies (sick, personal, vacation)\n- Workplace safety\n- Union rights and representation\n\nThe full contract is available from your steward or union office. Key articles are referenced in grievance filings — your steward will identify the specific articles that apply to your situation.',
       '', '📜', nextId - 1, 'Yes', 'All', today, 'System'],
     ['RES-' + String(nextId++).padStart(3, '0'), 'Caseload Standards & Workload Rights', 'Policy',
       'Your rights regarding manageable caseloads and workload distribution.',
-      'Under the contract and agency policy:\\n- Caseload limits exist for certain classifications\\n- You have the right to report excessive workloads through the workload tracker\\n- Management must address staffing shortages that create unsafe conditions\\n- Mandatory overtime to cover caseloads must follow contract provisions\\n\\nUsing the Workload Tracker:\\n1. Submit your weekly caseload numbers\\n2. Flag any categories that feel unmanageable\\n3. Your submission is anonymized in reports\\n4. Aggregate data helps the union advocate for adequate staffing\\n\\nIf your caseload is unsustainable, document specific impacts and speak with your steward.',
+      'Under the contract and agency policy:\n- Caseload limits exist for certain classifications\n- You have the right to report excessive workloads through the workload tracker\n- Management must address staffing shortages that create unsafe conditions\n- Mandatory overtime to cover caseloads must follow contract provisions\n\nUsing the Workload Tracker:\n1. Submit your weekly caseload numbers\n2. Flag any categories that feel unmanageable\n3. Your submission is anonymized in reports\n4. Aggregate data helps the union advocate for adequate staffing\n\nIf your caseload is unsustainable, document specific impacts and speak with your steward.',
       '', '📊', nextId - 1, 'Yes', 'All', today, 'System']
   ];
 
@@ -1805,7 +1807,7 @@ function seedNotificationsData() {
   }
 
   // Check existing data
-  var existingRows = sheet.getLastRow() - 1;
+  var existingRows = Math.max(0, sheet.getLastRow() - 1);
   if (existingRows >= 6) {
     log_('seedNotificationsData', 'Notifications sheet already has ' + existingRows + ' entries. Skipping seed.');
     return;
@@ -2738,11 +2740,17 @@ function NUKE_SEEDED_DATA() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // F39: Create backup before destructive operation
+  // F39: Create backup before destructive operation.
+  // createGrievanceSnapshot() dumps the entire grievance log (every row × every column),
+  // which routinely exceeds the PropertiesService 9KB per-property limit in production.
+  // Write to Drive so the backup is real; fall back to a ScriptProperties pointer.
   try {
     if (typeof createGrievanceSnapshot === 'function') {
       var preNukeBackup = createGrievanceSnapshot();
-      PropertiesService.getScriptProperties().setProperty('PRE_NUKE_SNAPSHOT', JSON.stringify(preNukeBackup));
+      var snapshotJson = JSON.stringify(preNukeBackup);
+      var snapshotName = 'PRE_NUKE_SNAPSHOT_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.json';
+      var backupFile = DriveApp.createFile(snapshotName, snapshotJson, MimeType.PLAIN_TEXT);
+      PropertiesService.getScriptProperties().setProperty('PRE_NUKE_SNAPSHOT_FILE_ID', backupFile.getId());
     }
   } catch (_backupErr) {
     log_('Pre-nuke backup skipped', _backupErr.message);

@@ -157,7 +157,9 @@ function shareWithCoordinators_(folder) {
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Form URLs — set in Config sheet column AP, read via getFormUrlFromConfig('satisfaction')
+  // Form URLs — resolved at runtime via getFormUrlFromConfig('satisfaction'),
+  // which reads the Config sheet dynamically by header name so column
+  // reordering can't break the lookup.
   FORM_URL: '',
   EDIT_URL: '',
 
@@ -520,6 +522,18 @@ function sortGrievanceLogByStatus() {
     _sortCache.put('_grievance_sort_debounce', '1', 30);
   }
 
+  // Use a short-timeout tryLock so we don't serialize concurrent edits but we
+  // also don't overwrite a concurrent onEdit mutation with a stale snapshot.
+  // Without the lock, the read-sort-write cycle can clobber another user's
+  // in-flight edit that landed between getValues and setValues.
+  var _sortLock = null;
+  try { _sortLock = LockService.getScriptLock(); } catch (_lockInitErr) {}
+  if (_sortLock && !_sortLock.tryLock(1500)) {
+    // Another edit is in flight — skip this sort rather than risk overwriting.
+    return;
+  }
+  try {
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -590,6 +604,9 @@ function sortGrievanceLogByStatus() {
 
   log_('sortGrievanceLogByStatus', 'Grievance Log sorted by status priority');
   ss.toast('Grievance Log sorted by status priority', 'Sorted', 2);
+  } finally {
+    if (_sortLock) { try { _sortLock.releaseLock(); } catch (_) {} }
+  }
 }
 
 /**

@@ -2120,7 +2120,7 @@ function renderMemberResources(appContainer) {
 
         // Expandable content
         var expandContent = el('div', { className: 'res-card-content' });
-        if (r.content) expandContent.appendChild(el('div', null, r.content));
+        if (r.content) { var bodyDiv = el('div', null); bodyDiv.appendChild(renderSafeText(r.content)); expandContent.appendChild(bodyDiv); }
         // H-53: Validate URL protocol to prevent javascript: XSS
         if (r.url && /^https?:\/\//i.test(r.url)) {
           var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
@@ -2440,7 +2440,7 @@ function renderUpdateProfile(appContainer) {
 function renderPINSetup(appContainer) {
   if (_renderPINRestricted(appContainer, 'PIN Setup')) return;
   renderPageLayout(appContainer, 'member', 'pinsetup', function(container) {
-    // ── Blue-themed "SolidBase" header ────────────────────────────────────
+    // ── Blue-themed "SolidBase" header ────────────────────────────────
     var header = el('div', {
       style: {
         background: 'linear-gradient(135deg, #1565C0, #1E88E5)',
@@ -2824,7 +2824,10 @@ function renderSurveyFormPage(appContainer) {
         var closedCard = el('div', { className: 'card card-glass', style: { padding: '28px', textAlign: 'center' } });
         closedCard.appendChild(el('div', { style: { fontSize: '40px', marginBottom: '12px' } }, '\uD83D\uDCCB'));
         closedCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'No Survey Open'));
-        closedCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6' } }, 'The quarterly satisfaction survey is not currently open. Surveys open at the start of each quarter — Jan, Apr, Jul, Oct.'));
+        // v4.55.4 sub-project B Zone 4: drop the misleading hardcoded quarterly
+        // schedule — surveys are opened manually by stewards, not on a calendar.
+        // The message must match the actual control model.
+        closedCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.6' } }, 'No survey period is currently active. Your steward will notify you when the next survey opens.'));
         content.appendChild(closedCard);
         return;
       }
@@ -3590,32 +3593,39 @@ function renderSurveyResultsPage(appContainer) {
 
       // ── Tab system ──
       var activeTab = 'story';
+      // v4.55.4 sub-project B Zone 2: radar option is only valid when sectionList.length >= 3
+      // (the radar chart needs ≥3 axes to form a polygon). Hide the tab entirely when
+      // sections are too few so users never land on the empty state.
       var TABS = [
         { id: 'story', label: '\uD83D\uDCD6 Overview' },
         { id: 'heatmap', label: '\uD83D\uDD25 Heatmap' },
         { id: 'sections', label: '\uD83D\uDCC8 Sections' },
-        { id: 'radar', label: '\uD83C\uDFAF Balance' },
         { id: 'detail', label: '\uD83D\uDD0D Detail' },
         { id: 'alerts', label: '\uD83D\uDEA8 Alerts' },
         { id: 'participation', label: '\uD83D\uDC65 Turnout' },
         { id: 'compare', label: '\uD83D\uDCCA Compare' },
         { id: 'meeting', label: '\uD83D\uDCCB Meeting' },
       ];
+      if (sectionList.length >= 3) TABS.splice(3, 0, { id: 'radar', label: '\uD83C\uDFAF Balance' });
 
       // ── Take Survey CTA — shown to all members regardless of dues status (v4.50.0) ──
       DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [SESSION_TOKEN], function(status) {
         if (status && !status.hasCompleted) {
-          var banner = el('div', { className: 'card card-glass fade-in', style: {
-            padding: '14px 16px', marginBottom: '12px', display: 'flex',
-            alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          // v4.55.7 sub-project C Zone 1: responsive class handles stacking on
+          // narrow screens via CSS media query, so text can't be squeezed into
+          // one word per line. Desktop keeps the horizontal row layout.
+          var banner = el('div', { className: 'card card-glass fade-in survey-cta-banner', style: {
+            padding: '14px 16px', marginBottom: '12px',
             border: '1px solid var(--accent)', borderRadius: 'var(--radius, 10px)'
           }});
-          var bannerText = el('div');
+          // Text column gets flex: 1 + min-width: 0 so it expands to fill and
+          // wraps at word boundaries instead of shrinking below content width.
+          var bannerText = el('div', { style: { flex: '1', minWidth: '0' } });
           bannerText.appendChild(el('div', { style: { fontWeight: '600', fontSize: '14px', color: 'var(--text)' } }, '\uD83D\uDCDD A survey is currently open'));
           bannerText.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '2px' } }, 'Your anonymous feedback helps shape priorities'));
           banner.appendChild(bannerText);
           banner.appendChild(el('button', {
-            className: 'btn btn-primary',
+            className: 'btn btn-primary survey-cta-button',
             style: { fontSize: '13px', whiteSpace: 'nowrap', flexShrink: '0' },
             onClick: function() { _handleTabNav('member', 'surveyform'); }
           }, 'Take Survey'));
@@ -3643,6 +3653,9 @@ function renderSurveyResultsPage(appContainer) {
       }
       function renderView() {
         vc.innerHTML = '';
+        // v4.55.4 sub-project B Zone 2: guard against stale 'radar' activeTab
+        // if sections dropped below 3 after a data refresh.
+        if (activeTab === 'radar' && sectionList.length < 3) { activeTab = 'story'; refreshTabs(); }
         if (activeTab === 'story') vStory();
         else if (activeTab === 'heatmap') vHeatmap();
         else if (activeTab === 'sections') vSections();
@@ -3800,7 +3813,16 @@ function _surveyViewRadar(vc, ctx) {
   var cd = el('div', { className: 'card card-glass survey-anim-slide p-14' });
   cd.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, '\uD83C\uDFAF Section Balance'));
   var sz = 220, cx = sz/2, mR = 80, n = sectionList.length;
-  if (n < 3) { cd.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', textAlign: 'center', padding: '20px' } }, 'Need 3+ sections for radar')); vc.appendChild(cd); return; }
+  if (n < 3) {
+    // v4.55.4 sub-project B Zone 2: the previous empty-state message was
+    // ambiguous — users read it as a response-count issue when they had 123
+    // responses but only 1–2 section groupings. This phrasing pins the blame
+    // on the visualization limit, not the data.
+    var msg = 'A radar chart needs at least 3 distinct sections to render. Your survey has ' + n + (n === 1 ? ' section' : ' sections') + ' — this is a visualization limit, not a data issue.';
+    cd.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', textAlign: 'center', padding: '20px', lineHeight: '1.5' } }, msg));
+    vc.appendChild(cd);
+    return;
+  }
   var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', sz); svg.setAttribute('height', sz);
   svg.style.display = 'block'; svg.style.margin = '0 auto';
@@ -5369,10 +5391,12 @@ function _renderGrievanceStatsContent(container, data) {
       if (data.monthly && data.monthly.length > 1) {
         var monthLabels = data.monthly.map(function(m) { return m.month; });
         var monthData = data.monthly.map(function(m) { return m.count; });
-        var datasets = [{ label: 'Filed', data: monthData }];
+        // v4.55.4 sub-project B Zone 1: explicit hex colors so the chart never
+        // falls through to _palette() and can't inherit a theme-resolved black.
+        var datasets = [{ label: 'Filed', data: monthData, color: '#f59e0b' }];
         if (data.monthlyResolved && data.monthlyResolved.length > 0) {
           var resolvedData = data.monthlyResolved.map(function(m) { return m.count; });
-          datasets.push({ label: 'Resolved', data: resolvedData });
+          datasets.push({ label: 'Resolved', data: resolvedData, color: '#10b981' });
         }
         var monthCard = el('div', { className: 'card card-glass p-16-mb-10' });
         monthCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Monthly Trend'));

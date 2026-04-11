@@ -3143,9 +3143,17 @@ function renderStewardResources(appContainer) {
       function renderCards() {
         cardsWrap.innerHTML = '';
         var searchTerm = (searchInput.value || '').toLowerCase().trim();
+        // v4.55.2 C05-BUG-07: fuzzy match on title/summary/content. Typo-
+        // tolerant, subsequence-aware. Falls back to plain indexOf() if
+        // fuzzyMatch isn't defined (old cached clients or loader race).
         var filtered = allResources.filter(function(r) {
           if (activeCategory !== 'All' && r.category !== activeCategory) return false;
           if (searchTerm) {
+            if (typeof fuzzyMatch === 'function') {
+              return fuzzyMatch(searchTerm, r.title).matches
+                  || fuzzyMatch(searchTerm, r.summary).matches
+                  || fuzzyMatch(searchTerm, r.content).matches;
+            }
             return (r.title || '').toLowerCase().indexOf(searchTerm) !== -1 ||
                    (r.summary || '').toLowerCase().indexOf(searchTerm) !== -1 ||
                    (r.content || '').toLowerCase().indexOf(searchTerm) !== -1;
@@ -3172,7 +3180,7 @@ function renderStewardResources(appContainer) {
           var hint = el('div', { className: 'text-xs-muted-mt-8' }, 'Tap to read more \u25BE');
           card.appendChild(hint);
           var expandContent = el('div', { className: 'res-card-content' });
-          if (r.content) expandContent.appendChild(el('div', null, r.content));
+          if (r.content) { var bodyDiv = el('div', null); bodyDiv.appendChild(renderSafeText(r.content)); expandContent.appendChild(bodyDiv); }
           // H-53: Validate URL protocol to prevent javascript: XSS
           if (r.url && /^https?:\/\//i.test(r.url)) {
             var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
@@ -4200,8 +4208,15 @@ function renderSurveyTracking(appContainer) {
         }).withFailureHandler(function() {}).dataGetSatisfactionSummary(SESSION_TOKEN);
 
         // ── No data ───────────────────────────────────────────────────────
+        // v4.55.4 sub-project B Zone 4: distinguish "no period active" from
+        // "period is active but no members match the current scope". The two
+        // states want different user-facing messages and different actions.
+        if (!trackingData.periodActive) {
+          dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'No survey period is currently active. Open a new period from the Survey Admin panel.'));
+          return;
+        }
         if (!total) {
-          dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'No survey tracking data. Open a period and populate tracking.'));
+          dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'Period "' + (trackingData.periodName || 'active period') + '" is active but no members are assigned in your current scope. Expand the scope filter above.'));
           return;
         }
 
@@ -6185,6 +6200,19 @@ function _buildExplorerUI(container, allMembers) {
 
   // ── Refresh all views ──
   function _fireChange() {
+    // v4.55.2 C05-BUG-08 decision: intentionally uses native confirm() instead
+    // of a custom modal. Rationale: (1) confirm() is synchronous, matching the
+    // short-circuit return pattern of this function; replacing with an async
+    // modal would require refactoring every caller to use a callback and
+    // retrying the slicer apply after the user answers, which the existing
+    // _EXP_SLICERS closure isn't structured for. (2) Native confirm() is
+    // accessible, keyboard-navigable (Tab + Enter/Escape), screen-reader
+    // friendly, and universal across browsers — functionally identical to a
+    // custom modal for the binary accept/cancel case. (3) The message is
+    // short and action-oriented; a fancier modal would only add visual
+    // polish, not information. Flagged in Backlog for consideration if the
+    // explorer ever gains a "Review edits" preview panel — at that point
+    // the modal could show diffs instead of just asking.
     if (_expUnsavedCount > 0 && !confirm('You have unsaved edits that will be lost. Continue?')) return;
     _expUnsavedCount = 0;
     _refreshSlicerOptions();
@@ -6319,8 +6347,21 @@ function _buildExplorerUI(container, allMembers) {
         var r = document.createElementNS(ns, 'rect');
         r.setAttribute('x', x); r.setAttribute('y', p.y); r.setAttribute('width', NW); r.setAttribute('height', p.h);
         r.setAttribute('fill', _gc(p.name)); r.setAttribute('rx', '3');
-        var tt = document.createElementNS(ns, 'title'); tt.textContent = p.name + ': ' + p.val;
-        r.appendChild(tt); svg.appendChild(r);
+        var _nodeTooltipText = p.name + ': ' + p.val;
+        var tt = document.createElementNS(ns, 'title'); tt.textContent = _nodeTooltipText;
+        r.appendChild(tt);
+        // v4.55.2 T06-BUG-05: mobile tap fallback for node rectangles — SVG
+        // <title> tooltips don't fire on touch devices, so a tap surfaces a
+        // toast with the node's count. Desktop hover still shows the native
+        // SVG title.
+        r.style.cursor = 'pointer';
+        (function(text) {
+          r.addEventListener('click', function() {
+            if (typeof showToast === 'function') showToast(text, 'info', 3000);
+            else alert(text);
+          });
+        })(_nodeTooltipText);
+        svg.appendChild(r);
         var txt = document.createElementNS(ns, 'text');
         txt.setAttribute('fill', 'var(--text, #ccc)'); txt.setAttribute('font-size', '10');
         var lbl = p.name.length > 22 ? p.name.substring(0, 20) + '\u2026' : p.name;
@@ -6362,7 +6403,10 @@ function _buildExplorerUI(container, allMembers) {
       return;
     }
 
-    var table = el('table', { style: { width: '100%', minWidth: '1200px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
+    // v4.55.7 sub-project C Zone 3: minWidth trimmed 1200px -> 900px so the
+    // table fits most laptops and tablets without horizontal scroll. The
+    // outer container still has overflowX: auto for the phone edge case.
+    var table = el('table', { style: { width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
     var thead = el('thead');
     var headRow = el('tr');
     _EXP_EDIT_COLS.forEach(function(c) {
@@ -8868,14 +8912,25 @@ function renderAccessLogPage(appContainer) {
         }
 
         // Render table
+        // v4.55.7 sub-project C Zone 2: table gets an access-log-table class
+        // so CSS can hide Sheet + Field columns on narrow screens (<= 640px).
         var table = el('div', { style: { overflowX: 'auto' } });
-        var tbl = el('table', { className: 'data-table', style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
+        var tbl = el('table', { className: 'data-table access-log-table', style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
 
-        // Header row
+        // Header row. v4.55.7: header cells carry per-column classes so the
+        // mobile media query can hide Sheet + Field (optional columns on narrow screens).
         var thead = el('thead');
         var hrow = el('tr');
-        ['Time', 'Event', 'User', 'Sheet', 'Field', 'Details'].forEach(function(h) {
-          hrow.appendChild(el('th', { style: { padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid var(--border)', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h));
+        var _headers = [
+          { label: 'Time', cls: 'alc-time' },
+          { label: 'Event', cls: 'alc-event' },
+          { label: 'User', cls: 'alc-user' },
+          { label: 'Sheet', cls: 'alc-sheet alc-hide-mobile' },
+          { label: 'Field', cls: 'alc-field alc-hide-mobile' },
+          { label: 'Details', cls: 'alc-details' }
+        ];
+        _headers.forEach(function(h) {
+          hrow.appendChild(el('th', { className: h.cls, style: { padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid var(--border)', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h.label));
         });
         thead.appendChild(hrow);
         tbl.appendChild(thead);
@@ -8887,21 +8942,21 @@ function renderAccessLogPage(appContainer) {
           // Time
           var ts = item.timestamp ? new Date(item.timestamp) : null;
           var timeStr = ts ? ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + ts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '--';
-          row.appendChild(el('td', { style: { padding: '6px', whiteSpace: 'nowrap', fontSize: '11px', color: 'var(--muted)' } }, timeStr));
+          row.appendChild(el('td', { className: 'alc-time', style: { padding: '6px', whiteSpace: 'nowrap', fontSize: '11px', color: 'var(--muted)' } }, timeStr));
 
           // Event type
-          var typeBadge = el('td', { style: { padding: '6px' } });
+          var typeBadge = el('td', { className: 'alc-event', style: { padding: '6px' } });
           typeBadge.appendChild(el('span', { style: { display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', background: 'var(--accentBg)', color: 'var(--accent)' } }, item.eventType || item.actionType || '--'));
           row.appendChild(typeBadge);
 
-          // User
-          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--text)' } }, item.user || '--'));
+          // User — v4.55.3 sub-project A Zone 3: humanize SHA-256 hashes
+          row.appendChild(el('td', { className: 'alc-user', style: { padding: '6px', fontSize: '11px', color: 'var(--text)' } }, displayUser(item.user)));
 
-          // Sheet
-          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.sheet || '--'));
+          // Sheet (hidden on narrow screens via alc-hide-mobile)
+          row.appendChild(el('td', { className: 'alc-sheet alc-hide-mobile', style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.sheet || '--'));
 
-          // Field
-          row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.fieldName || '--'));
+          // Field (hidden on narrow screens via alc-hide-mobile)
+          row.appendChild(el('td', { className: 'alc-field alc-hide-mobile', style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.fieldName || '--'));
 
           // Details (truncated, expandable)
           var detailsTd = el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.newValue || '--');
@@ -8950,6 +9005,7 @@ function renderAccessLogPage(appContainer) {
           className: 'btn-sm btn-outline', style: { marginTop: '8px' },
           onClick: function() {
             var csv = 'Timestamp,Event Type,User,Sheet,Field,Old Value,New Value,Record ID\n';
+            // Raw item.user (full hash) preserved here — exports need complete values for forensic integrity. UI render uses displayUser() at line ~8932.
             result.items.forEach(function(item) {
               csv += [item.timestamp, item.eventType, item.user, item.sheet, item.fieldName, item.oldValue, item.newValue, item.recordId]
                 .map(function(v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
@@ -10925,7 +10981,11 @@ function _loadMentorshipSuggestions(suggestList) {
     suggestions.forEach(function(s) {
       var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
       var info = el('div');
-      info.appendChild(el('div', { style: { fontWeight: '500' } }, escapeHtml(s.mentorEmail) + ' \u2192 ' + escapeHtml(s.menteeEmail)));
+      // v4.55.2 K11-BUG-07: prefer resolved display names from the server;
+      // fall back to email local-part for older clients or missing data.
+      var mentorLabel = s.mentorName || (s.mentorEmail ? String(s.mentorEmail).split('@')[0] : 'Mentor');
+      var menteeLabel = s.menteeName || (s.menteeEmail ? String(s.menteeEmail).split('@')[0] : 'Mentee');
+      info.appendChild(el('div', { style: { fontWeight: '500' } }, escapeHtml(mentorLabel) + ' \u2192 ' + escapeHtml(menteeLabel)));
       info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, escapeHtml(s.reason)));
       card.appendChild(info);
       card.appendChild(el('button', {
@@ -11150,6 +11210,32 @@ function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyCha
         card.appendChild(el('div', { className: 'kpi-label', style: { fontSize: '0.625rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' } }, k.label));
         statsGrid.appendChild(card);
       });
+
+      // v4.55.6 sub-project D Zone 4: browser + OS breakdowns
+      // (populated from pre-parsed fields on rows v4.55.6+; empty for older rows).
+      function _renderBreakdown(title, obj, emoji) {
+        var keys = Object.keys(obj || {});
+        if (keys.length === 0) return;
+        var section = el('div', { style: { marginTop: '12px' } });
+        section.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' } }, emoji + ' ' + title));
+        var total = keys.reduce(function(a, k) { return a + (obj[k] || 0); }, 0);
+        keys.sort(function(a, b) { return (obj[b] || 0) - (obj[a] || 0); });
+        keys.forEach(function(k) {
+          var count = obj[k] || 0;
+          var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+          var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+          row.appendChild(el('div', { style: { width: '80px', fontSize: '12px', color: 'var(--text)', textTransform: 'capitalize' } }, k));
+          var barWrap = el('div', { style: { flex: '1', height: '14px', background: 'var(--surfaceAlt, rgba(255,255,255,0.06))', borderRadius: '3px', overflow: 'hidden' } });
+          var bar = el('div', { style: { height: '100%', width: Math.max(2, pct) + '%', background: 'var(--accent)', borderRadius: '3px' } });
+          barWrap.appendChild(bar);
+          row.appendChild(barWrap);
+          row.appendChild(el('div', { style: { width: '56px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right' } }, count + ' (' + pct + '%)'));
+          section.appendChild(row);
+        });
+        statsGrid.appendChild(section);
+      }
+      _renderBreakdown('By Browser', result.byBrowser, '\uD83C\uDF10');
+      _renderBreakdown('By OS / Platform', result.byOs, '\uD83D\uDCF1');
 
       // ── Performance ──
       perfGrid.innerHTML = '';

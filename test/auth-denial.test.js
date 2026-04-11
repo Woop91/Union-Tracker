@@ -72,9 +72,12 @@ loadSources([
 
 const INVALID_TOKEN = 'invalid-token-that-does-not-exist';
 
-// Track skipped functions so we can fail if too many are undefined
+// Track skipped functions so we can fail if any are undefined. Zero budget:
+// every wrapper listed in this file is supposed to exist. If one vanishes
+// the test should FAIL so we notice the regression instead of silently
+// skipping up to 5 missing functions.
 const skippedFunctions = [];
-const MAX_ALLOWED_SKIPS = 5;
+const MAX_ALLOWED_SKIPS = 0;
 
 beforeEach(() => {
   // Make SSO return nothing (non-SSO user)
@@ -187,7 +190,7 @@ describe('Auth denial: DataService wrappers return safe empty values', () => {
     { name: 'dataGetUpcomingEvents', args: [INVALID_TOKEN, 10] },
     { name: 'dataGetMemberTasks', args: [INVALID_TOKEN, null] },
     { name: 'dataGetMemberMeetings', args: [INVALID_TOKEN] },
-    { name: 'dataGetMyFeedback', args: [INVALID_TOKEN] },
+    // v4.55.1: dataGetMyFeedback removed (feedback feature deleted v4.52.0)
     { name: 'dataGetMeetingMinutes', args: [INVALID_TOKEN, 10] },
     { name: 'dataGetCaseChecklist', args: [INVALID_TOKEN, 'case-1'] },
     { name: 'dataGetStewardMemberStats', args: [INVALID_TOKEN] },
@@ -197,7 +200,7 @@ describe('Auth denial: DataService wrappers return safe empty values', () => {
     { name: 'dataGetWorkloadSummaryStats', args: [INVALID_TOKEN] },
     { name: 'dataGetWelcomeData', args: [INVALID_TOKEN] },
     { name: 'dataMarkWelcomeDismissed', args: [INVALID_TOKEN] },
-    { name: 'dataSubmitFeedback', args: [INVALID_TOKEN, {}] },
+    // v4.55.1: dataSubmitFeedback removed (feedback feature deleted v4.52.0)
     { name: 'dataSubmitSurveyResponse', args: [INVALID_TOKEN, []] },
     { name: 'dataUpdateProfile', args: [INVALID_TOKEN, {}] },
   ];

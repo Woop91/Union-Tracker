@@ -22,6 +22,14 @@
  *   Scores are informational, not punitive — no inter-member ranking
  *   is visible to members. Pre-computed batch runs reduce real-time load.
  *
+ * NOTE (v4.55.1 T12-BUG-02): this service is intentionally distinct from
+ *   ScoringService (34_ScoringService.gs). The two services use different
+ *   dimensions and different weights and target different UIs:
+ *     - EngagementService (5 dimensions: 25/25/15/15/20) → Report Card + Scoreboard
+ *     - ScoringService (3 dimensions: 70/20/10) → Org Health Tree
+ *   A future version may consolidate them. If you edit weights or add dimensions,
+ *   update BOTH services and their documentation to keep behavior consistent.
+ *
  * WHAT HAPPENS IF THIS FILE BREAKS:
  *   Engagement tab and Report Card show empty/error state. Core features
  *   (grievances, auth, meetings) are unaffected.
@@ -38,7 +46,39 @@ var EngagementService = (function () {
   var HEADERS = ['Member Email', 'Member Name', 'Unit', 'Survey Score', 'Meeting Score',
     'QA Score', 'Workload Score', 'Contact Score', 'Composite Score', 'Last Computed', 'Trend'];
 
-  var WEIGHTS = { survey: 25, meeting: 25, qa: 15, workload: 15, contact: 20 };
+  // Default weights — overridable at runtime via Config (see _loadWeights).
+  var DEFAULT_WEIGHTS = { survey: 25, meeting: 25, qa: 15, workload: 15, contact: 20 };
+
+  /**
+   * Load engagement weights, prefer values from Script Properties (admin-set)
+   * over the compiled defaults. Script Properties provides a quick admin
+   * override path that doesn't require a schema migration or a Config-tab
+   * column addition. Future work: also expose these on the Config sheet.
+   *
+   * Property keys:
+   *   engagement_weight_survey / meeting / qa / workload / contact
+   *
+   * @returns {{survey:number,meeting:number,qa:number,workload:number,contact:number}}
+   */
+  function _loadWeights() {
+    var w = {
+      survey: DEFAULT_WEIGHTS.survey,
+      meeting: DEFAULT_WEIGHTS.meeting,
+      qa: DEFAULT_WEIGHTS.qa,
+      workload: DEFAULT_WEIGHTS.workload,
+      contact: DEFAULT_WEIGHTS.contact
+    };
+    try {
+      var props = PropertiesService.getScriptProperties();
+      ['survey', 'meeting', 'qa', 'workload', 'contact'].forEach(function(k) {
+        var raw = props.getProperty('engagement_weight_' + k);
+        if (raw == null || raw === '') return;
+        var n = Number(raw);
+        if (!isNaN(n) && n > 0) w[k] = n;
+      });
+    } catch (_e) { /* fall back to defaults */ }
+    return w;
+  }
 
   function initSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -67,14 +107,16 @@ var EngagementService = (function () {
    */
   function _computeSurveyScore(email, surveyData) {
     if (!surveyData || surveyData.length === 0) return 0; // no data = no score (consistent defaults)
+    // v4.55.1 T12-BUG-05: data source is SHEETS.SURVEY_TRACKING — the comments now
+    // reference the correct sheet instead of the old _Survey_Assignments name.
     var emailLower = email.toLowerCase().trim();
     var total = 0;
     var completed = 0;
     for (var i = 0; i < surveyData.length; i++) {
-      var rowEmail = String(surveyData[i][2] || '').toLowerCase().trim(); // EMAIL col per _Survey_Assignments schema (col C, index 2)
+      var rowEmail = String(surveyData[i][2] || '').toLowerCase().trim(); // EMAIL col per _Survey_Tracking schema (col C, index 2)
       if (rowEmail === emailLower) {
         total++;
-        var status = String(surveyData[i][5] || '').toLowerCase().trim(); // CURRENT_STATUS per _Survey_Assignments schema (col F, index 5)
+        var status = String(surveyData[i][5] || '').toLowerCase().trim(); // CURRENT_STATUS per _Survey_Tracking schema (col F, index 5)
         if (status === 'completed') completed++;
       }
     }
@@ -87,16 +129,25 @@ var EngagementService = (function () {
    * @returns {number} 0-100
    */
   function _computeMeetingScore(email, checkInData, totalMeetings90d) {
-    if (totalMeetings90d === 0) return 0;
+    // v4.55.1 T12-BUG-03: reject non-finite or missing totalMeetings90d to avoid NaN scores
+    if (!isFinite(totalMeetings90d) || totalMeetings90d <= 0) return 0;
+    if (!checkInData || checkInData.length === 0) return 0;
     var emailLower = email.toLowerCase().trim();
     var attended = 0;
     var now = new Date();
     var day90ago = new Date(now.getTime() - 90 * 86400000);
 
+    // Use the dynamic column map so a header reorder doesn't silently
+    // garbage-read every row. Fall back to the historical [7]/[2] positions
+    // when the MEETING_CHECKIN_COLS constants haven't been resolved yet.
+    var _emailIdx = (typeof MEETING_CHECKIN_COLS !== 'undefined' && MEETING_CHECKIN_COLS.EMAIL)
+      ? MEETING_CHECKIN_COLS.EMAIL - 1 : 7;
+    var _dateIdx = (typeof MEETING_CHECKIN_COLS !== 'undefined' && MEETING_CHECKIN_COLS.MEETING_DATE)
+      ? MEETING_CHECKIN_COLS.MEETING_DATE - 1 : 2;
     for (var i = 0; i < checkInData.length; i++) {
-      var ciEmail = String(checkInData[i][7] || '').toLowerCase().trim(); // EMAIL col per _Meeting_Check_In schema (col H, index 7)
+      var ciEmail = String(checkInData[i][_emailIdx] || '').toLowerCase().trim();
       if (ciEmail !== emailLower) continue;
-      var ciDate = checkInData[i][2]; // MEETING_DATE per _Meeting_Check_In schema (col C, index 2)
+      var ciDate = checkInData[i][_dateIdx];
       if (ciDate instanceof Date && ciDate >= day90ago) attended++;
     }
     return Math.min(100, Math.round((attended / Math.max(totalMeetings90d, 1)) * 100));
@@ -165,10 +216,14 @@ var EngagementService = (function () {
 
     if (!latestContact) return 0;
     var daysSince = Math.floor((new Date() - latestContact) / 86400000);
-    if (daysSince < 14) return 100;
-    if (daysSince < 30) return 75;
-    if (daysSince < 60) return 50;
-    if (daysSince < 90) return 25;
+    // v4.55.1 T12-BUG-08: linearly interpolate between anchors instead of 25-point step cliffs
+    // Anchors: 0d=100, 14d=85, 30d=60, 60d=35, 90d=10, 120+d=0
+    if (daysSince <= 0) return 100;
+    if (daysSince <= 14) return Math.round(100 - (daysSince / 14) * 15);
+    if (daysSince <= 30) return Math.round(85 - ((daysSince - 14) / 16) * 25);
+    if (daysSince <= 60) return Math.round(60 - ((daysSince - 30) / 30) * 25);
+    if (daysSince <= 90) return Math.round(35 - ((daysSince - 60) / 30) * 25);
+    if (daysSince <= 120) return Math.round(10 - ((daysSince - 90) / 30) * 10);
     return 0;
   }
 
@@ -188,6 +243,7 @@ var EngagementService = (function () {
       contact: _computeContactScore(email, cachedData.contactData)
     };
 
+    var WEIGHTS = _loadWeights();
     var composite = Math.round(
       (scores.survey * WEIGHTS.survey +
        scores.meeting * WEIGHTS.meeting +
@@ -212,9 +268,10 @@ var EngagementService = (function () {
     if (!memberSheet || memberSheet.getLastRow() < 2) return { computed: 0, avgScore: 0 };
     var memberData = memberSheet.getDataRange().getValues();
 
-    // Pre-load all data sources once (batch efficiency)
+    // v4.55.1 T12-BUG-01: SHEETS.SURVEY_TRACKING is always defined in 01_Core.gs;
+    // the previous `||` fallback was dead defensive code and hid schema drift.
     var cachedData = {
-      surveyData: _sheetRows(ss, SHEETS.SURVEY_TRACKING || '_Survey_Tracking'),
+      surveyData: _sheetRows(ss, SHEETS.SURVEY_TRACKING),
       checkInData: _sheetRows(ss, SHEETS.MEETING_CHECKIN_LOG),
       qaData: _sheetRows(ss, SHEETS.QA_FORUM),
       answerData: _sheetRows(ss, SHEETS.QA_ANSWERS),

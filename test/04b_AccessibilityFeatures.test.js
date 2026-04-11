@@ -1,6 +1,7 @@
 /**
  * Tests for 04b_AccessibilityFeatures.gs
- * Covers accessibility features, pomodoro, quick capture, import/export.
+ * Covers accessibility features and CSV import/export.
+ * (Pomodoro + Quick Capture were removed in v4.55.2 — see 04b_AccessibilityFeatures.gs.)
  */
 
 require('./gas-mock');
@@ -14,10 +15,7 @@ loadSources([
 
 describe('04b function existence', () => {
   const required = [
-    'getCommonStyles', 'startPomodoroTimer',
-    'getQuickCaptureNotes', 'saveQuickCaptureNotes',
-    'clearQuickCaptureNotes',
-    'showQuickCaptureNotepad',
+    'getCommonStyles',
     'processMemberImport',
     'parseCSVLine_', 'mapImportColumns_',
     'showThemeManager'
@@ -56,10 +54,3 @@ describe('parseCSVLine_', () => {
   });
 });
 
-describe('Quick Capture (PropertiesService)', () => {
-  test('saveQuickCaptureNotes stores text', () => {
-    saveQuickCaptureNotes('Test note');
-    // Verify it used PropertiesService
-    expect(PropertiesService.getUserProperties).toHaveBeenCalled();
-  });
-});

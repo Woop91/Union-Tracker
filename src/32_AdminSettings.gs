@@ -160,10 +160,33 @@ var ADMIN_SETTINGS_SCHEMA_ = [
       { key: 'ENABLE_CORRELATION',     label: 'Enable Correlation Engine', type: 'toggle', desc: 'Enable correlation analysis on the Insights page' },
       { key: 'SHOW_GRIEVANCES',        label: 'Show Grievances',           type: 'toggle', desc: 'Show grievance tracking (cases, new grievance, stats). Reload required.' },
       { key: 'ENABLE_TAB_MODALS',     label: 'Enable Tab Modals',         type: 'toggle', desc: 'Enable tab-based modal dialogs instead of sidebar modals. Reload required.' },
+      // v4.55.2 V09-BUG-04: expose contact validation domain blocklist.
+      { key: 'BLOCKED_EMAIL_DOMAINS', label: 'Blocked Email Domains',     type: 'text',   desc: 'Comma-separated list of email domain suffixes rejected on member profile saves (e.g. .gov,.us,.ma). Case-insensitive. Reload required.' },
       { key: 'CUSTOM_LINK_1_NAME',     label: 'Custom Link 1 Name',        type: 'text',   desc: 'Display name for first custom sidebar link' },
       { key: 'CUSTOM_LINK_1_URL',      label: 'Custom Link 1 URL',         type: 'url',    desc: 'URL for first custom sidebar link' },
       { key: 'CUSTOM_LINK_2_NAME',     label: 'Custom Link 2 Name',        type: 'text',   desc: 'Display name for second custom sidebar link' },
       { key: 'CUSTOM_LINK_2_URL',      label: 'Custom Link 2 URL',         type: 'url',    desc: 'URL for second custom sidebar link' }
+    ]
+  },
+  // v4.55.2 V09-BUG-04: Scoring engine + Org Health Tree configuration was
+  // previously unreachable from the Admin Settings sidebar — admins had to
+  // edit the Config sheet directly, which is error-prone and loses the
+  // sidebar's validation layer. Ten keys moved into this dedicated tab.
+  {
+    id: 'scoring',
+    label: 'Scoring & Health',
+    icon: '\uD83D\uDCCA',
+    fields: [
+      { key: 'SCORE_WEIGHT_ENGAGEMENT',   label: 'Weight: Engagement',         type: 'number', desc: 'Weight for engagement dimension in composite score (0\u2013100). Sum of weights should be 100; ScoringService auto-normalizes if not.', min: 0, max: 100 },
+      { key: 'SCORE_WEIGHT_PROFILE',      label: 'Weight: Profile',            type: 'number', desc: 'Weight for profile-completeness dimension in composite score (0\u2013100).',                                                              min: 0, max: 100 },
+      { key: 'SCORE_WEIGHT_GRIEVANCE',    label: 'Weight: Grievance',          type: 'number', desc: 'Weight for grievance-health dimension in composite score (0\u2013100).',                                                                  min: 0, max: 100 },
+      { key: 'SCORE_THRESHOLD_GREEN',     label: 'Threshold: Green',           type: 'number', desc: 'Composite score at or above this is rendered as healthy (green leaf in the Org Health Tree).',                                            min: 0, max: 100 },
+      { key: 'SCORE_THRESHOLD_YELLOW',    label: 'Threshold: Yellow',          type: 'number', desc: 'Composite score at or above this (but below green) is rendered as at-risk (yellow leaf).',                                               min: 0, max: 100 },
+      { key: 'GRIEVANCE_SCORE_DIRECTION', label: 'Grievance Score Direction',  type: 'text',   desc: 'Either "Negative" (open grievance lowers score) or "Positive" (engagement-oriented; open grievance raises score). Default: Negative.' },
+      { key: 'MAX_VOLUNTEER_HOURS',       label: 'Max Volunteer Hours (cap)',  type: 'number', desc: 'Upper cap on volunteer hours used in engagement scoring. Hours beyond this are clipped to prevent a single heavy contributor from skewing the curve.', min: 1, max: 10000 },
+      { key: 'ENABLE_ORG_HEALTH_TREE',    label: 'Enable Org Health Tree',     type: 'toggle', desc: 'Show the Org Health Tree tab (SVG tree visualization). Reload required.' },
+      { key: 'MEMBER_BRANCH_ASSIGNMENT',  label: 'Branch Assignment Mode',     type: 'text',   desc: 'How members map to branches on the tree: "auto" (use assigned steward) or "location" (use office location).' },
+      { key: 'STEWARD_LOCATION_MAP',      label: 'Steward Location Map',       type: 'text',   desc: 'JSON mapping of office location \u2192 steward email, used when Branch Assignment Mode is "location".' }
     ]
   }
 ];
@@ -362,6 +385,10 @@ function adminSaveSettings(changes) {
       if (fieldDef.type === 'number' && newValue !== '' && newValue !== null) {
         var num = Number(newValue);
         if (isNaN(num)) return { success: false, error: fieldDef.label + ' must be a number' };
+        // v4.55.1 V09-BUG-02: reject floats for integer fields (deadline days, cookie duration, etc.)
+        if (fieldDef.integer !== false && !Number.isInteger(num)) {
+          return { success: false, error: fieldDef.label + ' must be a whole number' };
+        }
         if (fieldDef.min !== undefined && num < fieldDef.min) {
           return { success: false, error: fieldDef.label + ' minimum is ' + fieldDef.min };
         }
@@ -370,9 +397,11 @@ function adminSaveSettings(changes) {
         }
       }
 
-      // Toggle normalization
+      // Toggle normalization — accept boolean true plus the usual truthy
+      // strings ('yes','true','1','on'); anything else falls back to 'no'.
       if (fieldDef.type === 'toggle') {
-        newValue = (newValue === true || newValue === 'yes') ? 'yes' : 'no';
+        var _tv = (newValue === true) ? 'yes' : String(newValue || '').trim().toLowerCase();
+        newValue = (['yes', 'true', '1', 'on'].indexOf(_tv) !== -1) ? 'yes' : 'no';
       }
 
       var oldValue = configSheet.getRange(3, col).getValue();

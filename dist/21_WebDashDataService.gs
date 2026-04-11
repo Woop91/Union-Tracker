@@ -485,16 +485,16 @@ var DataService = (function () {
       if (rowEmail !== email) continue;
 
       var rowNum = i + 1; // 1-indexed for sheet ops
-      var rowData = data[i].slice(); // copy row; apply all field edits in-memory
+      // Mirror updateMemberBySteward (GAMMA-05): write only changed columns so
+      // ARRAYFORMULA/derived columns are preserved and concurrent edits to
+      // other fields in the same row aren't clobbered by a stale snapshot.
       for (var field in updates) {
         if (!editableFields[field]) continue;
         var col = _findColumn(colMap, editableFields[field]);
         if (col === -1) continue;
         var val = String(updates[field] || '').trim().substring(0, 255);
-        rowData[col] = escapeForFormula(val);
+        sheet.getRange(rowNum, col + 1).setValue(escapeForFormula(val));
       }
-      // Write entire row in one API call instead of one setValue per field
-      sheet.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
 
       _invalidateSheetCache(MEMBER_SHEET);
       if (typeof logAuditEvent === 'function') {
@@ -690,11 +690,14 @@ var DataService = (function () {
 
     var data = cached.data;
     var colMap = cached.colMap;
+    // Normalize the caller email for comparison — rec.email is stored
+    // lowercased by _buildUserRecord but the incoming argument isn't.
+    var _callerLc = String(memberEmail || '').trim().toLowerCase();
     var stewards = [];
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
       if (!rec.isSteward) continue;
-      if (rec.email === memberEmail) continue;
+      if (rec.email === _callerLc) continue;
       // Prioritize same location, but include all stewards
       stewards.push({
         name: rec.name,
@@ -726,6 +729,14 @@ var DataService = (function () {
     if (!memberEmail || !stewardEmail) return { success: false, message: 'Invalid request.' };
     memberEmail = String(memberEmail).trim().toLowerCase();
     stewardEmail = String(stewardEmail).trim().toLowerCase();
+
+    // Verify the target is actually a steward. Without this check a member could
+    // point their "assigned steward" at any other member and then use endpoints
+    // like getStewardContact to read that member's PII.
+    var targetRecord = findUserByEmail(stewardEmail);
+    if (!targetRecord || !targetRecord.isSteward) {
+      return { success: false, message: 'Selected user is not a steward.' };
+    }
 
     var sheet = _getSheet(MEMBER_SHEET);
     if (!sheet) return { success: false, message: 'System error.' };
@@ -817,10 +828,13 @@ var DataService = (function () {
    * @returns {Object} { success: boolean, message: string }
    */
   function startGrievanceDraft(email, data, idemKey) {
+    // Check for duplicate up front but DO NOT burn the idem key until the
+    // mutation succeeds. Previously the put happened before validation, so a
+    // failed submission blocked all retries for 10 minutes.
+    var _idemCacheRef = null;
     if (idemKey) {
-      var idemCache = CacheService.getScriptCache();
-      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
+      _idemCacheRef = CacheService.getScriptCache();
+      if (_idemCacheRef.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
     }
     if (!email || !data) return { success: false, message: 'Missing required data.' };
     if (!data.title || !data.description) return { success: false, message: 'Title and description are required.' };
@@ -886,6 +900,11 @@ var DataService = (function () {
       sheet.appendRow(row);
       if (typeof logAuditEvent === 'function') {
         logAuditEvent('GRIEVANCE_DRAFT_CREATED', { email: email, grievanceId: row[colGrievanceId] || 'unknown' });
+      }
+      // Burn idem key only after successful mutation so validation/append
+      // failures don't permanently block the user's retry.
+      if (idemKey && _idemCacheRef) {
+        try { _idemCacheRef.put('IDEM_' + idemKey, '1', 600); } catch (_) {}
       }
       return { success: true, message: 'Draft submitted.' };
     } catch (e) {
@@ -1617,6 +1636,12 @@ var DataService = (function () {
    */
   function getStewardSurveyTracking(stewardEmail, scope) {
     scope = scope || 'assigned';
+    // v4.55.4 sub-project B Zone 4: compute period state once from the backend
+    // source of truth so both views can trust the same answer.
+    var period = null;
+    try { period = (typeof getSurveyPeriod === 'function') ? getSurveyPeriod() : null; } catch (_) { period = null; }
+    var periodActive = !!(period && period.status === 'Active');
+    var periodName = (period && period.name) ? period.name : null;
     var members;
     if (scope === 'all') {
       members = getAllMembers();
@@ -1640,7 +1665,7 @@ var DataService = (function () {
     } else {
       members = getStewardMembers(stewardEmail);
     }
-    if (members.length === 0) return { total: 0, completed: 0, members: [] };
+    if (members.length === 0) return { total: 0, completed: 0, members: [], periodActive: !!periodActive, periodName: periodName };
 
     // Pre-load _Survey_Tracking once and build email → status + participation maps
     // Single sheet read to avoid N+1 pattern.
@@ -1729,7 +1754,9 @@ var DataService = (function () {
       total: members.length,
       completed: completedCount,
       stewardInfo: stewardInfo,
-      members: tracking
+      members: tracking,
+      periodActive: !!periodActive,
+      periodName: periodName
     };
   }
 
@@ -1755,6 +1782,17 @@ var DataService = (function () {
 
     // Scope: 'mine' = only members assigned to this steward, 'all' = all members
     var scope = (filter && filter.scope === 'all') ? 'all' : 'mine';
+    // v4.55.1 P02-BUG-04: server-side enforcement of the broadcastScopeAll config toggle.
+    // Previously only the client checked this flag, so a steward could call the endpoint
+    // directly with scope='all' to bypass the restriction.
+    if (scope === 'all') {
+      var _bcConfig = ConfigReader.getConfig();
+      var _bcScopeAll = _bcConfig && _bcConfig.broadcastScopeAll;
+      var _bcScopeAllowed = (_bcScopeAll === true || String(_bcScopeAll).toLowerCase() === 'yes' || String(_bcScopeAll).toLowerCase() === 'true');
+      if (!_bcScopeAllowed) {
+        return { success: false, sentCount: 0, message: 'Org-wide broadcasts are disabled. Contact an admin.' };
+      }
+    }
     var members = (scope === 'all') ? getAllMembers() : getStewardMembers(stewardEmail);
     if (members.length === 0) return { success: false, sentCount: 0, message: 'No members found.' };
 
@@ -1794,9 +1832,27 @@ var DataService = (function () {
     subject = typeof escapeForFormula === 'function' ? escapeForFormula(subject) : subject;
     message = typeof escapeForFormula === 'function' ? escapeForFormula(message) : message;
 
+    // Route through safeSendEmail_ so the daily MailApp quota is honored and
+    // we stop early instead of burning into the 6-minute execution limit.
+    var _broadcastStart = Date.now();
     for (var i = 0; i < filtered.length; i++) {
+      if (Date.now() - _broadcastStart > 270000) {
+        failures.push({ email: 'remaining ' + (filtered.length - i), error: 'execution time guard' });
+        break;
+      }
       try {
-        MailApp.sendEmail(filtered[i].email, subject, message);
+        var _sendResult = null;
+        if (typeof safeSendEmail_ === 'function') {
+          _sendResult = safeSendEmail_({ to: filtered[i].email, subject: subject, body: message });
+          if (_sendResult && _sendResult.success === false) {
+            failedCount++;
+            failures.push({ email: filtered[i].email, error: _sendResult.error || 'send failed' });
+            if (_sendResult.error && /quota/i.test(_sendResult.error)) break;
+            continue;
+          }
+        } else {
+          MailApp.sendEmail(filtered[i].email, subject, message);
+        }
         sentCount++;
       } catch (e) {
         failedCount++;
@@ -2122,6 +2178,37 @@ var DataService = (function () {
   }
 
   /**
+   * v4.55.3 sub-project A Zone 2 — steward name sanity guard.
+   *
+   * rRec.steward reaches the Avg Resolution chart as a grouping key, but
+   * some live Grievance Log rows contain Date serials (46076.519...) or
+   * stringified Date objects in the Assigned Steward column from legacy
+   * admin edits or imports. This guard rejects values that clearly aren't
+   * names before they become phantom buckets. Legitimate-looking names
+   * and emails pass through; everything else collapses to 'unassigned'.
+   *
+   * Called only in the stewardResolution accumulation loop — this is NOT
+   * a general-purpose filter, and no other consumer of rRec.steward is
+   * affected.
+   *
+   * @param {string} s - lowercased, trimmed steward value from _buildGrievanceRecord
+   * @returns {boolean} true if s looks like a valid steward name/email
+   */
+  function _looksLikeStewardName(s) {
+    if (!s || typeof s !== 'string') return false;
+    if (s.length > 120) return false;
+    // Numeric-only (including serial floats and negatives)
+    if (/^-?\d+(\.\d+)?$/.test(s)) return false;
+    // Numeric-only (including serial floats, negatives, and scientific notation)
+    if (/^-?\d+(\.\d+)?e[+-]?\d+$/i.test(s)) return false;
+    // ISO 8601 date prefix
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return false;
+    // Weekday-prefixed date string (output of String(new Date()))
+    if (/^(mon|tue|wed|thu|fri|sat|sun) /.test(s)) return false;
+    return true;
+  }
+
+  /**
    * Constructs a normalized grievance record from a Grievance Log row.
    * @param {Array} row - Row data array
    * @param {Object} colMap - Column name-to-index map
@@ -2292,11 +2379,11 @@ var DataService = (function () {
       if (fileIter.hasNext()) {
         return SpreadsheetApp.open(fileIter.next());
       }
-      // Create new sheet in member's folder
+      // Create new sheet in member's folder. Use moveTo() — Google deprecated
+      // the addFile/removeFile folder-membership API.
       var ss = SpreadsheetApp.create(sheetTitle);
       var ssFile = DriveApp.getFileById(ss.getId());
-      memberFolder.addFile(ssFile);
-      DriveApp.getRootFolder().removeFile(ssFile); // move out of My Drive root
+      ssFile.moveTo(memberFolder);
 
       var sheet = ss.getActiveSheet();
       sheet.setName(CONTACT_SHEET_TAB_);
@@ -2519,10 +2606,11 @@ var DataService = (function () {
    * @returns {Object} { success: boolean, message: string, taskId?: string }
    */
   function createTask(stewardEmail, title, description, memberEmail, priority, dueDate, assignToEmail, idemKey) {
+    // Check for duplicate up front, burn key only after success (idem poisoning fix).
+    var _idemCacheRef = null;
     if (idemKey) {
-      var idemCache = CacheService.getScriptCache();
-      if (idemCache.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
-      idemCache.put('IDEM_' + idemKey, '1', 600); // 10-minute TTL to reduce duplicate mutation risk
+      _idemCacheRef = CacheService.getScriptCache();
+      if (_idemCacheRef.get('IDEM_' + idemKey)) return { duplicate: true, message: 'Duplicate request ignored' };
     }
     if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
     // If assignToEmail is provided and caller is chief steward, assign to that steward
@@ -2539,6 +2627,9 @@ var DataService = (function () {
     _invalidateSheetCache(SHEETS.STEWARD_TASKS);
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('TASK_CREATED', { taskId: id, owner: ownerEmail, createdBy: stewardEmail });
+    }
+    if (idemKey && _idemCacheRef) {
+      try { _idemCacheRef.put('IDEM_' + idemKey, '1', 600); } catch (_) {}
     }
     return { success: true, message: 'Task created.', taskId: id };
   }
@@ -2574,7 +2665,11 @@ var DataService = (function () {
       var pa = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
       var pb = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
       if (pa !== pb) return pa - pb;
-      return (a.dueDays || 999) - (b.dueDays || 999);
+      // `|| 999` collapsed dueDays === 0 (due today) to 999 and buried
+      // actionable tasks. Treat null/undefined as 999, but 0 stays 0.
+      var da = (a.dueDays == null) ? 999 : a.dueDays;
+      var db = (b.dueDays == null) ? 999 : b.dueDays;
+      return da - db;
     });
     return tasks;
   }
@@ -2704,7 +2799,11 @@ var DataService = (function () {
       var pa = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
       var pb = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
       if (pa !== pb) return pa - pb;
-      return (a.dueDays || 999) - (b.dueDays || 999);
+      // `|| 999` collapsed dueDays === 0 (due today) to 999 and buried
+      // actionable tasks. Treat null/undefined as 999, but 0 stays 0.
+      var da = (a.dueDays == null) ? 999 : a.dueDays;
+      var db = (b.dueDays == null) ? 999 : b.dueDays;
+      return da - db;
     });
     return tasks;
   }
@@ -3011,7 +3110,10 @@ var DataService = (function () {
           if (days >= 0 && days < 3650) {
             resolutionDays.push(days);
             // Per-steward resolution
-            var stw = rRec.steward || 'unassigned';
+            // v4.55.3 sub-project A Zone 2: reject Date serials / ISO / weekday
+            // strings that bleed in from dirty Grievance Log rows so they do
+            // not create phantom grouping keys in the Avg Resolution chart.
+            var stw = _looksLikeStewardName(rRec.steward) ? rRec.steward : 'unassigned';
             if (!stewardResolution[stw]) stewardResolution[stw] = [];
             stewardResolution[stw].push(days);
           }
@@ -3389,7 +3491,7 @@ var DataService = (function () {
     var pairs = {};
     pairs[key + '_n'] = String(numChunks);
     for (var i = 0; i < numChunks; i++) {
-      pairs[key + '_' + i] = json.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+      pairs[key + '_' + i] = json.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
     }
     cache.putAll(pairs, ttl);
   }
@@ -4038,7 +4140,7 @@ var DataService = (function () {
     var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
     if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
 
-    var id = 'MIN_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+    var id = 'MIN_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
 
     // Date parsing: append T12:00:00 to YYYY-MM-DD to avoid UTC midnight timezone shift
     var rawDate = minutesData.meetingDate;
@@ -4067,11 +4169,13 @@ var DataService = (function () {
     var rowNum;
     try {
       rowNum = withScriptLock_(function() {
-        // Idempotency check (inside lock for atomicity with the write)
+        // Idempotency check (inside lock for atomicity with the write).
+        // Burn the key only after appendRow succeeds so a throw doesn't
+        // poison retries.
+        var idemCache = null;
         if (idemKey) {
-          var idemCache = CacheService.getScriptCache();
+          idemCache = CacheService.getScriptCache();
           if (idemCache.get('IDEM_' + idemKey)) return -1; // signal: duplicate
-          idemCache.put('IDEM_' + idemKey, '1', 600);
         }
         sheet.appendRow([
           id,
@@ -4085,6 +4189,9 @@ var DataService = (function () {
           '',  // attachmentUrl — filled in Phase 3
           ''   // attachmentName — filled in Phase 3
         ]);
+        if (idemKey && idemCache) {
+          try { idemCache.put('IDEM_' + idemKey, '1', 600); } catch (_) {}
+        }
         return sheet.getLastRow();
       });
     } catch (_lockErr) {
@@ -4269,6 +4376,35 @@ var DataService = (function () {
     } catch (_e) {
       log_('getCaseChecklist error', _e.message);
       return [];
+    }
+  }
+
+  /**
+   * Returns the member email that owns a given grievance/case, or empty string if not found.
+   * Used for ownership checks on member-facing case endpoints (v4.55.1 priv-esc fix).
+   * @param {string} caseId
+   * @returns {string} lowercase member email, or empty string
+   */
+  function getCaseOwnerEmail(caseId) {
+    try {
+      if (!caseId) return '';
+      caseId = String(caseId).trim();
+      var ss = _getSS();
+      if (!ss) return '';
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      if (!sheet || sheet.getLastRow() <= 1) return '';
+      if (typeof GRIEVANCE_COLS === 'undefined' ||
+          !GRIEVANCE_COLS.GRIEVANCE_ID || !GRIEVANCE_COLS.MEMBER_EMAIL) return '';
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (String(col_(data[i], GRIEVANCE_COLS.GRIEVANCE_ID)).trim() === caseId) {
+          return String(col_(data[i], GRIEVANCE_COLS.MEMBER_EMAIL) || '').trim().toLowerCase();
+        }
+      }
+      return '';
+    } catch (_e) {
+      log_('getCaseOwnerEmail error', _e.message);
+      return '';
     }
   }
 
@@ -4529,10 +4665,10 @@ var DataService = (function () {
         if (assignedTo !== String(filter.steward).toLowerCase()) continue;
       }
 
-      // Location filter
+      // Location filter (case-insensitive — mirrors the steward filter above).
       if (filter.location) {
-        var memberLoc = locCol !== -1 ? String(data[i][locCol]).trim() : '';
-        if (memberLoc !== filter.location) continue;
+        var memberLoc = locCol !== -1 ? String(data[i][locCol]).trim().toLowerCase() : '';
+        if (memberLoc !== String(filter.location).trim().toLowerCase()) continue;
       }
 
       // Open grievance filter
@@ -4541,11 +4677,11 @@ var DataService = (function () {
         if (!rec.hasOpenGrievance) continue;
       }
 
-      // Unit filter
+      // Unit filter (case-insensitive).
       if (filter.unit) {
         var unitCol = _findColumn(colMap, HEADERS.memberUnit);
-        var memberUnit = unitCol !== -1 ? String(data[i][unitCol]).trim() : '';
-        if (memberUnit !== filter.unit) continue;
+        var memberUnit = unitCol !== -1 ? String(data[i][unitCol]).trim().toLowerCase() : '';
+        if (memberUnit !== String(filter.unit).trim().toLowerCase()) continue;
       }
 
       // Dues status filter
@@ -5256,6 +5392,36 @@ var DataService = (function () {
       }
     }
 
+    // v4.55.1 AMIR-02 fix: pre-load open grievances keyed by lowercase member email.
+    // Previously calculateGrievanceScore received hardcoded empty status and 30 days,
+    // so the grievance dimension was effectively binary. Now we pass real status
+    // and earliest days-to-deadline per member from the Grievance Log.
+    var grievanceMap = {};
+    try {
+      var gss = _getSS();
+      var gSheet = gss ? gss.getSheetByName(SHEETS.GRIEVANCE_LOG) : null;
+      if (gSheet && gSheet.getLastRow() > 1 &&
+          typeof GRIEVANCE_COLS !== 'undefined' &&
+          GRIEVANCE_COLS.MEMBER_EMAIL && GRIEVANCE_COLS.STATUS && GRIEVANCE_COLS.DAYS_TO_DEADLINE) {
+        var gData = gSheet.getDataRange().getValues();
+        var closedSet = { 'closed': 1, 'withdrawn': 1, 'resolved': 1 };
+        for (var gi = 1; gi < gData.length; gi++) {
+          var gRow = gData[gi];
+          var gEmail = String(col_(gRow, GRIEVANCE_COLS.MEMBER_EMAIL) || '').trim().toLowerCase();
+          if (!gEmail) continue;
+          var gStatus = String(col_(gRow, GRIEVANCE_COLS.STATUS) || '').trim();
+          if (closedSet[gStatus.toLowerCase()]) continue;
+          var gDays = Number(col_(gRow, GRIEVANCE_COLS.DAYS_TO_DEADLINE));
+          if (!isFinite(gDays)) gDays = 30;
+          // Keep the most urgent open grievance per member
+          var existing = grievanceMap[gEmail];
+          if (!existing || gDays < existing.daysToDeadline) {
+            grievanceMap[gEmail] = { status: gStatus, daysToDeadline: gDays };
+          }
+        }
+      }
+    } catch (_gErr) { log_('getOrgHealthScores.grievanceMap', _gErr.message || String(_gErr)); }
+
     var scoredMembers = [];
 
     for (var i = 1; i < data.length; i++) {
@@ -5295,7 +5461,9 @@ var DataService = (function () {
 
       var engagementScore = ScoringService.calculateEngagementScore(volunteerHours, openRate, committees);
       var profileScore    = ScoringService.calculateProfileScore(profileFields);
-      var grievanceScore  = ScoringService.calculateGrievanceScore(hasOpenGrievance, '', 30, config.grievanceScoreDirection || 'Negative');
+      // v4.55.1 AMIR-02 fix: pass real grievance status and days-to-deadline from pre-loaded map
+      var gInfo = grievanceMap[email] || { status: '', daysToDeadline: 30 };
+      var grievanceScore  = ScoringService.calculateGrievanceScore(hasOpenGrievance, gInfo.status, gInfo.daysToDeadline, config.grievanceScoreDirection || 'Negative');
       var composite       = ScoringService.calculateCompositeScore(engagementScore, profileScore, grievanceScore);
       var color           = ScoringService.getScoreColor(composite);
 
@@ -5412,6 +5580,7 @@ var DataService = (function () {
     getStewardPerformance: getStewardPerformance,
     getAllStewardPerformance: getAllStewardPerformance,
     getCaseChecklist: getCaseChecklist,
+    getCaseOwnerEmail: getCaseOwnerEmail,
     getCaseChecklistProgress: getCaseChecklistProgress,
     toggleChecklistItem: toggleChecklistItem,
     getMemberMeetings: getMemberMeetings,
@@ -5507,7 +5676,9 @@ function updateAgencyDirectorOverrides(overrides) {
     var sheet = ss.getSheetByName(SHEETS.CONFIG);
     if (!sheet || !CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES) return { success: false, message: 'Config sheet unavailable.' };
     var json = JSON.stringify(overrides);
-    sheet.getRange(3, CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES).setValue(escapeForFormula(json));
+    // v4.55.1: JSON is not interpreted as a formula by Sheets, so escapeForFormula is not needed.
+    // Previously it was doubling backslashes in JSON, corrupting values on read-back.
+    sheet.getRange(3, CONFIG_COLS.AGENCY_DIRECTOR_OVERRIDES).setValue(json);
     if (typeof ConfigReader !== 'undefined' && ConfigReader.refreshConfig) {
       try { ConfigReader.refreshConfig(); } catch (_) {}
     }

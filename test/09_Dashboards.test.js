@@ -57,7 +57,14 @@ global.getSatisfactionColMap_ = jest.fn(() => ({
   'q56': 57, 'q57': 58, 'q58': 59, 'q59': 60, 'q60': 61, 'q61': 62, 'q62': 63
 }));
 
-// Clean up module-level mocks between tests
+// v4.55.2 Wave 27 / Auditor-Beta B-14: reset mock call counts between tests.
+// jest.restoreAllMocks() only touches jest.spyOn spies, not the module-level
+// global.xxx = jest.fn() assignments above, so call counts could leak from one
+// test into the next. jest.clearAllMocks() resets .mock.calls on ALL jest.fn
+// instances without destroying the implementations, which is what we want.
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 afterEach(() => {
   jest.restoreAllMocks();
 });

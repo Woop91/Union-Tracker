@@ -480,24 +480,30 @@ function handleSecurityAudit_(e) {
       alertMessage = alertMessage || 'LARGE_CHANGE';
     }
 
-    var details = JSON.stringify({
+    // v4.55.1 D10-BUG-01: route through logAuditEvent() so entries are protected by the
+    // HMAC chain. Previously the direct 5-column appendRow bypassed the chain and left
+    // entries without integrity hashes. Falls back to direct append only if logAuditEvent
+    // is unavailable at load time (shouldn't happen in prod since 08d_ loads before 10_).
+    var auditDetails = {
       cell: range.getA1Notation(),
       sheet: range.getSheet().getName(),
       oldValue: e.oldValue || '(empty)',
       newValue: e.value || '(deleted)',
-      alert: alertMessage || ''
-    });
-
-    var auditRow = [
-      new Date(),
-      alertMessage || 'CELL_EDIT',
-      userEmail,
-      details,
-      ''
-    ];
-
-    // Direct append — every audit event is written immediately for reliability
-    auditSheet.appendRow(auditRow);
+      alert: alertMessage || '',
+      user: userEmail
+    };
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent(alertMessage || 'CELL_EDIT', auditDetails);
+    } else {
+      var auditRow = [
+        new Date(),
+        alertMessage || 'CELL_EDIT',
+        userEmail,
+        JSON.stringify(auditDetails),
+        ''
+      ];
+      auditSheet.appendRow(auditRow);
+    }
 
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
@@ -605,19 +611,19 @@ function handleStageGateWorkflow_(e) {
 }
 
 /**
- * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AQ)
+ * Sends escalation alert email to Chief Steward.
+ * Reads email dynamically from CONFIG_COLS.CHIEF_STEWARD_EMAIL — the actual
+ * column letter depends on the active header order and is not fixed.
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
  * @private
  */
 function sendEscalationAlert_(memberName, caseID, status) {
-  // Get Chief Steward email from Config sheet
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    log_('sendEscalationAlert_', 'Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
+    log_('sendEscalationAlert_', 'Chief Steward email not configured (CONFIG_COLS.CHIEF_STEWARD_EMAIL) - skipping escalation alert');
     return;
   }
 
@@ -2037,10 +2043,11 @@ function updateGrievance(grievanceId, updates) {
 
     // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.DESCRIPTION).setValue(escapeForFormula(updates.description));
+      // Preserve newlines — grievance descriptions are multi-paragraph.
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.DESCRIPTION).setValue(escapeForFormulaPreserveNewlines(updates.description));
     }
     if (updates.notes !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(updates.notes));
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormulaPreserveNewlines(updates.notes));
     }
     if (updates.status !== undefined) {
       sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(escapeForFormula(updates.status));
@@ -2417,59 +2424,7 @@ function exportMemberDirectory(format) {
   }
 }
 
-/**
- * Searches members for the find dialog
- * @param {string} term - Search term
- * @returns {Array} Array of matching members
- */
-function searchMembersForDialog(term) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+// Dead code removed (v4.55.2): searchMembersForDialog() and navigateToMemberRow()
+// were server-side callbacks for a find-member HtmlService dialog that was
+// removed in an earlier refactor. Zero callers in src/ or test/.
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  const data = sheet.getDataRange().getValues();
-  const results = [];
-  const searchLower = term.toLowerCase();
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const firstName = (col_(row, MEMBER_COLS.FIRST_NAME) || '').toString().toLowerCase();
-    const lastName = (col_(row, MEMBER_COLS.LAST_NAME) || '').toString().toLowerCase();
-    const email = (col_(row, MEMBER_COLS.EMAIL) || '').toString().toLowerCase();
-    const memberId = (col_(row, MEMBER_COLS.MEMBER_ID) || '').toString().toLowerCase();
-
-    if (firstName.includes(searchLower) ||
-        lastName.includes(searchLower) ||
-        email.includes(searchLower) ||
-        memberId.includes(searchLower)) {
-      results.push({
-        row: i + 1,
-        name: col_(row, MEMBER_COLS.FIRST_NAME) + ' ' + col_(row, MEMBER_COLS.LAST_NAME),
-        email: col_(row, MEMBER_COLS.EMAIL),
-        id: col_(row, MEMBER_COLS.MEMBER_ID)
-      });
-
-      if (results.length >= 10) break; // Limit results
-    }
-  }
-
-  return results;
-}
-
-/**
- * Navigates to a specific member row
- * @param {number} row - Row number to navigate to
- */
-function navigateToMemberRow(row) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (sheet) {
-    sheet.activate();
-    sheet.getRange(row, 1).activate();
-    SpreadsheetApp.flush();
-  }
-}

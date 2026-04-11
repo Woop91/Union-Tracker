@@ -797,10 +797,11 @@ function test_endpoints_taskFnsExist() {
 
 /** Tests endpoints: survey feedback fns exist. */
 function test_endpoints_surveyFeedbackFnsExist() {
+  // v4.55.1: dataSubmitFeedback / dataGetMyFeedback removed (feedback feature deleted v4.52.0)
   var fns = [
     'dataGetSurveyStatus', 'dataGetSurveyQuestions',
     'dataSubmitSurveyResponse', 'dataGetSurveyResults',
-    'dataGetSatisfactionTrends', 'dataSubmitFeedback', 'dataGetMyFeedback'
+    'dataGetSatisfactionTrends'
   ];
   for (var i = 0; i < fns.length; i++) {
     TestRunner.assertEquals('function', typeof this[fns[i]], fns[i] + ' exists');
@@ -872,10 +873,10 @@ function test_endpoints_pollStubsRemoved() {
 /** Tests endpoints: all write endpoints reject null. */
 function test_endpoints_allWriteEndpointsRejectNull() {
   // Write/mutate endpoints must reject null session tokens
+  // v4.55.1: dataSubmitFeedback removed (feedback feature deleted v4.52.0)
   var writeEndpoints = [
     { fn: 'dataUpdateProfile', args: [null, {}] },
     { fn: 'dataCreateTask', args: [null, {}] },
-    { fn: 'dataSubmitFeedback', args: [null, {}] },
     { fn: 'dataSendBroadcast', args: [null, '', '', ''] },
     { fn: 'dataLogMemberContact', args: [null, '', '', ''] },
     { fn: 'dataAddMeetingMinutes', args: [null, {}, ''] }

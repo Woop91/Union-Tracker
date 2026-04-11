@@ -855,8 +855,9 @@ describe('resolveGrievance', () => {
 
     resolveGrievance('GRV-2026-0001', 'Denied', 'No violation found', 'Reviewed thoroughly');
 
+    // v4.55.1 H07-BUG-01: resolveGrievance now logs GRIEVANCE_RESOLVED (previously miscategorized as GRIEVANCE_UPDATED)
     expect(logAuditEvent).toHaveBeenCalledWith(
-      AUDIT_EVENTS.GRIEVANCE_UPDATED,
+      AUDIT_EVENTS.GRIEVANCE_RESOLVED,
       expect.objectContaining({
         grievanceId: 'GRV-2026-0001',
         action: 'RESOLVED',
@@ -1011,6 +1012,72 @@ describe('advanceGrievanceStep', () => {
         toStep: 'Step III'
       })
     );
+  });
+
+  // v4.55.2 Wave 26 / Auditor-Alpha AA-21: invalid state transition tests.
+  // H07-BUG-04 (already-closed guard) was fixed in v4.55.1 Wave 2 but had no
+  // regression test. These cover every GRIEVANCE_CLOSED_STATUSES value plus
+  // the positive-control case (open grievance still advances).
+
+  test('AA-21: rejects advancement when status is "Won" (closed)', () => {
+    var setup = setupAdvanceMock('GRV-2026-0001', 'Step II');
+    // Override status on the grievance row to "Won" (a closed status)
+    var headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    var grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = 'Step II';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.WON;
+    var data = [headerRow, grievanceRow];
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
+    sheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 41)
+    });
+    sheet.getRange.mockReturnValue(setup.mockRange);
+    var mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    var result = advanceGrievanceStep('GRV-2026-0001', {});
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/closed/i);
+    // Audit log must NOT record an advancement for a closed grievance.
+    expect(logAuditEvent).not.toHaveBeenCalledWith(
+      AUDIT_EVENTS.GRIEVANCE_STEP_ADVANCED,
+      expect.anything()
+    );
+  });
+
+  test('AA-21: rejects advancement when status is "Denied" (closed)', () => {
+    var setup = setupAdvanceMock('GRV-2026-0001', 'Step III');
+    var headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    var grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = 'Step III';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.DENIED;
+    var data = [headerRow, grievanceRow];
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
+    sheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 41)
+    });
+    sheet.getRange.mockReturnValue(setup.mockRange);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([sheet]));
+
+    var result = advanceGrievanceStep('GRV-2026-0001', {});
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/closed/i);
+  });
+
+  test('AA-21: positive control — advances an "Open" grievance normally', () => {
+    // Re-proves the happy path still works alongside the closed-status guard.
+    setupAdvanceMock('GRV-2026-0001', 1);
+    var result = advanceGrievanceStep('GRV-2026-0001', {});
+    expect(result.success).toBe(true);
+    expect(result.newStep).toBe('Step II');
   });
 });
 
@@ -1450,5 +1517,184 @@ describe('bulkUpdateGrievanceStatus zero-count handling', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('No matching');
     expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+
+  // v4.55.2 Wave 26 / Auditor-Alpha AA-21: invalid newStatus must be rejected
+  // before any sheet writes. H07-BUG-06 (newStatus whitelist) was fixed in
+  // v4.55.1 Wave 2 but had no regression test.
+
+  test('AA-21: rejects unknown newStatus before touching the sheet', () => {
+    var headers = new Array(41).fill('');
+    headers[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    var row1 = new Array(41).fill('');
+    row1[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-001';
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headers, row1]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([sheet]));
+
+    var result = bulkUpdateGrievanceStatus(['GRV-001'], 'BogusStatus', '');
+    expect(result.success).toBe(false);
+    expect(result.error || result.message).toMatch(/invalid grievance status/i);
+    // Critical: no audit event emitted for a rejected bulk op
+    expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+
+  test('AA-21: rejects empty-string newStatus', () => {
+    var headers = new Array(41).fill('');
+    headers[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    var row1 = new Array(41).fill('');
+    row1[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-001';
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headers, row1]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([sheet]));
+
+    var result = bulkUpdateGrievanceStatus(['GRV-001'], '', '');
+    expect(result.success).toBe(false);
+    expect(result.error || result.message).toMatch(/invalid grievance status/i);
+    expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+
+  test('AA-21: rejects null newStatus', () => {
+    var headers = new Array(41).fill('');
+    headers[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    var row1 = new Array(41).fill('');
+    row1[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-001';
+    var sheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headers, row1]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([sheet]));
+
+    var result = bulkUpdateGrievanceStatus(['GRV-001'], null, '');
+    expect(result.success).toBe(false);
+    expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// v4.55.2 H-UX-01: grievance lifecycle member notifications
+// ============================================================================
+
+describe('H-UX-01: grievance member notifications', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function setupLifecycleWithNotifications(grievanceId, currentStep, memberEmail) {
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headerRow[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = 'Member Email';
+
+    const grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLS.RESOLUTION - 1] = '';
+    grievanceRow[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = memberEmail || 'alice@union.test';
+
+    const data = [headerRow, grievanceRow];
+
+    const mockRange = {
+      setValue: jest.fn(),
+      setValues: jest.fn(),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => [grievanceRow]),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 41),
+      getA1Notation: jest.fn(() => 'A2'),
+      getSheet: jest.fn()
+    };
+
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, data);
+    grievSheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 1),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 41)
+    });
+    grievSheet.getRange.mockReturnValue(mockRange);
+
+    // Separate Notifications sheet so the helper has somewhere to write.
+    const notifSheet = createMockSheet(SHEETS.NOTIFICATIONS, [[]]);
+
+    const mockSS = createMockSpreadsheet([grievSheet, notifSheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    if (!global.logAuditEvent) global.logAuditEvent = jest.fn();
+    else global.logAuditEvent.mockClear();
+
+    return { grievSheet, notifSheet, mockRange };
+  }
+
+  test('advanceGrievanceStep writes a notification addressed to the grievance owner', () => {
+    const { notifSheet } = setupLifecycleWithNotifications('GRV-2026-0042', 1, 'bob@union.test');
+
+    advanceGrievanceStep('GRV-2026-0042', {});
+
+    expect(notifSheet.appendRow).toHaveBeenCalledTimes(1);
+    const row = notifSheet.appendRow.mock.calls[0][0];
+    // Recipient (col 2, index 1) — must match grievance owner's email
+    expect(row[NOTIFICATIONS_COLS.RECIPIENT - 1]).toBe('bob@union.test');
+    // Title mentions step advancement
+    expect(String(row[NOTIFICATIONS_COLS.TITLE - 1])).toMatch(/advanced/i);
+    // Type is scoped to grievances so the member UI can badge it
+    expect(row[NOTIFICATIONS_COLS.TYPE - 1]).toBe('Grievance Update');
+    // Status active so it actually renders
+    expect(row[NOTIFICATIONS_COLS.STATUS - 1]).toBe('Active');
+  });
+
+  test('resolveGrievance writes a notification addressed to the grievance owner', () => {
+    const { notifSheet } = setupLifecycleWithNotifications('GRV-2026-0099', 2, 'carol@union.test');
+
+    resolveGrievance('GRV-2026-0099', 'Won', 'Management conceded', '');
+
+    expect(notifSheet.appendRow).toHaveBeenCalledTimes(1);
+    const row = notifSheet.appendRow.mock.calls[0][0];
+    expect(row[NOTIFICATIONS_COLS.RECIPIENT - 1]).toBe('carol@union.test');
+    expect(String(row[NOTIFICATIONS_COLS.TITLE - 1])).toMatch(/resolved/i);
+    expect(String(row[NOTIFICATIONS_COLS.MESSAGE - 1])).toContain('Won');
+  });
+
+  test('helper is a silent no-op when the Notifications sheet is missing', () => {
+    // Grievance sheet only — no notifications sheet provided.
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = 'Member Email';
+    const grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-NO-NOTIFS';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = 1;
+    grievanceRow[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = 'dave@union.test';
+
+    const grievSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [headerRow, grievanceRow]);
+    grievSheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => [headerRow, grievanceRow]),
+      getNumRows: jest.fn(() => 2),
+      getNumColumns: jest.fn(() => 41)
+    });
+    grievSheet.getRange.mockReturnValue({
+      setValue: jest.fn(),
+      setValues: jest.fn(),
+      getValues: jest.fn(() => [grievanceRow]),
+      getNumColumns: jest.fn(() => 41)
+    });
+
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([grievSheet]));
+    if (!global.logAuditEvent) global.logAuditEvent = jest.fn();
+
+    // Should succeed normally even without a Notifications sheet.
+    const result = advanceGrievanceStep('GRV-NO-NOTIFS', {});
+    expect(result.success).toBe(true);
+  });
+
+  test('helper returns false for a grievance row with no member email', () => {
+    // The helper is unit-testable directly.
+    const row = new Array(41).fill('');
+    row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-ORPHAN';
+    // MEMBER_EMAIL deliberately left blank
+
+    const notifSheet = createMockSheet(SHEETS.NOTIFICATIONS, [[]]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(createMockSpreadsheet([notifSheet]));
+
+    const wrote = _notifyGrievanceMember_(row, 'title', 'body');
+    expect(wrote).toBe(false);
+    expect(notifSheet.appendRow).not.toHaveBeenCalled();
   });
 });

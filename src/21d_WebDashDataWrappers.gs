@@ -60,6 +60,24 @@ function _requireStewardAuth(sessionToken) {
   return (auth.email || '').toLowerCase().trim();
 }
 
+/**
+ * Case-insensitive + whitespace-tolerant header lookup. Returns the 0-based
+ * column index of `name` in `headers`, or -1 if not found. Previously the
+ * data wrappers called headers.indexOf('Email') directly, which silently
+ * failed on " Email ", "email", or any slightly-off header variant.
+ * @param {Array<string>} headers
+ * @param {string} name
+ * @returns {number}
+ */
+function _hi(headers, name) {
+  if (!headers || !name) return -1;
+  var needle = String(name).trim().toLowerCase();
+  for (var k = 0; k < headers.length; k++) {
+    if (String(headers[k]).trim().toLowerCase() === needle) return k;
+  }
+  return -1;
+}
+
 // ═══════════════════════════════════════
 // AUTHENTICATED DATA SERVICE WRAPPERS
 // ═══════════════════════════════════════
@@ -176,7 +194,7 @@ function dataGetSurveyStatus(sessionToken) { var e = _resolveCallerEmail(session
 /** @param {string} sessionToken @returns {Object[]} All members from directory. Requires steward auth. */
 function dataGetAllMembers(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllMembers(); }
 /** @param {string} sessionToken @param {string} [scope] @returns {Object} Survey tracking for steward's members. Requires steward auth. */
-function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { log_('dataGetStewardSurveyTracking error', e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
+function dataGetStewardSurveyTracking(sessionToken, scope) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { log_('dataGetStewardSurveyTracking error', e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [], periodActive: false, periodName: null }; } }
 /** @param {string} sessionToken @param {Object} filter @param {string} msg @param {string} subject @returns {Object} Sends broadcast email. Requires steward auth. */
 function dataSendBroadcast(sessionToken, filter, msg, subject) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg, subject); }
 /** @param {string} sessionToken @returns {Object} Aggregated survey results. Requires steward auth. */
@@ -222,6 +240,18 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
   if (!s) return { success: false, authError: true, message: 'Steward access required.' };
   if (!memberEmail || !subject || !body) return { success: false, message: 'Missing required fields.' };
 
+  // v4.55.1 P02-BUG-03: verify the recipient exists in the Member Directory so stewards
+  // cannot use this endpoint as an arbitrary-recipient email relay.
+  try {
+    var recipientLc = String(memberEmail).trim().toLowerCase();
+    var memberRecord = (typeof findUserByEmail === 'function') ? findUserByEmail(recipientLc) : null;
+    if (!memberRecord) {
+      return { success: false, message: 'Recipient is not in the Member Directory.' };
+    }
+  } catch (_mvErr) {
+    return { success: false, message: 'Recipient could not be validated.' };
+  }
+
   // Rate limiting: max 10 direct messages per minute per steward
   var _dmCache = CacheService.getScriptCache();
   var _dmRateKey = 'DM_RATE_' + s.toLowerCase().trim();
@@ -259,8 +289,10 @@ function dataSendDirectMessage(sessionToken, memberEmail, subject, body) {
 
     return { success: true, message: 'Message sent.' };
   } catch (e) {
-    log_('dataSendDirectMessage error', e.message);
-    return { success: false, message: 'Failed to send: ' + e.message };
+    // Don't echo e.message back to the client — it may contain sheet names,
+    // stack fragments, or service quota details. Log the real error server-side.
+    log_('dataSendDirectMessage error', e.message + (e.stack ? '\n' + e.stack : ''));
+    return { success: false, message: 'Could not send the message. Please try again.' };
   }
 }
 
@@ -523,18 +555,29 @@ function dataStaffCompleteMemberTask(sessionToken, taskId) { var s = _requireSte
 function dataUpdateTask(sessionToken, taskId, updates) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return withScriptLock_(function() { return DataService.updateTask(s, taskId, updates); }); }
 /** @param {string} sessionToken @returns {Object[]} All steward performance metrics. Requires steward auth. */
 function dataGetAllStewardPerformance(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getAllStewardPerformance(); }
-/** @param {string} sessionToken @param {string} caseId @returns {Object[]} Checklist items for a case. Requires auth. */
-function dataGetCaseChecklist(sessionToken, caseId) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Authentication required.' }; /* TODO: add ownership check — member should only see their own case's checklist */ return DataService.getCaseChecklist(caseId); }
+/**
+ * @param {string} sessionToken @param {string} caseId @returns {Object[]|Object} Checklist items for a case. Requires auth.
+ * v4.55.1 priv-esc fix: stewards see any case; members see only their own.
+ */
+function dataGetCaseChecklist(sessionToken, caseId) {
+  var e = _resolveCallerEmail(sessionToken);
+  if (!e) return { success: false, authError: true, message: 'Authentication required.' };
+  var steward = _requireStewardAuth(sessionToken);
+  if (!steward) {
+    var owner = DataService.getCaseOwnerEmail(caseId);
+    if (!owner || owner !== e) return { success: false, authError: true, message: 'Access denied.' };
+  }
+  return DataService.getCaseChecklist(caseId);
+}
 /** @param {string} sessionToken @param {string} checklistId @param {boolean} completed @returns {Object} Toggles checklist item. Requires auth. */
 function dataToggleChecklistItem(sessionToken, checklistId, completed) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.toggleChecklistItem(checklistId, completed, s); }
 /** @param {string} sessionToken @returns {Object[]} Meetings the caller has attended. Requires auth. */
 function dataGetMemberMeetings(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMemberMeetings(e) : { success: false, authError: true, message: 'Authentication required.' }; }
 /** @param {string} sessionToken @returns {Object} Satisfaction survey trends. Requires steward auth. */
 function dataGetSatisfactionTrends(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getSatisfactionTrends(); }
-/** @param {string} sessionToken @param {Object} data @param {string} idemKey @returns {Object} Submits user feedback. Requires auth. */
-function dataSubmitFeedback(sessionToken, data, idemKey) { var e = _resolveCallerEmail(sessionToken); return e ? withScriptLock_(function() { return DataService.submitFeedback(e, data, idemKey); }) : { success: false, authError: true, message: 'Authentication required.' }; }
-/** @param {string} sessionToken @returns {Object[]} Caller's submitted feedback. Requires auth. */
-function dataGetMyFeedback(sessionToken) { var e = _resolveCallerEmail(sessionToken); return e ? DataService.getMyFeedback(e) : { success: false, authError: true, message: 'Authentication required.' }; }
+// v4.55.1 (N14-BUG-09 / Beta B-01/B-02): dataSubmitFeedback and dataGetMyFeedback wrappers removed.
+// They called DataService.submitFeedback() / getMyFeedback() which were deleted in v4.52.0 — dead code that would TypeError on call.
+// No callers exist in any .html file.
 
 // v4.33.0 — Insights batch: 6 parallel server calls in 1 round-trip
 /**
@@ -577,6 +620,8 @@ function dataRefreshNavData(sessionToken) {
  * @returns {Object} Grievance data for signing or error object
  */
 function dataGetGrievanceForSigning(sigToken) {
+  // v4.55.1 V09-BUG-05: respect SHOW_GRIEVANCES toggle even on token-auth signing flows
+  if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances are disabled.' };
   return getGrievanceForSigning(sigToken);
 }
 
@@ -587,6 +632,8 @@ function dataGetGrievanceForSigning(sigToken) {
  * @returns {Object} Result object with success status
  */
 function dataSubmitGrievanceSignature(sigToken, sigBase64) {
+  // v4.55.1 V09-BUG-05: respect SHOW_GRIEVANCES toggle on signature submission as well
+  if (!_isGrievancesEnabled()) return { success: false, message: 'Grievances are disabled.' };
   return submitGrievanceSignature(sigToken, sigBase64);
 }
 
@@ -895,7 +942,8 @@ function dataGetBroadcastFilterOptions(sessionToken) {
     var broadcastScopeAll = false;
     try {
       var config = ConfigReader.getConfig();
-      broadcastScopeAll = (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes');
+      // Accept checkbox booleans (true/false), raw strings ('yes'/'true'/'1'/'on'), and legacy 'Yes'.
+      broadcastScopeAll = (config.broadcastScopeAll === true || ['yes','true','1','on'].indexOf(String(config.broadcastScopeAll || '').trim().toLowerCase()) !== -1);
     } catch (_e) { log_('dataGetBroadcastFilterOptions', 'Error reading config: ' + (_e.message || _e)); }
     return {
       locations: Object.keys(locations).sort(),
@@ -996,8 +1044,11 @@ function dataLogResourceClick(sessionToken, resourceId, resourceTitle) {
     }
 
     // Append the click record. appendRow is atomic and handles concurrency.
-    // No LockService needed — appendRow is naturally safe for concurrent appends.
-    sheet.appendRow([new Date(), email, String(resourceId), String(resourceTitle || '')]);
+    // Pass user-controlled strings through escapeForFormula so a malicious
+    // resourceTitle like "=IMPORTRANGE(...)" can't hijack the hidden log sheet
+    // when a steward later opens it manually.
+    var _safeEsc = typeof escapeForFormula === 'function' ? escapeForFormula : function(v) { return v; };
+    sheet.appendRow([new Date(), email, _safeEsc(String(resourceId)), _safeEsc(String(resourceTitle || ''))]);
     return { success: true };
   } catch (e) {
     log_('dataLogResourceClick error', e.message);
@@ -1040,9 +1091,9 @@ function dataGetEngagementStats(sessionToken) {
     if (memberSheet && memberSheet.getLastRow() >= 2) {
       var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
       var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
-      var emailIdx   = mHeaders.indexOf('Email');
-      var duesIdx    = mHeaders.indexOf('Dues Status');
-      var hireIdx    = mHeaders.indexOf('Hire Date');
+      var emailIdx   = _hi(mHeaders, 'Email');
+      var duesIdx    = _hi(mHeaders, 'Dues Status');
+      var hireIdx    = _hi(mHeaders, 'Hire Date');
       for (var mi = 0; mi < mData.length; mi++) {
         var dues = duesIdx >= 0 ? String(mData[mi][duesIdx]).trim() : '';
         if (dues !== '' && dues.toLowerCase() !== 'inactive') {
@@ -1094,7 +1145,7 @@ function dataGetEngagementStats(sessionToken) {
       var gSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
       if (gSheet && gSheet.getLastRow() >= 2) {
         var gHeaders = gSheet.getRange(1, 1, 1, gSheet.getLastColumn()).getValues()[0];
-        var gEmailIdx = gHeaders.indexOf('Member Email');
+        var gEmailIdx = _hi(gHeaders, 'Member Email');
         if (gEmailIdx >= 0) {
           var gData = gSheet.getRange(2, 1, gSheet.getLastRow() - 1, gSheet.getLastColumn()).getValues();
           var grievantSet = {};
@@ -1168,9 +1219,9 @@ function dataGetEngagementStats(sessionToken) {
       if (ciSheet && ciSheet.getLastRow() >= 2) {
         var ciData = ciSheet.getRange(2, 1, ciSheet.getLastRow() - 1, ciSheet.getLastColumn()).getValues();
         var ciHeaders = ciSheet.getRange(1, 1, 1, ciSheet.getLastColumn()).getValues()[0];
-        var ciDateIdx = ciHeaders.indexOf('Meeting Date');
-        var ciEmailIdx2 = ciHeaders.indexOf('Email');
-        var ciMeetingIdIdx = ciHeaders.indexOf('Meeting ID');
+        var ciDateIdx = _hi(ciHeaders, 'Meeting Date');
+        var ciEmailIdx2 = _hi(ciHeaders, 'Email');
+        var ciMeetingIdIdx = _hi(ciHeaders, 'Meeting ID');
         if (ciDateIdx >= 0) {
           var mtMap = {};
           var meetingIds = {};
@@ -1258,8 +1309,8 @@ function dataGetEngagementStats(sessionToken) {
       if (notifSheet && notifSheet.getLastRow() >= 2) {
         var notifData = notifSheet.getRange(2, 1, notifSheet.getLastRow() - 1, notifSheet.getLastColumn()).getValues();
         var notifHeaders = notifSheet.getRange(1, 1, 1, notifSheet.getLastColumn()).getValues()[0];
-        var notifStatusIdx = notifHeaders.indexOf('Status');
-        var notifDismissedIdx = notifHeaders.indexOf('Dismissed_By');
+        var notifStatusIdx = _hi(notifHeaders, 'Status');
+        var notifDismissedIdx = _hi(notifHeaders, 'Dismissed_By');
         for (var ni = 0; ni < notifData.length; ni++) {
           notifTotal++;
           var nStatus = notifStatusIdx >= 0 ? String(notifData[ni][notifStatusIdx]).trim().toLowerCase() : '';
@@ -1295,9 +1346,9 @@ function dataGetEngagementStats(sessionToken) {
       // Re-read member sheet for steward assignments
       if (memberSheet && memberSheet.getLastRow() >= 2) {
         var memHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
-        var assignedStewardIdx = memHeaders.indexOf('Assigned Steward');
-        var isStewardIdx = memHeaders.indexOf('Is Steward');
-        var memLocIdx = memHeaders.indexOf('Work Location');
+        var assignedStewardIdx = _hi(memHeaders, 'Assigned Steward');
+        var isStewardIdx = _hi(memHeaders, 'Is Steward');
+        var memLocIdx = _hi(memHeaders, 'Work Location');
         if (assignedStewardIdx >= 0) {
           var memAllData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
           var stewardMemberCount = {}; // stewardEmail -> count
@@ -1429,7 +1480,7 @@ function dataGetMyEngagementScore(sessionToken) {
       if (ciSheet && ciSheet.getLastRow() >= 2) {
         var ciData = ciSheet.getRange(2, 1, ciSheet.getLastRow() - 1, ciSheet.getLastColumn()).getValues();
         var ciHeaders = ciSheet.getRange(1, 1, 1, ciSheet.getLastColumn()).getValues()[0];
-        var ciEmailIdx = ciHeaders.indexOf('Email');
+        var ciEmailIdx = _hi(ciHeaders, 'Email');
         if (ciEmailIdx >= 0) {
           var meetingsAttended = 0;
           for (var mi = 0; mi < ciData.length; mi++) {
@@ -1670,8 +1721,8 @@ function dataGetWorkloadSummaryStats(sessionToken) {
       var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
       if (memberSheet && memberSheet.getLastRow() >= 2) {
         var mHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
-        var isStewardIdx = mHeaders.indexOf('Is Steward');
-        var emailIdx     = mHeaders.indexOf('Email');
+        var isStewardIdx = _hi(mHeaders, 'Is Steward');
+        var emailIdx     = _hi(mHeaders, 'Email');
         if (isStewardIdx >= 0 && emailIdx >= 0) {
           var mData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn()).getValues();
           var stewardSet = {};
@@ -1875,66 +1926,15 @@ function dataGetWebAppSearchResults(sessionToken, query, tab) {
     var results = getWebAppSearchResults(query || '', tab || 'all');
     return { success: true, results: results || [] };
   } catch (e) {
-    log_('dataGetWebAppSearchResults error', e.message);
-    return { success: false, message: 'Search failed: ' + e.message };
+    log_('dataGetWebAppSearchResults error', e.message + (e.stack ? '\n' + e.stack : ''));
+    return { success: false, message: 'Search failed. Please try again.' };
   }
 }
 
-// ═══════════════════════════════════════
-// UNDO SYSTEM WRAPPERS (v4.33.0)
-// ═══════════════════════════════════════
-
-/**
- * Reverts undo history to the specified index. Requires steward auth.
- * @param {string} sessionToken
- * @param {number} targetIndex
- * @returns {Object} { success: boolean, message: string }
- */
-function dataUndoToIndex(sessionToken, targetIndex) {
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try {
-    undoToIndex(Math.floor(targetIndex));
-    return { success: true, message: 'Undone to index ' + targetIndex };
-  } catch (e) {
-    log_('dataUndoToIndex error', e.message);
-    return { success: false, message: e.message };
-  }
-}
-
-/**
- * Exports undo history to a new sheet. Requires steward auth.
- * @param {string} sessionToken
- * @returns {Object} { success: boolean, sheetUrl?: string, message?: string }
- */
-function dataExportUndoHistory(sessionToken) {
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try {
-    var url = exportUndoHistoryToSheet();
-    return { success: true, sheetUrl: url };
-  } catch (e) {
-    log_('dataExportUndoHistory error', e.message);
-    return { success: false, message: e.message };
-  }
-}
-
-/**
- * Returns the undo history stack. Requires steward auth.
- * @param {string} sessionToken
- * @returns {Object} { success: boolean, history?: Array, message?: string }
- */
-function dataGetUndoHistory(sessionToken) {
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  try {
-    var history = getUndoHistory();
-    return { success: true, history: history };
-  } catch (e) {
-    log_('dataGetUndoHistory error', e.message);
-    return { success: false, message: e.message };
-  }
-}
+// The dataUndoToIndex / dataExportUndoHistory / dataGetUndoHistory wrappers
+// from v4.33.0 were removed: no HTML view ever called them, so the undo system
+// had no UI surface. The backing undo helpers still exist as server-side menu
+// utilities in 06_Maintenance.gs.
 
 // ═══════════════════════════════════════
 // MEETING CHECK-IN WRAPPER (v4.33.0)
@@ -1953,8 +1953,8 @@ function dataWebCheckInMember(sessionToken, meetingId, pin) {
   try {
     return webCheckInMember(meetingId, email, pin);
   } catch (e) {
-    log_('dataWebCheckInMember error', e.message);
-    return { success: false, message: 'Check-in failed: ' + e.message };
+    log_('dataWebCheckInMember error', e.message + (e.stack ? '\n' + e.stack : ''));
+    return { success: false, message: 'Check-in failed. Please try again or contact your steward.' };
   }
 }
 
@@ -2106,12 +2106,20 @@ function dataGetAuditLog(sessionToken, options) {
   var searchTerm = options.searchTerm ? String(options.searchTerm).toLowerCase().trim() : '';
 
   // Process rows in reverse (newest first)
+  // Resolve columns via AUDIT_LOG_COLS (1-indexed) so a Config-driven reorder
+  // doesn't silently garble every row. Falls back to AUDIT_LOG_HEADER_MAP_ default
+  // positions if the dynamic map failed to sync.
+  var _A = (typeof AUDIT_LOG_COLS === 'object' && AUDIT_LOG_COLS) ? AUDIT_LOG_COLS : null;
+  function _acol(row, logical, fallbackIndex) {
+    if (_A && _A[logical]) return row[_A[logical] - 1];
+    return row[fallbackIndex];
+  }
   for (var i = data.length - 1; i >= 0; i--) {
     var row = data[i];
-    var ts = row[0]; // Timestamp
-    var eventType = String(row[9] || row[1] || '').trim(); // ACTION_TYPE or EVENT_TYPE
-    var user = String(row[1] || '').trim(); // USER_EMAIL
-    var details = String(row[7] || row[3] || '').trim(); // NEW_VALUE or DETAILS
+    var ts = _acol(row, 'TIMESTAMP', 0);
+    var eventType = String(_acol(row, 'ACTION_TYPE', 9) || _acol(row, 'EVENT_TYPE', 1) || '').trim();
+    var user = String(_acol(row, 'USER_EMAIL', 1) || '').trim();
+    var details = String(_acol(row, 'NEW_VALUE', 7) || _acol(row, 'DETAILS', 3) || '').trim();
 
     if (eventType) eventTypeSet[eventType] = true;
 
@@ -2139,11 +2147,11 @@ function dataGetAuditLog(sessionToken, options) {
       timestamp: ts instanceof Date ? ts.toISOString() : String(ts),
       eventType: eventType,
       user: displayUser,
-      sheet: String(row[2] || '').trim(),
-      fieldName: String(row[5] || '').trim(),
-      oldValue: String(row[6] || '').substring(0, 200),
+      sheet: String(_acol(row, 'SHEET', 2) || '').trim(),
+      fieldName: String(_acol(row, 'FIELD_NAME', 5) || '').trim(),
+      oldValue: String(_acol(row, 'OLD_VALUE', 6) || '').substring(0, 200),
       newValue: displayDetails.substring(0, 500),
-      recordId: String(row[8] || '').trim(),
+      recordId: String(_acol(row, 'RECORD_ID', 8) || '').trim(),
       actionType: eventType
     });
   }
@@ -2259,33 +2267,6 @@ function dataBulkCreateFolders(sessionToken, caseIds) {
   }
   return { success: true, created: created, errors: errors };
 }
-
-/** Bulk send email to members. Steward-only. */
-function dataBulkSendEmail(sessionToken, memberEmails, subject, body) {
-  var s = _requireStewardAuth(sessionToken);
-  if (!s) return { success: false, authError: true, message: 'Steward access required.' };
-  if (!Array.isArray(memberEmails) || !memberEmails.length || !subject) return { success: false, message: 'Invalid parameters.' };
-
-  var sent = 0;
-  var safeSubject = typeof escapeHtml === 'function' ? escapeHtml(subject) : subject;
-  var safeBody = typeof escapeHtml === 'function' ? escapeHtml(body || '') : (body || '');
-  var htmlBody = '<p>' + safeBody.replace(/\n/g, '<br>') + '</p>';
-
-  for (var i = 0; i < memberEmails.length; i++) {
-    try {
-      if (typeof safeSendEmail_ === 'function') {
-        safeSendEmail_({ to: memberEmails[i], subject: safeSubject, htmlBody: htmlBody });
-      } else if (MailApp.getRemainingDailyQuota() > 5) {
-        MailApp.sendEmail({ to: memberEmails[i], subject: safeSubject, htmlBody: htmlBody });
-      }
-      sent++;
-    } catch (e) {
-      log_('dataBulkSendEmail', 'Bulk email failed for ' + maskEmail(memberEmails[i]) + ': ' + e.message);
-    }
-  }
-  return { success: true, sent: sent };
-}
-
 
 // ═══════════════════════════════════════
 // POMS REFERENCE DATA (lazy-loaded by poms_reference.html)
@@ -2616,19 +2597,37 @@ function dataLogUsageEvents(sessionToken, payload) {
     var sheetName = (typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.USAGE_LOG) || '_Usage_Log';
     var sheet = ss.getSheetByName(sheetName);
 
-    // Auto-create the sheet if it doesn't exist
+    // Auto-create the sheet if it doesn't exist. v4.55.6 sub-project D Zone 4:
+    // new sheets get the 10-column header including Browser/OS/Device Class.
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.appendRow(['Timestamp', 'Email', 'Session ID', 'Event Type', 'Event Data', 'Session Elapsed (ms)', 'User Agent']);
+      sheet.appendRow(['Timestamp', 'Email', 'Session ID', 'Event Type', 'Event Data', 'Session Elapsed (ms)', 'User Agent', 'Browser', 'OS', 'Device Class']);
       sheet.setFrozenRows(1);
       try { sheet.hideSheet(); } catch (_h) {}
     }
 
-    // Batch-write events
+    // v4.55.6 sub-project D Zone 4: lazy migration — if the existing sheet has
+    // only the legacy 7 columns, append the new 3 headers on first write. Existing
+    // rows stay as-is; new rows get the parsed fields populated.
+    var _usageCols = sheet.getLastColumn();
+    if (_usageCols < 10) {
+      var _extra = ['Browser', 'OS', 'Device Class'];
+      sheet.getRange(1, _usageCols + 1, 1, 10 - _usageCols).setValues([_extra.slice(0, 10 - _usageCols)]);
+      _usageCols = 10;
+    }
+
+    // Batch-write events. Escape user-controlled payload fields so a
+    // malicious event type / data / userAgent value (e.g. "=IMPORTRANGE(...)")
+    // can't hijack the hidden usage log sheet when opened.
+    var _ueEsc = typeof escapeForFormula === 'function' ? escapeForFormula : function(v) { return v; };
     var rows = [];
-    var sid = String(payload.sessionId || '').slice(0, 20);
-    var ua = String(payload.userAgent || '').slice(0, 150);
+    var sid = _ueEsc(String(payload.sessionId || '').slice(0, 20));
+    var ua = _ueEsc(String(payload.userAgent || '').slice(0, 150));
     var elapsed = payload.elapsed || 0;
+    // v4.55.6 sub-project D Zone 4: pre-parsed fields from the client.
+    var browser = _ueEsc(String(payload.browser || '').slice(0, 20));
+    var os = _ueEsc(String(payload.os || '').slice(0, 20));
+    var deviceClass = _ueEsc(String(payload.deviceClass || '').slice(0, 20));
 
     for (var i = 0; i < payload.events.length && i < 100; i++) {
       var ev = payload.events[i];
@@ -2637,15 +2636,18 @@ function dataLogUsageEvents(sessionToken, payload) {
         ts,
         email,
         sid,
-        String(ev.type || '').slice(0, 30),
-        JSON.stringify(ev.data || {}).slice(0, 500),
+        _ueEsc(String(ev.type || '').slice(0, 30)),
+        _ueEsc(JSON.stringify(ev.data || {}).slice(0, 500)),
         elapsed,
-        ua
+        ua,
+        browser,
+        os,
+        deviceClass
       ]);
     }
 
     if (rows.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 7).setValues(rows);
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 10).setValues(rows);
     }
 
     // Auto-trim: keep only the latest 10,000 rows to prevent sheet bloat
@@ -2700,7 +2702,11 @@ function dataGetUsageAnalytics(sessionToken, days) {
       return { success: true, days: days, totalEvents: 0, message: 'No usage data yet.' };
     }
 
-    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+    // v4.55.6 sub-project D Zone 4: read dynamic column count so the aggregation
+    // handles both legacy 7-col rows (pre-migration, no browser/os/device) and
+    // new 10-col rows. Missing fields fall back to UA-parse-at-read-time.
+    var _lastCol = Math.max(7, sheet.getLastColumn());
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, _lastCol).getValues();
 
     // Aggregate metrics
     var uniqueUsers = {};
@@ -2714,6 +2720,9 @@ function dataGetUsageAnalytics(sessionToken, days) {
     var backSwipes = 0;
     var errors = [];
     var deviceTypes = { mobile: 0, tablet: 0, desktop: 0 };
+    // v4.55.6 sub-project D Zone 4: new groupings
+    var byBrowser = {};  // { chrome: N, safari: N, firefox: N, edge: N, other: N }
+    var byOs = {};       // { ios: N, android: N, macos: N, windows: N, linux: N, other: N }
     var dailySessions = {};
     var userLoadTimes = {};
     var totalEvents = 0;
@@ -2734,6 +2743,11 @@ function dataGetUsageAnalytics(sessionToken, days) {
       var eventData = {};
       try { eventData = JSON.parse(row[4] || '{}'); } catch (_) {}
       var ua = String(row[6] || '');
+      // v4.55.6 sub-project D Zone 4: read parsed fields from columns 8-10 if
+      // present (new rows). Legacy rows have _lastCol === 7 so these are empty.
+      var rowBrowser = _lastCol >= 8 ? String(row[7] || '') : '';
+      var rowOs = _lastCol >= 9 ? String(row[8] || '') : '';
+      var rowDeviceClass = _lastCol >= 10 ? String(row[9] || '') : '';
 
       // Track unique users
       if (userEmail) uniqueUsers[userEmail] = (uniqueUsers[userEmail] || 0) + 1;
@@ -2759,10 +2773,16 @@ function dataGetUsageAnalytics(sessionToken, days) {
             if (Object.prototype.hasOwnProperty.call(authMethods, method)) authMethods[method]++;
             else authMethods.unknown++;
           }
-          // Device detection from UA
-          if (/Mobile|Android|iPhone/i.test(ua)) deviceTypes.mobile++;
-          else if (/iPad|Tablet/i.test(ua)) deviceTypes.tablet++;
+          // v4.55.6 sub-project D Zone 4: prefer pre-parsed fields over UA regex
+          // so historical rows keep the old detection path and new rows use the
+          // accurate client-side parse.
+          var _dc = rowDeviceClass || (/Mobile|Android|iPhone/i.test(ua) ? 'mobile' : (/iPad|Tablet/i.test(ua) ? 'tablet' : 'desktop'));
+          if (_dc === 'mobile') deviceTypes.mobile++;
+          else if (_dc === 'tablet') deviceTypes.tablet++;
           else deviceTypes.desktop++;
+          // New byBrowser + byOs groupings (only populated for v4.55.6+ rows)
+          if (rowBrowser) byBrowser[rowBrowser] = (byBrowser[rowBrowser] || 0) + 1;
+          if (rowOs) byOs[rowOs] = (byOs[rowOs] || 0) + 1;
           break;
         case 'perf_load':
           if (eventData.ms) {
@@ -2844,6 +2864,12 @@ function dataGetUsageAnalytics(sessionToken, days) {
       },
       backSwipes: backSwipes,
       deviceTypes: deviceTypes,
+      // v4.55.6 sub-project D Zone 4: new groupings populated by pre-parsed
+      // rows (v4.55.6+). Empty objects if no parsed rows exist yet — the
+      // admin display should render a "No data yet — will populate after the
+      // next session" message in that case.
+      byBrowser: byBrowser,
+      byOs: byOs,
       topTabs: topTabs.slice(0, 20),
       dailySessions: dailyData,
       userPerf: userPerfList.slice(0, 20),
@@ -2920,6 +2946,10 @@ function _getActiveMeetingForCheckIn(email) {
  * @returns {Object} { success, memberName, message } or { success: false, error }
  */
 function dataWebAppCheckIn(sessionToken, meetingId) {
+  // Outer try/catch so an unexpected exception (e.g. getDataRange() on a
+  // corrupted sheet) doesn't propagate raw to the client as "Exception:
+  // Cannot read property 'getValues' of null".
+  try {
   var email = _resolveCallerEmail(sessionToken);
   if (!email) return { success: false, message: 'Please log in to check in.', authError: true };
 
@@ -2973,18 +3003,26 @@ function dataWebAppCheckIn(sessionToken, meetingId) {
     var meetingName = '';
     var meetingDate = '';
     var meetingType = '';
+    var meetingStatus = '';
     var meetingFound = false;
     for (var k = 1; k < checkInData.length; k++) {
       if (String(col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_ID) || '') === meetingId) {
         meetingName = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_NAME) || '';
         meetingDate = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_DATE) || '';
         meetingType = col_(checkInData[k], MEETING_CHECKIN_COLS.MEETING_TYPE) || '';
+        meetingStatus = String(col_(checkInData[k], MEETING_CHECKIN_COLS.EVENT_STATUS) || '').trim().toLowerCase();
         meetingFound = true;
         break;
       }
     }
 
     if (!meetingFound) return errorResponse('Meeting not found or no longer active.');
+
+    // v4.55.1 R04-BUG-05: reject check-in for completed/cancelled meetings.
+    // Previously a stale banner could record attendance on a closed meeting.
+    if (meetingStatus === 'completed' || meetingStatus === 'cancelled' || meetingStatus === 'canceled') {
+      return errorResponse('This meeting is no longer accepting check-ins.');
+    }
 
     // Record check-in
     checkInSheet.appendRow([
@@ -3026,6 +3064,10 @@ function dataWebAppCheckIn(sessionToken, meetingId) {
     memberName: memberName.trim(),
     message: memberName.trim() + ' checked in successfully!'
   };
+  } catch (_checkInErr) {
+    log_('dataWebAppCheckIn error', _checkInErr.message + (_checkInErr.stack ? '\n' + _checkInErr.stack : ''));
+    return { success: false, message: 'Check-in failed. Please try again or contact your steward.' };
+  }
 }
 
 // ═══════════════════════════════════════
@@ -3074,7 +3116,9 @@ function dataGetLeaderDashboard(sessionToken) {
  */
 function dataGetLeaderUnitMembers(sessionToken) {
   var leader = _requireLeaderAuth(sessionToken);
-  if (!leader || !leader.unit) return { success: false, authError: true, message: 'Leader access required.' };
+  // v4.55.1 K11-BUG-03: distinguish "not a leader" from "leader has no unit assigned"
+  if (!leader) return { success: false, authError: true, message: 'Leader access required.' };
+  if (!leader.unit) return { success: false, message: 'No unit is assigned to your leader account. Contact an admin.' };
   return DataService.getUnitMembers(leader.unit).filter(function(m) {
     return m.email.toLowerCase() !== leader.email;
   }).map(function(m) { return { name: m.name, email: m.email }; });

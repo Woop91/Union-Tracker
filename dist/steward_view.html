@@ -2999,9 +2999,17 @@ function renderStewardResources(appContainer) {
   function renderCards() {
   cardsWrap.innerHTML = '';
   var searchTerm = (searchInput.value || '').toLowerCase().trim();
+  
+  
+  // fuzzyMatch isn't defined (old cached clients or loader race).
   var filtered = allResources.filter(function(r) {
    if (activeCategory !== 'All' && r.category !== activeCategory) return false;
    if (searchTerm) {
+   if (typeof fuzzyMatch === 'function') {
+    return fuzzyMatch(searchTerm, r.title).matches
+     || fuzzyMatch(searchTerm, r.summary).matches
+     || fuzzyMatch(searchTerm, r.content).matches;
+   }
    return (r.title || '').toLowerCase().indexOf(searchTerm) !== -1 ||
      (r.summary || '').toLowerCase().indexOf(searchTerm) !== -1 ||
      (r.content || '').toLowerCase().indexOf(searchTerm) !== -1;
@@ -3028,7 +3036,7 @@ function renderStewardResources(appContainer) {
    var hint = el('div', { className: 'text-xs-muted-mt-8' }, 'Tap to read more \u25BE');
    card.appendChild(hint);
    var expandContent = el('div', { className: 'res-card-content' });
-   if (r.content) expandContent.appendChild(el('div', null, r.content));
+   if (r.content) { var bodyDiv = el('div', null); bodyDiv.appendChild(renderSafeText(r.content)); expandContent.appendChild(bodyDiv); }
    
    if (r.url && /^https?:\/\//i.test(r.url)) {
    var resLink = el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource');
@@ -4017,8 +4025,15 @@ function renderSurveyTracking(appContainer) {
   }).withFailureHandler(function() {}).dataGetSatisfactionSummary(SESSION_TOKEN);
 
   
+  // v4.55.4 sub-project B Zone 4: distinguish "no period active" from
+  // "period is active but no members match the current scope". The two
+  
+  if (!trackingData.periodActive) {
+   dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'No survey period is currently active. Open a new period from the Survey Admin panel.'));
+   return;
+  }
   if (!total) {
-   dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'No survey tracking data. Open a period and populate tracking.'));
+   dataWrap.appendChild(el('div', { className: 'empty-state-sm' }, 'Period "' + (trackingData.periodName || 'active period') + '" is active but no members are assigned in your current scope. Expand the scope filter above.'));
    return;
   }
 
@@ -5918,6 +5933,19 @@ function _buildExplorerUI(container, allMembers) {
 
  
  function _fireChange() {
+ 
+ 
+ 
+ 
+ 
+ // _EXP_SLICERS closure isn't structured for. (2) Native confirm() is
+ 
+ 
+ 
+ 
+ 
+ // explorer ever gains a "Review edits" preview panel — at that point
+ 
  if (_expUnsavedCount > 0 && !confirm('You have unsaved edits that will be lost. Continue?')) return;
  _expUnsavedCount = 0;
  _refreshSlicerOptions();
@@ -6052,8 +6080,21 @@ function _buildExplorerUI(container, allMembers) {
   var r = document.createElementNS(ns, 'rect');
   r.setAttribute('x', x); r.setAttribute('y', p.y); r.setAttribute('width', NW); r.setAttribute('height', p.h);
   r.setAttribute('fill', _gc(p.name)); r.setAttribute('rx', '3');
-  var tt = document.createElementNS(ns, 'title'); tt.textContent = p.name + ': ' + p.val;
-  r.appendChild(tt); svg.appendChild(r);
+  var _nodeTooltipText = p.name + ': ' + p.val;
+  var tt = document.createElementNS(ns, 'title'); tt.textContent = _nodeTooltipText;
+  r.appendChild(tt);
+  
+  // <title> tooltips don't fire on touch devices, so a tap surfaces a
+  // toast with the node's count. Desktop hover still shows the native
+  
+  r.style.cursor = 'pointer';
+  (function(text) {
+   r.addEventListener('click', function() {
+   if (typeof showToast === 'function') showToast(text, 'info', 3000);
+   else alert(text);
+   });
+  })(_nodeTooltipText);
+  svg.appendChild(r);
   var txt = document.createElementNS(ns, 'text');
   txt.setAttribute('fill', 'var(--text, #ccc)'); txt.setAttribute('font-size', '10');
   var lbl = p.name.length > 22 ? p.name.substring(0, 20) + '\u2026' : p.name;
@@ -6095,7 +6136,10 @@ function _buildExplorerUI(container, allMembers) {
   return;
  }
 
- var table = el('table', { style: { width: '100%', minWidth: '1200px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
+ 
+ 
+ 
+ var table = el('table', { style: { width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: '12px', color: 'var(--text)' } });
  var thead = el('thead');
  var headRow = el('tr');
  _EXP_EDIT_COLS.forEach(function(c) {
@@ -8481,14 +8525,25 @@ function renderAccessLogPage(appContainer) {
   }
 
   
+  
+  
   var table = el('div', { style: { overflowX: 'auto' } });
-  var tbl = el('table', { className: 'data-table', style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
+  var tbl = el('table', { className: 'data-table access-log-table', style: { width: '100%', fontSize: '12px', borderCollapse: 'collapse' } });
 
+  
   
   var thead = el('thead');
   var hrow = el('tr');
-  ['Time', 'Event', 'User', 'Sheet', 'Field', 'Details'].forEach(function(h) {
-   hrow.appendChild(el('th', { style: { padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid var(--border)', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h));
+  var _headers = [
+   { label: 'Time', cls: 'alc-time' },
+   { label: 'Event', cls: 'alc-event' },
+   { label: 'User', cls: 'alc-user' },
+   { label: 'Sheet', cls: 'alc-sheet alc-hide-mobile' },
+   { label: 'Field', cls: 'alc-field alc-hide-mobile' },
+   { label: 'Details', cls: 'alc-details' }
+  ];
+  _headers.forEach(function(h) {
+   hrow.appendChild(el('th', { className: h.cls, style: { padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid var(--border)', fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, h.label));
   });
   thead.appendChild(hrow);
   tbl.appendChild(thead);
@@ -8500,21 +8555,21 @@ function renderAccessLogPage(appContainer) {
    
    var ts = item.timestamp ? new Date(item.timestamp) : null;
    var timeStr = ts ? ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + ts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '--';
-   row.appendChild(el('td', { style: { padding: '6px', whiteSpace: 'nowrap', fontSize: '11px', color: 'var(--muted)' } }, timeStr));
+   row.appendChild(el('td', { className: 'alc-time', style: { padding: '6px', whiteSpace: 'nowrap', fontSize: '11px', color: 'var(--muted)' } }, timeStr));
 
    
-   var typeBadge = el('td', { style: { padding: '6px' } });
+   var typeBadge = el('td', { className: 'alc-event', style: { padding: '6px' } });
    typeBadge.appendChild(el('span', { style: { display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600', background: 'var(--accentBg)', color: 'var(--accent)' } }, item.eventType || item.actionType || '--'));
    row.appendChild(typeBadge);
 
    
-   row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--text)' } }, item.user || '--'));
+   row.appendChild(el('td', { className: 'alc-user', style: { padding: '6px', fontSize: '11px', color: 'var(--text)' } }, displayUser(item.user)));
 
    
-   row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.sheet || '--'));
+   row.appendChild(el('td', { className: 'alc-sheet alc-hide-mobile', style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.sheet || '--'));
 
    
-   row.appendChild(el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.fieldName || '--'));
+   row.appendChild(el('td', { className: 'alc-field alc-hide-mobile', style: { padding: '6px', fontSize: '11px', color: 'var(--muted)' } }, item.fieldName || '--'));
 
    
    var detailsTd = el('td', { style: { padding: '6px', fontSize: '11px', color: 'var(--muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.newValue || '--');
@@ -8563,6 +8618,7 @@ function renderAccessLogPage(appContainer) {
    className: 'btn-sm btn-outline', style: { marginTop: '8px' },
    onClick: function() {
    var csv = 'Timestamp,Event Type,User,Sheet,Field,Old Value,New Value,Record ID\n';
+   
    result.items.forEach(function(item) {
     csv += [item.timestamp, item.eventType, item.user, item.sheet, item.fieldName, item.oldValue, item.newValue, item.recordId]
     .map(function(v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
@@ -10499,7 +10555,11 @@ function _loadMentorshipSuggestions(suggestList) {
  suggestions.forEach(function(s) {
   var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
   var info = el('div');
-  info.appendChild(el('div', { style: { fontWeight: '500' } }, escapeHtml(s.mentorEmail) + ' \u2192 ' + escapeHtml(s.menteeEmail)));
+  
+  
+  var mentorLabel = s.mentorName || (s.mentorEmail ? String(s.mentorEmail).split('@')[0] : 'Mentor');
+  var menteeLabel = s.menteeName || (s.menteeEmail ? String(s.menteeEmail).split('@')[0] : 'Mentee');
+  info.appendChild(el('div', { style: { fontWeight: '500' } }, escapeHtml(mentorLabel) + ' \u2192 ' + escapeHtml(menteeLabel)));
   info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, escapeHtml(s.reason)));
   card.appendChild(info);
   card.appendChild(el('button', {
@@ -10717,6 +10777,32 @@ function _loadAnalytics(container, days, statsGrid, perfGrid, tabsList, dailyCha
   card.appendChild(el('div', { className: 'kpi-label', style: { fontSize: '0.625rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' } }, k.label));
   statsGrid.appendChild(card);
   });
+
+  
+  
+  function _renderBreakdown(title, obj, emoji) {
+  var keys = Object.keys(obj || {});
+  if (keys.length === 0) return;
+  var section = el('div', { style: { marginTop: '12px' } });
+  section.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' } }, emoji + ' ' + title));
+  var total = keys.reduce(function(a, k) { return a + (obj[k] || 0); }, 0);
+  keys.sort(function(a, b) { return (obj[b] || 0) - (obj[a] || 0); });
+  keys.forEach(function(k) {
+   var count = obj[k] || 0;
+   var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+   var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+   row.appendChild(el('div', { style: { width: '80px', fontSize: '12px', color: 'var(--text)', textTransform: 'capitalize' } }, k));
+   var barWrap = el('div', { style: { flex: '1', height: '14px', background: 'var(--surfaceAlt, rgba(255,255,255,0.06))', borderRadius: '3px', overflow: 'hidden' } });
+   var bar = el('div', { style: { height: '100%', width: Math.max(2, pct) + '%', background: 'var(--accent)', borderRadius: '3px' } });
+   barWrap.appendChild(bar);
+   row.appendChild(barWrap);
+   row.appendChild(el('div', { style: { width: '56px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right' } }, count + ' (' + pct + '%)'));
+   section.appendChild(row);
+  });
+  statsGrid.appendChild(section);
+  }
+  _renderBreakdown('By Browser', result.byBrowser, '\uD83C\uDF10');
+  _renderBreakdown('By OS / Platform', result.byOs, '\uD83D\uDCF1');
 
   
   perfGrid.innerHTML = '';

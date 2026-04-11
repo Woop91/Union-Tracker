@@ -276,7 +276,13 @@ function correlateLocationSatVsGrievance_(data) {
 
   for (var loc in satByLoc) {
     if (!Object.prototype.hasOwnProperty.call(satByLoc, loc)) continue;
-    var satScore = satByLoc[loc].score || 0;
+    // Accept either the documented {location: avgScore} shape OR the actual
+    // {location: {score}} shape. `.score || 0` previously silently zeroed
+    // every entry when one shape was swapped for the other.
+    var _satVal = satByLoc[loc];
+    var satScore = (typeof _satVal === 'number')
+      ? _satVal
+      : ((_satVal && typeof _satVal.score === 'number') ? _satVal.score : 0);
     var memberCount = locBreakdown[loc] || 0;
     if (memberCount < 3) continue; // Need enough members
 
@@ -440,7 +446,9 @@ function correlateEngagementVsSatisfaction_(data) {
     if (!part.count || part.count < 3) continue;
 
     var engagement = ((part.emailRate || 0) + (part.meetingRate || 0)) / 2;
-    var sat = satByLoc[loc] ? satByLoc[loc].score : null;
+    // Accept both shapes (see note in correlateLocationSatVsGrievance_).
+    var _sv = satByLoc[loc];
+    var sat = (typeof _sv === 'number') ? _sv : (_sv && typeof _sv.score === 'number' ? _sv.score : null);
     if (sat === null || sat === 0) continue;
 
     x.push(engagement);
@@ -604,6 +612,12 @@ function correlateArticleVsOutcome_(data) {
 /**
  * Correlation 7: Grievance step level vs average resolution time
  * Question: How much longer do cases take at higher steps?
+ *
+ * v4.55.1 A08-BUG-04: With only 4 possible step levels (I/II/III/Arbitration),
+ * this correlation can never reach Pearson's n>=5 reliability threshold.
+ * The old minimum of 3 produced statistically meaningless r values.
+ * We now return a non-correlation "step breakdown" summary instead of a Pearson r,
+ * so the UI can display the data without misleading users into thinking it's a correlation.
  */
 function correlateStepVsTime_(data) {
   var avgDays = data.avgDaysAtStep || {};
@@ -625,7 +639,8 @@ function correlateStepVsTime_(data) {
     }
   }
 
-  if (x.length < 3) return null;
+  // Return null below Pearson minimum — this correlation is inherently limited to n<=4
+  if (x.length < 5) return null;
 
   var r = pearsonCorrelation_(x, y);
   var cls = classifyCorrelation_(r, x.length);

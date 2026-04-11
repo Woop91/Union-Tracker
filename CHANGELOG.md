@@ -4,22 +4,182 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.55.7] - 2026-04-11
+
+### SolidBase: Wholesale catchup sync from DDS v4.55.1 → v4.55.7
+
+This sync bundles six DDS wave-equivalents into one SolidBase commit
+because sub-projects B/E/D/C all landed on DDS in the same session
+after the v4.55.1 SB sync was committed. See the per-wave entries
+below (copied from DDS CHANGELOG) for the full detail of each wave.
+
+### Fixed (Sub-project C — Mobile Audit & Horizontal-Scroll Kills)
+- **#3** Survey Results card text wrap: on narrow screens the "A survey is currently open" headline wrapped one word per line because the text `<div>` had no `flex: 1` or `min-width: 0` to expand to fill available space. Fix: add `flex: 1` + `min-width: 0` to the bannerText div, plus a new `.survey-cta-banner` CSS class that switches to `flex-direction: column` at ≤ 480px so the button stacks below the text on phones.
+- **Access Log not mobile-friendly**: the 6-column audit log table forced horizontal scroll on every phone. Fix: added `access-log-table` class and per-column classes (`alc-time`, `alc-event`, `alc-user`, `alc-sheet`, `alc-field`, `alc-details`) with an `alc-hide-mobile` marker on Sheet + Field. New CSS media query at ≤ 640px hides those two columns, leaving Time / Event / User / Details which fit without sideways scroll. Details column also gets `word-break: break-word` on mobile.
+- **Wide Explorer/Org-Health table**: `steward_view.html:6406` had `minWidth: '1200px'` on the inline-edit members table, forcing horizontal scroll on every laptop under 1200px. Trimmed to `minWidth: '900px'` — still wide enough for the desktop data layout, narrow enough that only phones (and small tablets in portrait) trigger the outer `overflowX: auto`.
+- **Sidebar scrollbar in header**: investigation showed no separate header scroll exists. The sidebar has one `overflow-y: auto` on `.sidebar-nav`, which is expected for long nav lists. The user's screenshot likely captured a transient artifact at a specific viewport height. No code change; documented for future reference.
+
+### Tests
+- New `G-NO-WIDE-TABLES` guard in `test/spa-integrity.test.js` (+19): asserts no `src/*.html` file contains a hardcoded `minWidth` ≥ 1100px. One test per HTML file. Catches wide-table-minWidth regressions at CI time. Legitimate desktop-only wide surfaces can be added to the EXEMPT whitelist if ever needed (empty today).
+- Total deploy guards: 301 (up from 282).
+
+## [4.55.6] - 2026-04-11
+
+### Added / Changed (Sub-project D — Admin UX Enhancements)
+- **Larger sidebar org name** — `.sidebar-header-title` bumped from `1rem` to `1.375rem`, `font-weight` 700 → 800, `line-height: 1.15`, `letter-spacing: -0.01em`. `.sidebar-header` padding grows from `12px 20px 20px` to `16px 20px 24px` so the header block takes more vertical space and the org name has real presence.
+- **Notification bell hides when empty** — the entire `notif-bell-wrap` creation is now wrapped in the existing `if (_bellTotal > 0)` guard. When there are no pending notifications (and no unanswered Q&A for stewards), the bell is absent from the DOM entirely instead of showing a static unclickable icon.
+- **Data Failsafe + Test Runner promoted to Admin group** — both tabs were previously in a dev-only "Temp" group that got filtered out by `_filterDevTabs()` in production. They are now pushed into the `IS_ADMIN` Admin group alongside `Usage Analytics`, so admin users see all three admin tools together. The tab router's Test Runner DEV-gate was also expanded to `(IS_DEV_MODE || IS_ADMIN)` so admins can actually load the page in prod.
+- **Browser / OS / device class tracking in usage analytics** — new `parseUserAgent(ua)` helper in `src/index.html` classifies every `navigator.userAgent` into `{browser, os, deviceClass}` (edge/chrome/firefox/safari, ios/android/macos/windows/linux, mobile/tablet/desktop). The client-side usage logger includes these in the event payload; the backend `dataLogUsageEvents` extends `_Usage_Log` from 7 to 10 columns (with lazy migration for existing sheets) and stores the parsed values. `dataGetUsageAnalytics` aggregates two new groupings (`byBrowser`, `byOs`) and the admin Analytics page renders them as horizontal bar charts with counts + percentages. Legacy rows fall back to the existing UA-regex device detection; new rows use the pre-parsed fields for accuracy.
+
+### Tests
+- New suite: `test/parse-user-agent.test.js` (+10).
+- Total deploy guards: 282 (unchanged — parse-user-agent is a unit test).
+
+## [4.55.5] - 2026-04-11
+
+### Fixed (Sub-project E — Org Health Tree Layout)
+- **#11** Org Health Tree heavily skewed left for small orgs. The `branchCount==1` fallback in the angle formula at `src/org_health_tree.html:139` defaulted to `: 0`, which set `angle = startAngle = 7π/8` (upper-left corner). Changed to `: angleSpread / 2` so a single-branch tree points straight up (`π/2`) instead. For `branchCount >= 2` the formula is unchanged and remains symmetric.
+
+### Tests
+- New suite: `test/org-health-tree-layout.test.js` (+5).
+- Total deploy guards: 282 (unchanged — the new file is a unit test, not a deploy guard).
+
+## [4.55.4] - 2026-04-11
+
+### Fixed (Sub-project B — Broken Tab/Chart/State Logic)
+- **#2** Monthly Trend chart "Filed" series rendered as solid black fill. Explicit hex colors (`#f59e0b` amber for Filed, `#10b981` emerald for Resolved) added to the `datasets` array in `member_view.html` so the chart never falls through to `_palette()` and can't inherit a theme-resolved black.
+- **#4** Section Balance radar chart showed "Need 3+ sections for radar" in a way users read as "need 3+ responses." New message: "A radar chart needs at least 3 distinct sections to render. Your survey has N sections — this is a visualization limit, not a data issue." Radar option is also hidden from the view picker when fewer than 3 sections exist, so the empty state is unreachable by normal navigation.
+- **#7** `renderQAForum is not defined` tab load failure for pure stewards. `renderQAForum` only lives in `member_view.html`, which pure stewards never load. Both `case 'qaforum':` branches in the tab router now wrap the call in the existing `_loadMemberViewThen(container, callback)` lazy-loader (synchronous pass-through for pure members, lazy-fetch for dual-role and pure stewards).
+- **#8** + survey open/close mismatch: `getStewardSurveyTracking` now returns `periodActive: boolean` and `periodName: string | null` derived from `getSurveyPeriod()` — one backend source of truth for both views. Steward empty state split into "no survey period active" and "period active but no members in scope" messages. Member view drops the misleading "Jan, Apr, Jul, Oct" hardcoded quarterly message — surveys are opened manually by stewards, not on a calendar.
+
+### Tests
+- New suites: `test/radar-section-threshold.test.js` (+5), `test/survey-period-state.test.js` (+7).
+- New `G-TAB-ROUTES-SAFE` guard in `test/spa-integrity.test.js` (+4): parses every `case '…':` in the tab router and asserts each routed function name is defined somewhere in the concatenated src bundle. Catches the #7 regression class at CI time.
+- Total deploy guards: 282 (up from 278).
+
+## [4.55.3] - 2026-04-11
+
+### Fixed
+- **Avg Resolution by Steward chart Y-axis serials** — `_looksLikeStewardName` guard rejects Date serials (including scientific notation), ISO dates, and weekday-prefixed strings from becoming phantom grouping keys in the aggregation loop (`21_WebDashDataService.gs`). No `_findColumn` change — verified during plan-writing that the lookup chain was already exact-match only; the dirty data is in the live Grievance Log rows.
+- **Access Log user column hashes** — new `displayUser` helper in `index.html` detects 64-hex-char SHA-256 values and renders `User #xxxxxxxx` instead of the raw hash. Adopted in `renderAccessLogPage` (`steward_view.html`). CSV export intentionally preserves full hashes for forensic integrity.
+- **Know Your Rights / FAQ / How to File a Grievance literal `\n`** — new `renderSafeText` helper in `index.html` converts both literal `\n` (backslash+n) and real `\n` into `<br>` nodes while HTML-escaping the rest. Adopted in Resources render sites in `member_view.html` and `steward_view.html`. Seed strings in `10b_SurveyDocSheets.gs` and `07_DevTools.gs` were also corrected (152 substitutions) so future re-seeds produce clean data.
+
+### Tests
+- New suites: `test/render-safe-text.test.js` (+10), `test/steward-name-guard.test.js` (+11, includes scientific-notation cases), `test/display-user.test.js` (+7).
+- New G-RENDER-SAFE guard in `test/spa-integrity.test.js` (+4).
+- Total deploy guards: 278 (up from 274).
+
 ## [4.55.1] - 2026-04-10
 
 ### Fixed
 - **Survey steward/member visibility mismatch** — `getSurveyQuestions()` was caching the entire payload (including `period`) for 5 min via CacheService. Steward view (which calls `getSurveyPeriod()` directly) saw live state; members saw stale `period: null`. Stripped `period` from the cached payload, bumped cache key v1 → v2 to invalidate stale entries, and overlay live `getSurveyPeriod()` on every call. Added cache invalidation in `openNewSurveyPeriod()` and `archiveSurveyPeriod_()` so period lifecycle changes propagate to members immediately.
-- **PIN setup blocked by missing Member ID** — `dataCompleteOnboardingStep('pin', ...)` rejected with "Member ID required before setting PIN" when the email-matched row had an empty Member ID cell (legacy data, manual import, partial seed). Now self-heals: generates a unique `M` + 6-digit ID (collision-checked against existing IDs), writes it back to the row, audit-logs `MEMBER_ID_AUTOGEN`, and proceeds with the hash.
-- **Session persistence — multi-pronged diagnostic** — Bumped redirect-loop guard in `index.html` from 2 → 5 attempts. Instrumented `Auth._getSessionData` with three-way failure logging (not present / expired / corrupt JSON). `_serveAuth` now records `SESSION_TOKEN_REJECTED` (MEDIUM) security event when a sessionToken fails validation. SSO and magic-link `createSessionToken` failures now escalate to `SESSION_CREATE_FAILED` (HIGH) security events instead of dying silently in `log_`.
+- **PIN setup blocked by missing Member ID** — `dataCompleteOnboardingStep('pin', ...)` rejected with "Member ID required before setting PIN" when the email-matched row had an empty Member ID cell (legacy data, manual import, partial seed). Now self-heals: generates a unique `M` + 6-digit ID (collision-checked against existing IDs), writes it back to the row, audit-logs `MEMBER_ID_AUTOGEN`, and proceeds with the hash. Members with broken rows can now set their PIN AND their row gets repaired in one shot.
+- **Session persistence — multi-pronged diagnostic** — Bumped redirect-loop guard in `index.html` from 2 → 5 attempts (the original was so tight that two transient server hiccups cleared a valid token). Instrumented `Auth._getSessionData` with three-way failure logging (not present / expired / corrupt JSON), each line includes the token prefix for correlation. `_serveAuth` now records `SESSION_TOKEN_REJECTED` (MEDIUM) security event when a sessionToken fails validation. SSO and magic-link `createSessionToken` failures now escalate to `SESSION_CREATE_FAILED` (HIGH) security events instead of dying silently in `log_`. After the next user complaint, the GAS execution log + audit trail tells you exactly which of the three failure modes fired.
 
 ### Added
-- **Survey anonymity disclosure card** — New `_renderSurveyAnonymityCard(content)` helper in `member_view.html` prepended to the survey wizard. Two-part honest disclosure: (1) "your answers are stored in a separate encrypted vault with no link back to you, by design" and (2) "what stewards CAN see: completion status and unit-level percentages — never your individual answers."
-- **Steward survey "History: On/Off" toggle** — Added a toggle pill in the survey tracking scope filter row. When off, hides the per-member historical participation rate bar in `_renderSurveyMemberItem`. State persists in localStorage. Default ON.
-- **Home screen icon scaffolding** — Added Apple PWA meta tags (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `mobile-web-app-capable`) and `<link rel="apple-touch-icon">` references in `index.html` `<head>`. New `app_icon.html` ships with a 1×1 transparent PNG placeholder data URL — replace its content with your organization's actual icon (180×180 PNG, base64-encoded with `data:image/png;base64,` prefix) when ready. **Caveat:** iOS Safari may still ignore this on home-screen install because GAS web apps live inside a `script.googleusercontent.com` iframe and iOS reads icons from the parent frame.
-- **Auth view "previous session expired" hint** — Non-alarming explainer surfaced on the auth page when `PAGE_DATA.tokenChecked === true`, so users understand WHY they're being asked to email a new link.
+- **Survey anonymity disclosure card** — New `_renderSurveyAnonymityCard(content)` helper in `member_view.html` prepended to the survey wizard. Two-part honest disclosure: (1) "your answers are stored in a separate encrypted vault with no link back to you, by design" and (2) "what stewards CAN see: completion status and unit-level percentages — never your individual answers." Solves the surprise factor when members notice the steward progress view.
+- **Steward survey "History: On/Off" toggle** — Added a toggle pill in the survey tracking scope filter row. When off, hides the per-member historical participation rate bar in `_renderSurveyMemberItem`, leaving only current-quarter completion. State persists in `localStorage.dds_steward_show_history`. Default ON. Threaded `showHistory` flag through `_surveyPaginate` and the renderer.
+- **Home screen icon (favicon + apple-touch-icon)** — New `src/app_icon.html` containing the DDS logo as a base64 data URL (110KB). Wired into `index.html` `<head>` via `<? var _appIconUrl = include('app_icon'); ?>` (read once). Added Apple PWA meta tags: `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `mobile-web-app-capable`. Added `app_icon.html` to `build.js` HTML_FILES list. **Caveat:** iOS Safari may still ignore this on home-screen install because GAS web apps live inside a `script.googleusercontent.com` iframe and iOS reads icons from the parent frame. Chrome desktop favicon and Android home-screen install should work.
+- **Auth view "previous session expired" hint** — Non-alarming explainer surfaced on the auth page when `PAGE_DATA.tokenChecked === true`, so users understand WHY they're being asked to email a new link instead of being silently redirected.
 
 ### Changed
-- **`getSurveyQuestions()` cache key** — Bumped `surveyQuestions_v1` → `surveyQuestions_v2`. The v2 payload no longer contains `period`. Both `clearSurveyQuestionsCache()` and the inline cache-clear now remove both keys for a clean transition.
+- **`getSurveyQuestions()` cache key** — Bumped `surveyQuestions_v1` → `surveyQuestions_v2`. The v2 payload no longer contains `period`. Both `clearSurveyQuestionsCache()` (in `10b_SurveyDocSheets.gs`) and the inline cache-clear in `08e_SurveyEngine.gs` now remove both keys for a clean transition.
 - **Redirect-loop guard tolerance** — `dashboardSessionRedirectCount` threshold raised from 2 to 5 in `index.html`.
+
+## [4.51.1] - 2026-04-05
+
+### Added
+- **E-signature schema** — 4 signature columns (SIGNATURE_STATUS, SIGNATURE_TOKEN, SIGNED_DATE, SIGNATURE_HASH) + DESCRIPTION column added to GRIEVANCE_HEADER_MAP_, unblocking the entire signing workflow.
+- **Q&A Reopen button** — Resolved questions can be reopened by owner or steward (backend already existed, UI was missing).
+- **Meeting data enrichment** — `getMemberMeetings` now returns duration, notesUrl, agendaUrl fields.
+- **Leader Hub "Mentorships" sub-tab** — Read-only unit-scoped mentorship visibility for member leaders + `dataGetLeaderUnitMentorships` endpoint.
+- **CSV export for My Cases** — Client-side Blob download for grievance/task data.
+- **Poll participation badges** — Vote count + participation percentage on poll results.
+- **Resources list caching** — DataCache with 30-min STABLE_TTL (follows steward directory pattern).
+- **Mobile default view preference** — Dual-role users can set default view from mobile header.
+- **ICS calendar download** — Cross-platform calendar integration for events.
+- **Autocomplete keyboard navigation** — ArrowDown/Up/Enter/Escape with highlight tracking in all autocomplete fields.
+- **Column reorder utility** — `reorderMemberDirectoryColumns()` in 06_Maintenance.gs for normalizing sheet layout.
+- **Privacy hints in onboarding wizard** — Phone/address visibility explanations.
+- **Email Open Rate tooltip** — Info icon explaining the metric on profile page.
+
+### Fixed
+- **`defaultView_` property key mismatch** — `dataGetBatchData` read `DEFAULT_VIEW_` but write used `defaultView_`, corrupting SWR cache for dual-role users.
+- **Admin Settings HTML-entity corruption** — Removed server-side `escapeHtml()` on list values (client uses `textContent`, inherently XSS-safe).
+- **`escapeForFormula` quote doubling** — Removed SQL-style apostrophe/quote doubling that corrupted config values.
+- **ALERT_DAYS config disconnect** — Notification system now reads Config sheet via `getConfigValue_()` instead of ignoring it.
+- **Satisfaction trend chart** — Fixed flat array passed to `createLineChart` (needed dataset object wrapper).
+- **Survey vault dedup** — Changed `!== 'Superseded'` to `=== 'Latest'` (Superseded value never existed).
+- **PIN security** — Weak PIN validation added to standalone setup page (client + server). Client weak PIN list synced to server's 21 entries. PIN reset restores old hash on email failure.
+- **4 missing `withScriptLock_` calls** — dataCreateTaskForSteward, dataAddMeetingMinutes, dataSubmitFeedback, attachDriveFiles.
+- **`attachDriveFiles` cache invalidation** — Added `_cacheInvalidate()` matching other TimelineService mutations.
+- **10 mobile touch-target fixes** — 44px minimums for sub-tab, handoff-btn, swipe-panel-close, nav-item, filter-add-btn. iOS zoom prevention for msg-textarea, search-input, form-select. Deadline dot exclusion. Bulk toolbar safe-area padding.
+- **Ctrl+Enter submit** — Expanded `.closest()` selector to match actual form containers (.content, .card, .member-detail-panel).
+- **Steward resource cards** — Added keyboard activation (Enter/Space) + ARIA attributes.
+- **Minutes "Start a Grievance"** — Changed direct `renderMyCases()` to `_handleTabNav()`.
+- **Outreach autocomplete crash** — Added `Array.isArray()` guard for auth failure responses.
+- **Broadcast "undefined member(s)"** — Added array check before `.length`.
+- **Task notification empty body** — Added `body` field to notification object.
+- **Engagement score defaults** — Normalized all "no data" defaults to 0 (was asymmetric: some 50, some 0).
+- **Cross-Unit Q&A showResolved** — Now passes through actual toggle value instead of hardcoding `true`.
+- **5 PII log leaks** — Replaced raw email logging with `maskEmail()` across 5 files.
+- **Contact Log double-submit** — Added disabled guard during server call.
+- **Bulk email double-click** — Added sending flag + button disable.
+- **`syncColumnMaps` case-sensitivity** — Added case-insensitive fallback to prevent duplicate column creation.
+- **`getMemberViewHtml` auth guard** — Added sessionToken parameter and `_resolveCallerEmail` check.
+- **`dataSendDirectMessage` rate limit** — Max 10/min per steward via CacheService.
+- **`disableDashboardMemberAuth` confirmation** — Added UI alert dialog matching enable counterpart.
+- **idemKey TTL** — Increased from 300s to 600s across all 5 endpoints.
+- **Spearman guard** — Changed n<3 to n<5 to match Pearson delegate requirement.
+- **Config TTL doc** — Corrected header comment from "6-hour" to "5-minute".
+- **Cat icons on mobile** — Show during loading (chasing/pouncing classes override display:none).
+- **Union tab expandable cards** — Wrapped `_initV9()` in try/catch + fallback onclick rebinder.
+- **Agency chart tabs** — Added smod null guard + fallback onclick rebinder.
+- **Vacant card dark mode** — Changed background from `#1a1214` to `var(--card-bg)`.
+- **`VERSION_INFO.codename` case** — Changed `CODENAME` to lowercase `codename`.
+- **Contact wrapper return types** — `dataGetMemberContactHistory`/`dataGetStewardContactLog` return `[]` on auth failure (was `{success:false}`).
+- **Phone number validation** — Added format check (7-15 chars, digits/spaces/dashes) in profile + onboarding.
+- **Task completion UX** — Replaced blocking `confirm()` with toast notification.
+
+## [4.51.0] - 2026-04-03
+
+### Added
+- **Directory Explorer** — Slicer-style filter + SVG Sankey chart + inline editing for Member Directory exploration.
+- **Director field** — New `director` field in member records.
+- **`dataUpdateMemberBySteward` endpoint** — New server endpoint for steward-initiated member updates.
+
+### Changed
+- **Config hardening** — Directors rename for clarity.
+
+### Fixed
+- **`dataGetAllMembers`/`dataGetMemberGrievances`/`dataGetAvailableStewards`** — Fixed returning authError objects instead of arrays, which caused downstream iteration failures.
+- **Cases sub-tab agency-wide fallback** — Fixed unreachable fallback branch.
+- **Broadcast recipient count** — Wired up previously disconnected recipient count display.
+- **Mentorship dropdowns** — Added steward/member selector dropdowns to mentorship pairing UI.
+- **`getAllMembers()` enrichment** — Added `role` and `duesPaying` fields to member payload.
+- **`appsscript.json` build copy** — Fixed `build.js` not copying `appsscript.json` to dist.
+
+## [4.50.7] - 2026-04-02
+
+### Fixed
+- **`onOpenDeferred_` trigger persistence** — Fixed leftover code that deleted the installable trigger after first run (from old one-shot approach). Deferred init (column sync, tab colors, modals) now runs on every spreadsheet open.
+- **Tab modals on sheet open** — Tab modals now auto-open via installable trigger (full authorization) instead of simple trigger (which lacks `showModalDialog` permission).
+- **Session invalidation hardening** — Added deletion verification to session invalidation flow.
+- **TrendAlertService race condition** — Wrapped `runDetection()` in `LockService` to prevent duplicate alerts from concurrent triggers.
+
+## [4.50.6] - 2026-04-01
+
+### Fixed
+- **Tab modals not auto-opening** — GAS simple triggers (`onSelectionChange`) cannot call `showModalDialog()`. `onTabSwitch_` now uses `toast()` hint instead of the blocked modal call.
+- **`showCurrentTabModal()` convenience function** — Auto-detects active sheet and shows the appropriate modal; accessible via menu.
+- **Tab Modals menu discoverability** — Moved Tab Modals submenu to top-level menu item.
+
+## [4.50.5] - 2026-04-01
+
+### Fixed
+- **`createConfigSheet` seed alignment** — `syncColumnMaps()` now runs after writing new headers so `seedConfigDefault_` and `_applyYesNoValidation` target correct columns (previously used stale `CONFIG_COLS` positions from before header rewrite).
+- **Branding column repair** — One-time repair clears misaligned yes/no values and stale data validations from Branding columns (Logo Initials, Steward Label, etc.) that received Feature Toggle dropdowns from the v4.50.0-v4.50.4 bug.
+- **`INSIGHTS_CACHE_TTL_MIN` seed location** — Moved from Branding section to Feature Toggles section to match `CONFIG_HEADER_MAP_` grouping.
 
 ## [4.50.4] - 2026-04-01
 
@@ -32,6 +192,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - **Config data migration on column reorder** — `createConfigSheet()` now detects when existing sheet headers differ in order from `CONFIG_HEADER_MAP_` and remaps row 3+ data to match before overwriting headers. Prevents org name showing "yes"/"no" after the v4.50.0 column reorder.
 - **Hardened `_applyYesNoValidation`** — No longer silently overwrites non-boolean values with "yes". Logs a warning instead, protecting against data destruction when columns are misaligned.
+
+## [4.50.2] - 2026-03-31
+
+### Fixed
+- **Stale ConfigReader cache after column sync** — When `RESOLVED_COL_MAPS` cache expires and `syncColumnMaps()` re-resolves column positions, ConfigReader now force-refreshes instead of serving cached values built with wrong (array-order) positions.
+- **`ORG_CONFIG_v2` cache invalidation** — `syncColumnMaps()` now invalidates `ORG_CONFIG_v2` cache key when columns change. Fixes org name showing as "yes" and steward label showing URL after cache expiry.
 
 ## [4.50.1] - 2026-03-31
 
@@ -50,12 +216,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Shirt Size column** on Non-Member Contacts tab — dropdown with XS, S, M, L, XL, 2XL, 3XL, 4XL.
 - **Steward (Yes/No) column** on Non-Member Contacts tab — dropdown indicating steward status.
 - All three fields added to: `NMC_HEADER_MAP_` / `NMC_COLS` (01_Core.gs), sheet creation validations (10a_SheetCreation.gs), tab formatting with updated column widths (09_Dashboards.gs), DataService CRUD (21_WebDashDataService.gs), steward view modal and contact cards (steward_view.html), and fallback modal (03_UIComponents.gs).
-- **Shirt Size in member profile** — Self-service shirt size dropdown in Update Profile page with dedicated Shirt Size Log sheet for tracking.
-- **Non-Member dues status** — `Non-Member` recognized as non-paying dues status with corresponding feature restrictions.
+- **Non-Member dues status** — Added `Non-Member` to the recognized non-paying dues statuses. Non-member contacts added to the Member Directory with `Dues Status: Non-Member` are subject to the same feature restrictions as non-dues-paying members.
 
 ### Changed
-- **Survey open to all members** — Removed the dues-paying gate from the Quarterly Survey. All authenticated users can now take the survey regardless of dues status.
-- **Swipe gestures inverted** — Right-edge swipe now opens "More" menu; left-edge swipe opens Member Hub.
+- **Survey open to all members** — Removed the dues-paying gate from the Quarterly Survey. All authenticated users in the Member Directory can now take the survey regardless of dues status. Survey banner, Take Survey CTA, and More menu lock removed.
 - Updated dues-restricted banner text to remove Survey from the locked features list.
 
 ## [4.44.0] - 2026-03-28

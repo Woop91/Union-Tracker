@@ -158,7 +158,7 @@ var WeeklyQuestions = (function () {
    * @returns {string} ID in the form 'PL_<base36ts>_<rand4>'.
    */
   function _id() {
-    return 'PL_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+    return 'PL_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
   }
 
   /**
@@ -340,26 +340,30 @@ var WeeklyQuestions = (function () {
 
     var thisPeriod = _periodKey();
 
-    // Deactivate any existing steward poll this week
-    if (qSheet.getLastRow() > 1) {
-      var data = qSheet.getDataRange().getValues();
-      for (var i = 1; i < data.length; i++) {
-        var wk = data[i][Q_COLS.WEEK_START];
-        if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
-        if (String(wk) === thisPeriod && String(data[i][Q_COLS.SOURCE]) === 'steward') {
-          qSheet.getRange(i + 1, Q_COLS.ACTIVE + 1).setValue('FALSE');
+    // v4.55.1 R04-BUG-02: deactivate-and-create must happen inside a script lock so
+    // concurrent steward poll creations cannot leave two active polls for the same week.
+    var runLocked = (typeof withScriptLock_ === 'function') ? withScriptLock_ : function (fn) { return fn(); };
+    return runLocked(function () {
+      if (qSheet.getLastRow() > 1) {
+        var data = qSheet.getDataRange().getValues();
+        for (var i = 1; i < data.length; i++) {
+          var wk = data[i][Q_COLS.WEEK_START];
+          if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
+          if (String(wk) === thisPeriod && String(data[i][Q_COLS.SOURCE]) === 'steward') {
+            qSheet.getRange(i + 1, Q_COLS.ACTIVE + 1).setValue('FALSE');
+          }
         }
       }
-    }
 
-    var id = _id();
-    qSheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), 'steward',
-                      callerEmail, thisPeriod, 'TRUE', new Date()]);
+      var id = _id();
+      qSheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), 'steward',
+                        callerEmail, thisPeriod, 'TRUE', new Date()]);
 
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('POLL_STEWARD_CREATE', { steward: callerEmail, weekStart: thisPeriod });
-    }
-    return { success: true, message: 'Poll created for this week.', id: id };
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('POLL_STEWARD_CREATE', { steward: callerEmail, weekStart: thisPeriod });
+      }
+      return { success: true, message: 'Poll created for this week.', id: id };
+    });
   }
 
   // ── Public: Member — Submit to Pool ─────────────────────────────────────
@@ -584,7 +588,8 @@ var WeeklyQuestions = (function () {
     try {
       PropertiesService.getScriptProperties().setProperty('POLL_FREQUENCY', freq);
     } catch (e) {
-      return { success: false, message: 'Failed to save setting: ' + e.message };
+      log_('setPollFrequency', 'setProperty failed: ' + e.message);
+      return { success: false, message: 'Could not save the poll frequency. Please try again.' };
     }
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('POLL_FREQ_CHANGE', { steward: stewardEmail, frequency: freq });

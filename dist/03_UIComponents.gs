@@ -851,15 +851,9 @@ function applyDashboardTheme(theme) {
  * Toggles dark mode
  * @returns {void}
  */
-function toggleDarkMode() {
-  var props = PropertiesService.getUserProperties();
-  var isDark = props.getProperty('visual_darkMode') === 'true';
-  props.setProperty('visual_darkMode', (!isDark).toString());
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    isDark ? 'Dark mode disabled' : 'Dark mode enabled',
-    'Theme', 2
-  );
-}
+// Dead code removed (v4.55.2): toggleDarkMode() — the Visual Control Panel in
+// 04a_UIMenus.gs uses saveVisualSetting('darkMode', ...) directly and never
+// called this function. Left the panel as the single source of truth.
 // ============================================================================
 // COMFORT VIEW SETTINGS
 // ============================================================================
@@ -914,14 +908,7 @@ function applyComfortViewSettings(settings) {
   saveComfortViewSettings(settings);
 }
 
-/**
- * Resets Comfort View settings to defaults
- * @returns {void}
- */
-function resetComfortViewSettings() {
-  saveComfortViewSettings(getDefaultComfortViewSettings_());
-  SpreadsheetApp.getActiveSpreadsheet().toast('Comfort View settings reset', 'Settings', 2);
-}
+// Dead code removed (v4.55.2): resetComfortViewSettings() — no callers.
 
 /**
  * Hides gridlines on all sheets
@@ -934,16 +921,7 @@ function hideAllGridlines() {
     sheet.setHiddenGridlines(true);
   });
 }
-/**
- * Toggles gridlines visibility
- * @returns {void}
- */
-function toggleGridlinesComfortView() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var currentSheet = ss.getActiveSheet();
-  var hidden = currentSheet.hasHiddenGridlines();
-  currentSheet.setHiddenGridlines(!hidden);
-}
+// Dead code removed (v4.55.2): toggleGridlinesComfortView() — no callers.
 
 /**
  * Applies zebra stripes to a sheet
@@ -996,63 +974,11 @@ function removeZebraStripes(sheet) {
   dataRange.setBackground(SHEET_COLORS.BG_WHITE);
 }
 
-/**
- * Toggles zebra stripes on active sheet
- * @returns {void}
- */
-function toggleZebraStripes() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getActiveSheet();
-
-  var isStriped;
-  if (sheet.getLastRow() < 3) {
-    // Default to applying stripes for sheets with < 3 rows
-    isStriped = false;
-  } else {
-    // Check if zebra stripes are applied (row 2 has different color than row 3)
-    var row2Color = sheet.getRange(2, 1).getBackground();
-    var row3Color = sheet.getRange(3, 1).getBackground();
-    isStriped = (row2Color !== row3Color);
-  }
-
-  if (isStriped) {
-    removeZebraStripes(sheet);
-  } else {
-    applyZebraStripes(sheet);
-  }
-}
-/**
- * Activates focus mode
- * @returns {void}
- */
-function activateFocusMode() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getActiveSheet();
-  var selection = sheet.getSelection();
-
-  if (!selection) {
-    ss.toast('Please select a cell first', 'Focus Mode', 2);
-    return;
-  }
-
-  var settings = getComfortViewSettings();
-  settings.focusMode = true;
-  saveComfortViewSettings(settings);
-
-  ss.toast('Focus mode activated. Press Esc to exit.', 'Focus Mode', 3);
-}
-
-/**
- * Deactivates focus mode
- * @returns {void}
- */
-function deactivateFocusMode() {
-  var settings = getComfortViewSettings();
-  settings.focusMode = false;
-  saveComfortViewSettings(settings);
-
-  SpreadsheetApp.getActiveSpreadsheet().toast('Focus mode deactivated', 'Focus Mode', 2);
-}
+// Dead code removed (v4.55.2): toggleZebraStripes / activateFocusMode /
+// deactivateFocusMode — the Visual Control Panel in 04a_UIMenus.gs is the
+// only active entry point for these settings. The "Press Esc to exit" toast
+// in activateFocusMode was also a UI lie — GAS can't intercept Esc, so that
+// instruction would never have worked anyway.
 
 /**
  * Gets the current theme
@@ -1171,30 +1097,7 @@ function refreshAllVisuals() {
  * @param {number} [limit=5] Maximum number of grievances to return
  * @returns {Array<Object>} Array of grievance objects with mobile-friendly properties
  */
-function getRecentGrievancesForMobile(limit) {
-  limit = limit || 5;
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!sheet || sheet.getLastRow() <= 1) return [];
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.RESOLUTION).getValues();
-  return data.map(function(row, idx) {
-    var filed = col_(row, GRIEVANCE_COLS.DATE_FILED);
-    var deadline = col_(row, GRIEVANCE_COLS.NEXT_ACTION_DUE);
-    return {
-      id: col_(row, GRIEVANCE_COLS.GRIEVANCE_ID),
-      memberName: col_(row, GRIEVANCE_COLS.FIRST_NAME) + ' ' + col_(row, GRIEVANCE_COLS.LAST_NAME),
-      issueType: col_(row, GRIEVANCE_COLS.ISSUE_CATEGORY),
-      status: col_(row, GRIEVANCE_COLS.STATUS),
-      filedDate: filed instanceof Date ? Utilities.formatDate(filed, Session.getScriptTimeZone(), 'MM/dd/yyyy') : filed,
-      deadline: deadline instanceof Date ? Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'MM/dd/yyyy') : null,
-      filedDateObj: filed
-    };
-  }).sort(function(a, b) {
-    var da = a.filedDateObj instanceof Date ? a.filedDateObj : new Date(0);
-    var db = b.filedDateObj instanceof Date ? b.filedDateObj : new Date(0);
-    return db - da;
-  }).slice(0, limit);
-}
+// Dead code removed (v4.55.2): getRecentGrievancesForMobile() — zero callers.
 
 /**
  * Gets search results for mobile search interface
@@ -1246,19 +1149,8 @@ function getMobileSearchData(query, tab) {
  * Displays a quick summary dialog of assigned cases
  * @returns {void}
  */
-function showMyAssignedGrievances() {
-  var email = Session.getActiveUser().getEmail();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!sheet || sheet.getLastRow() <= 1) { SpreadsheetApp.getUi().alert('No grievances found'); return; }
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
-  var mine = data.filter(function(row) { var steward = col_(row, GRIEVANCE_COLS.STEWARD); return steward && steward.indexOf(email) >= 0; });
-  if (mine.length === 0) { SpreadsheetApp.getUi().alert('No grievances assigned to you'); return; }
-  var msg = 'You have ' + mine.length + ' assigned grievance(s):\n\n';
-  mine.slice(0, 10).forEach(function(row) { msg += '#' + col_(row, GRIEVANCE_COLS.GRIEVANCE_ID) + ' - ' + col_(row, GRIEVANCE_COLS.FIRST_NAME) + ' ' + col_(row, GRIEVANCE_COLS.LAST_NAME) + ' (' + col_(row, GRIEVANCE_COLS.STATUS) + ')\n'; });
-  if (mine.length > 10) msg += '\n... and ' + (mine.length - 10) + ' more';
-  SpreadsheetApp.getUi().alert('My Cases', msg, SpreadsheetApp.getUi().ButtonSet.OK);
-}
+// Dead code removed (v4.55.2): showMyAssignedGrievances() — zero callers. The
+// steward "My Cases" view in steward_view.html replaces this.
 
 /**
  * ============================================================================
@@ -1403,7 +1295,6 @@ function showMemberQuickActions(row) {
     </div>
     <div class="actions">
       <div class="section-header">📋 Member Actions</div>
-      <button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(${row});google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>
       <button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(${memberIdJson});google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>
       <button class="action-btn" onclick="navigator.clipboard.writeText(${memberIdJson});alert('Copied!')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">${escapeHtml(memberId)}</div></span></button>
       <button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+'\\n'+r.folderUrl)}else{alert('Error: '+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(${memberIdJson})"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>
@@ -1885,16 +1776,14 @@ function showMemberGrievanceHistory(memberId) {
     'Grievance History - ' + memberId, 500, 500);
 }
 
-/**
- * Opens grievance form for a member (placeholder - directs to Grievance Log)
- * @param {number} row - The member row number
- */
-function openGrievanceFormForMember(row) {
-  SpreadsheetApp.getUi().alert('ℹ️ New Grievance', 'To start a new grievance for this member, navigate to the Grievance Log sheet and add a new row with their Member ID.', SpreadsheetApp.getUi().ButtonSet.OK);
-}
+// openGrievanceFormForMember was a placeholder that showed an alert telling
+// users to add a row manually. The quick-actions button that called it has
+// been removed — use the Grievance Log directly to start a new grievance.
 
 /**
- * Syncs a single grievance to the calendar
+ * Syncs a single grievance to the calendar. Delegates to
+ * syncDeadlinesToCalendar(grievanceIdFilter) so the sync is actually scoped
+ * to the requested id (the previous version fired a full org-wide sync).
  * @param {string} grievanceId - The grievance ID to sync
  */
 function syncSingleGrievanceToCalendar(grievanceId) {
@@ -3041,30 +2930,25 @@ function modalAddContact(data) {
     var sheet = ss.getSheetByName(SHEETS.NON_MEMBER_CONTACTS) || ss.getSheetByName('Non member contacts');
     if (!sheet) return { success: false, error: 'Non-Member Contacts sheet not found' };
 
-    // Duplicate check: same first+last name at same location
+    // Duplicate check: same first+last name at same location. Use NMC_COLS so
+    // a header reorder can't silently compare the wrong columns.
     var existing = sheet.getDataRange().getValues();
     for (var r = 1; r < existing.length; r++) {
-      if (String(existing[r][1]).trim().toLowerCase() === data.firstName.trim().toLowerCase() &&
-          String(existing[r][2]).trim().toLowerCase() === data.lastName.trim().toLowerCase() &&
-          String(existing[r][4]).trim().toLowerCase() === data.workLocation.trim().toLowerCase()) {
+      if (String(col_(existing[r], NMC_COLS.FIRST_NAME) || '').trim().toLowerCase() === String(data.firstName || '').trim().toLowerCase() &&
+          String(col_(existing[r], NMC_COLS.LAST_NAME) || '').trim().toLowerCase() === String(data.lastName || '').trim().toLowerCase() &&
+          String(col_(existing[r], NMC_COLS.WORK_LOCATION) || '').trim().toLowerCase() === String(data.workLocation || '').trim().toLowerCase()) {
         return { success: false, error: 'Duplicate: ' + data.firstName + ' ' + data.lastName + ' at ' + data.workLocation + ' already exists.' };
       }
     }
 
-    var row = [];
-    setCol_(row, NMC_COLS.FIRST_NAME, escapeForFormula(data.firstName));
-    setCol_(row, NMC_COLS.LAST_NAME, escapeForFormula(data.lastName));
-    setCol_(row, NMC_COLS.JOB_TITLE, escapeForFormula(data.jobTitle || ''));
-    setCol_(row, NMC_COLS.WORK_LOCATION, escapeForFormula(data.workLocation || ''));
-    setCol_(row, NMC_COLS.UNIT, escapeForFormula(data.unit || ''));
-    setCol_(row, NMC_COLS.UNION_NAME, escapeForFormula(data.unionName || ''));
-    setCol_(row, NMC_COLS.SHIRT_SIZE, escapeForFormula(data.shirtSize || ''));
-    setCol_(row, NMC_COLS.IS_STEWARD, escapeForFormula(data.isSteward || 'No'));
-    setCol_(row, NMC_COLS.EMAIL, escapeForFormula(data.email || ''));
-    setCol_(row, NMC_COLS.PHONE, escapeForFormula(data.phone || ''));
-    sheet.appendRow(row);
+    // Delegate to DataService.addNonMemberContact which generates the CONTACT_ID.
+    // The prior hand-rolled append omitted CONTACT_ID entirely, creating orphan
+    // rows that update/delete APIs could never find (they look up by ID).
+    if (typeof DataService !== 'undefined' && typeof DataService.addNonMemberContact === 'function') {
+      return DataService.addNonMemberContact(data);
+    }
 
-    return { success: true };
+    return { success: false, error: 'Contact service unavailable.' };
   } catch (e) {
     log_('modalAddContact', 'Error: ' + e.message);
     return { success: false, error: e.message };
@@ -3281,18 +3165,23 @@ function modalGetCaseChecklist(caseId) {
     var data = sheet.getDataRange().getValues();
     var items = [];
     for (var r = 1; r < data.length; r++) {
-      if (String(data[r][1]).trim() === String(caseId).trim()) {
+      if (String(col_(data[r], CHECKLIST_COLS.CASE_ID)).trim() === String(caseId).trim()) {
+        // Required is stored as "Yes"/"No" by generateChecklistItems (12_Features.gs).
+        // The previous check String(...).toUpperCase() === 'Y' was always false for
+        // "YES", silently flipping every item to required:false and corrupting writebacks.
+        var _requiredRaw = String(col_(data[r], CHECKLIST_COLS.REQUIRED) || '').trim().toUpperCase();
+        var _completedRaw = col_(data[r], CHECKLIST_COLS.COMPLETED);
         items.push({
           row: r + 1,
-          checklistId: data[r][0],
-          caseId: data[r][1],
-          actionType: escapeHtml(String(data[r][2] || '')),
-          text: escapeHtml(String(data[r][3] || '')),
-          category: String(data[r][4] || ''),
-          required: String(data[r][5]).toUpperCase() === 'Y',
-          completed: data[r][6] === true,
-          completedBy: data[r][7] || '',
-          completedDate: data[r][8] || ''
+          checklistId: col_(data[r], CHECKLIST_COLS.CHECKLIST_ID),
+          caseId: col_(data[r], CHECKLIST_COLS.CASE_ID),
+          actionType: escapeHtml(String(col_(data[r], CHECKLIST_COLS.ACTION_TYPE) || '')),
+          text: escapeHtml(String(col_(data[r], CHECKLIST_COLS.ITEM_TEXT) || '')),
+          category: String(col_(data[r], CHECKLIST_COLS.CATEGORY) || ''),
+          required: _requiredRaw === 'YES' || _requiredRaw === 'TRUE' || _requiredRaw === 'Y' || _requiredRaw === '1',
+          completed: _completedRaw === true || String(_completedRaw).trim().toUpperCase() === 'TRUE',
+          completedBy: col_(data[r], CHECKLIST_COLS.COMPLETED_BY) || '',
+          completedDate: col_(data[r], CHECKLIST_COLS.COMPLETED_DATE) || ''
         });
       }
     }
@@ -3312,6 +3201,10 @@ function modalSaveCaseChecklist(updates) {
     var user = Session.getActiveUser().getEmail() || 'Unknown';
     var now = new Date();
 
+    // CHECKLIST_COLS is 1-indexed. CHECKLIST_COLS.COMPLETED/COMPLETED_BY/COMPLETED_DATE
+    // are consecutive in the canonical header map; fall back to 7/8/9 if the
+    // dynamic map hasn't been resolved in this execution context.
+    var _completedCol = (typeof CHECKLIST_COLS === 'object' && CHECKLIST_COLS.COMPLETED) || 7;
     for (var i = 0; i < updates.length; i++) {
       var u = updates[i];
       var rowValues = [u.completed];
@@ -3322,7 +3215,7 @@ function modalSaveCaseChecklist(updates) {
         rowValues.push('');  // Clear Completed By
         rowValues.push('');  // Clear Completed Date
       }
-      sheet.getRange(u.row, 7, 1, rowValues.length).setValues([rowValues]);
+      sheet.getRange(u.row, _completedCol, 1, rowValues.length).setValues([rowValues]);
     }
 
     return { success: true };

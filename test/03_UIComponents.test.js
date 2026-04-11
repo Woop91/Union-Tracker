@@ -332,3 +332,108 @@ describe('email validation regex (C-XSS-17 regression)', () => {
     expect(emailRegex.test(email)).toBe(expected);
   });
 });
+
+// ============================================================================
+// isTabModalsEnabled_ — Auditor-Alpha AA-14
+// ============================================================================
+//
+// The ENABLE_TAB_MODALS feature toggle gates the v4.48.0 tab-modal system
+// that replaces legacy sidebar modals. Pre-v4.55.2 there were zero tests
+// for this toggle. A regression inverting the check would either spam
+// users with modal dialogs everywhere or suppress them entirely. These
+// tests exercise every branch of isTabModalsEnabled_ directly against
+// the real source.
+// ============================================================================
+
+describe('isTabModalsEnabled_ (AA-14)', () => {
+  var _origGetActive;
+
+  beforeEach(() => {
+    _origGetActive = SpreadsheetApp.getActiveSpreadsheet;
+  });
+
+  afterEach(() => {
+    SpreadsheetApp.getActiveSpreadsheet = _origGetActive;
+  });
+
+  function mockConfigSheet(value) {
+    var configSheet = {
+      getRange: jest.fn(() => ({ getValue: jest.fn(() => value) })),
+      getName: jest.fn(() => SHEETS.CONFIG)
+    };
+    var ss = {
+      getSheetByName: jest.fn(name => (name === SHEETS.CONFIG ? configSheet : null))
+    };
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    return configSheet;
+  }
+
+  test('defaults to true when no active spreadsheet', () => {
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => null);
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('defaults to true when Config sheet is missing', () => {
+    var ss = { getSheetByName: jest.fn(() => null) };
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('returns true when Config value is "yes"', () => {
+    mockConfigSheet('yes');
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('returns true for "YES" (case-insensitive)', () => {
+    mockConfigSheet('YES');
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('returns true when Config value is empty (default enabled)', () => {
+    mockConfigSheet('');
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('returns true when Config value is whitespace', () => {
+    mockConfigSheet('   ');
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('returns false when Config value is "no"', () => {
+    mockConfigSheet('no');
+    expect(isTabModalsEnabled_()).toBe(false);
+  });
+
+  test('returns false for "NO" (case-insensitive)', () => {
+    mockConfigSheet('NO');
+    expect(isTabModalsEnabled_()).toBe(false);
+  });
+
+  test('returns false for "  no  " (whitespace padded)', () => {
+    mockConfigSheet('  no  ');
+    expect(isTabModalsEnabled_()).toBe(false);
+  });
+
+  test('returns true for arbitrary non-"no" string (fail-open)', () => {
+    mockConfigSheet('enabled');
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('fail-open: returns true when getRange throws', () => {
+    var configSheet = {
+      getRange: jest.fn(() => { throw new Error('Range error'); })
+    };
+    var ss = {
+      getSheetByName: jest.fn(() => configSheet)
+    };
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    expect(isTabModalsEnabled_()).toBe(true);
+  });
+
+  test('reads from row 3 of the Config sheet', () => {
+    var configSheet = mockConfigSheet('yes');
+    isTabModalsEnabled_();
+    // First arg to getRange is row (3), second is column (ENABLE_TAB_MODALS)
+    expect(configSheet.getRange).toHaveBeenCalledWith(3, CONFIG_COLS.ENABLE_TAB_MODALS);
+  });
+});

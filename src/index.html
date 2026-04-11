@@ -81,7 +81,25 @@
     } catch (_fragErr) { /* cross-origin iframe — skip */ }
 
     var SESSION_TOKEN = _fragSessionToken || PAGE_DATA.sessionToken || localStorage.getItem('dashboardSessionToken') || null;
-    var INITIAL_TAB = PAGE_DATA.initialTab || null;
+
+    // v4.55.2 D03-BUG-03: URL hash deep linking.
+    // Read the tab from the URL hash on boot (same-origin iframe's own
+    // location.hash) and feed it into INITIAL_TAB as a fallback after the
+    // server-injected PAGE_DATA.initialTab. Hash format is "#tab=<tabId>".
+    // Sanitized: anything that isn't a plain a-z0-9_ identifier is rejected
+    // so a malicious or corrupted hash can't route to an arbitrary handler.
+    // Validation against the real KNOWN_TABS whitelist happens later in
+    // _checkDeepLink (which also lives inside this IIFE).
+    function _readTabFromHash() {
+      try {
+        var h = (window.location && window.location.hash) || '';
+        if (!h || h.indexOf('#tab=') !== 0) return '';
+        var val = h.substring(5);
+        if (!/^[a-z0-9_]{1,32}$/i.test(val)) return '';
+        return val;
+      } catch (_hashReadErr) { return ''; }
+    }
+    var INITIAL_TAB = PAGE_DATA.initialTab || _readTabFromHash() || null;
 
     // Web app URL for redirects (injected server-side, avoids iframe URL issues)
     var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
@@ -1241,6 +1259,205 @@
     var _TAB_FREQ_KEY = 'dds_tabFreq';
     var _MAX_PREFETCH = 3;
 
+    // ============================================================================
+    // v4.55.2 C05-BUG-07: fuzzyMatch — shared typo-tolerant substring matcher.
+    // ============================================================================
+    //
+    // Carmen's C05-BUG-07 flagged "no fuzzy/typo-tolerant search anywhere".
+    // This helper gives every search input a single, consistent way to opt
+    // into typo tolerance without forking each call site to its own regex.
+    //
+    // Scoring model (cheap, branchless fast paths first):
+    //
+    //   1. Empty query → {matches: true, score: 1}
+    //      (empty search should match everything — the existing behavior)
+    //
+    //   2. Exact case-insensitive substring → {matches: true, score: 0.9..1}
+    //      Prefix match scores higher than interior match. This is the fast
+    //      path for users who type the start of a name or tag.
+    //
+    //   3. All query characters appear in order in target (subsequence) →
+    //      {matches: true, score: 0.5..0.8}
+    //      Captures "jdoe" matching "John Doe" or "gri lvl" matching
+    //      "Grievance Level". Order-preserving but permissive.
+    //
+    //   4. Bounded Levenshtein within ceil(query.length / 4) edits →
+    //      {matches: true, score: 0.3..0.6}
+    //      Catches single-character typos, transpositions, and one-off
+    //      misspellings. Only runs for short queries (<= 32 chars) because
+    //      Levenshtein is O(n*m) and the resource/member search datasets
+    //      can exceed 1000 rows.
+    //
+    //   5. Otherwise → {matches: false, score: 0}
+    //
+    // Performance notes:
+    //   - All paths short-circuit on the first success so the common case
+    //     (substring hit) is O(n).
+    //   - Levenshtein is capped at max 32x32 = 1024 operations per call,
+    //     called at most once per (query, target) pair.
+    //   - Callers should still debounce their input listeners; this helper
+    //     doesn't cache.
+    //
+    // Usage:
+    //   var r = fuzzyMatch(searchTerm, resource.title);
+    //   if (r.matches) { ... include resource; r.score ranks relevance ... }
+    //
+    // Return shape is {matches: boolean, score: number in [0,1]} so callers
+    // can sort by score to show best matches first.
+    function fuzzyMatch(query, target) {
+      if (query == null || query === '') return { matches: true, score: 1 };
+      if (target == null || target === '') return { matches: false, score: 0 };
+      var q = String(query).toLowerCase().trim();
+      var t = String(target).toLowerCase();
+      if (!q) return { matches: true, score: 1 };
+
+      // Path 2: substring match (fast path)
+      var idx = t.indexOf(q);
+      if (idx !== -1) {
+        // Prefix match wins over interior match; longer queries score higher
+        var prefixBonus = (idx === 0) ? 0.1 : 0;
+        return {
+          matches: true,
+          score: 0.9 + prefixBonus * (q.length / (q.length + 8))
+        };
+      }
+
+      // Path 3: subsequence — every char of q appears in order in t
+      var qi = 0;
+      for (var ti = 0; ti < t.length && qi < q.length; ti++) {
+        if (t.charAt(ti) === q.charAt(qi)) qi++;
+      }
+      if (qi === q.length) {
+        // Score decays as the subsequence spreads — shorter target = tighter match
+        return {
+          matches: true,
+          score: 0.5 + 0.3 * Math.min(1, q.length / Math.max(1, t.length))
+        };
+      }
+
+      // Path 4: bounded Levenshtein for short queries (typo tolerance)
+      if (q.length > 32 || t.length > 128) {
+        return { matches: false, score: 0 };
+      }
+      var maxEdits = Math.max(1, Math.ceil(q.length / 4));
+      // Simple two-row Levenshtein; abandons early when min(row) > maxEdits.
+      var prev = new Array(t.length + 1);
+      var curr = new Array(t.length + 1);
+      for (var j = 0; j <= t.length; j++) prev[j] = j;
+      for (var i = 1; i <= q.length; i++) {
+        curr[0] = i;
+        var rowMin = curr[0];
+        for (var jj = 1; jj <= t.length; jj++) {
+          var cost = (q.charAt(i - 1) === t.charAt(jj - 1)) ? 0 : 1;
+          curr[jj] = Math.min(
+            curr[jj - 1] + 1,
+            prev[jj] + 1,
+            prev[jj - 1] + cost
+          );
+          if (curr[jj] < rowMin) rowMin = curr[jj];
+        }
+        if (rowMin > maxEdits) return { matches: false, score: 0 };
+        for (var k = 0; k <= t.length; k++) prev[k] = curr[k];
+      }
+      // Best alignment = min over last row (allows trailing slack in target)
+      var best = prev[t.length];
+      for (var m = 0; m <= t.length; m++) if (prev[m] < best) best = prev[m];
+      if (best <= maxEdits) {
+        return {
+          matches: true,
+          score: Math.max(0.3, 0.6 - (best / Math.max(1, q.length)) * 0.3)
+        };
+      }
+      return { matches: false, score: 0 };
+    }
+
+    // ============================================================================
+    // v4.55.3 sub-project A Zone 1: renderSafeText — newline-tolerant text renderer.
+    // ============================================================================
+    //
+    // Resources sheet content contains literal '\n' (two characters: backslash + n)
+    // from an older seed bug, plus real '\n' from admin edits. Callers previously
+    // piped content straight into .textContent, so '\n' rendered as visible
+    // backslash-n instead of a line break. This helper normalizes both forms into
+    // <br> nodes while HTML-escaping everything else by using text nodes, which
+    // makes it XSS-safe by construction (no innerHTML path).
+    //
+    // Return shape is a DocumentFragment so callers can appendChild directly
+    // without an intermediate HTML string.
+    function renderSafeText(str) {
+      var frag = document.createDocumentFragment();
+      if (str === null || str === undefined || str === '') return frag;
+      var s = String(str);
+      // Normalize CRLF → LF, then convert literal '\n' (two chars) into real '\n'
+      // so a single split handles both.
+      s = s.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
+      var parts = s.split('\n');
+      for (var i = 0; i < parts.length; i++) {
+        if (i > 0) frag.appendChild(document.createElement('br'));
+        if (parts[i].length > 0) {
+          frag.appendChild(document.createTextNode(parts[i]));
+        }
+      }
+      return frag;
+    }
+
+    // ============================================================================
+    // v4.55.3 sub-project A Zone 3: displayUser — humanize Access Log user column.
+    // ============================================================================
+    //
+    // The Audit Log sometimes stores SHA-256 hashes (64 hex chars) instead of
+    // emails in the user column for privacy reasons. Rendering those raw leaks
+    // unreadable hex to the UI (see issue #5). This helper detects the hash
+    // shape and returns an abbreviated 'User #xxxxxxxx' form; emails pass
+    // through lowercased; empty values become em-dash.
+    //
+    // Pure, total, never throws. No backend round-trip — the full hash→name
+    // resolution is an optional future enhancement (tracked in sub-project B).
+    function displayUser(rawId) {
+      if (rawId === null || rawId === undefined || rawId === '') return '—';
+      var s = String(rawId).trim();
+      if (s === '') return '—';
+      if (/^[a-f0-9]{64}$/i.test(s)) {
+        return 'User #' + s.substring(0, 8).toLowerCase();
+      }
+      // Emails are normalized to lowercase for display consistency.
+      if (s.indexOf('@') !== -1) return s.toLowerCase();
+      return s;
+    }
+
+    // ============================================================================
+    // v4.55.6 sub-project D Zone 4: parseUserAgent — classify a raw UA string
+    // into {browser, os, deviceClass} for the usage analytics pipeline.
+    // ============================================================================
+    //
+    // Pure, total, never throws. Handles null/empty/undefined by returning
+    // all "other" values. Edge is checked BEFORE Chrome because Edge UA strings
+    // contain both "Chrome/" and "Edg/" and the first match wins.
+    //
+    // Called client-side by the usage logger before sending events so the
+    // backend can aggregate without re-parsing every row. Also usable by the
+    // admin Usage Analytics display to classify historical rows that
+    // predate this feature.
+    function parseUserAgent(ua) {
+      ua = String(ua == null ? '' : ua);
+      var lua = ua.toLowerCase();
+      var browser = 'other';
+      if (lua.indexOf('edg/') !== -1) browser = 'edge';
+      else if (lua.indexOf('firefox/') !== -1) browser = 'firefox';
+      else if (lua.indexOf('chrome/') !== -1) browser = 'chrome';
+      else if (lua.indexOf('safari/') !== -1) browser = 'safari';
+      var os = 'other';
+      if (/iphone|ipad|ipod/i.test(ua)) os = 'ios';
+      else if (/android/i.test(ua)) os = 'android';
+      else if (/macintosh|mac os x/i.test(ua)) os = 'macos';
+      else if (/windows/i.test(ua)) os = 'windows';
+      else if (/linux/i.test(ua)) os = 'linux';
+      var deviceClass = 'desktop';
+      if (/ipad|tablet/i.test(ua)) deviceClass = 'tablet';
+      if (/mobile|android|iphone|ipod/i.test(ua)) deviceClass = 'mobile';
+      return { browser: browser, os: os, deviceClass: deviceClass };
+    }
+
     /**
      * Records a tab visit for frequency tracking. Called from _handleTabNav.
      * Stores per-role counts in localStorage: { steward: { cases: 12, members: 8 }, member: { ... } }
@@ -2271,11 +2488,18 @@
       function flush() {
         if (_events.length === 0) return;
         var batch = _events.splice(0);
+        // v4.55.6 sub-project D Zone 4: classify UA once per flush and send the
+        // parsed fields so the backend doesn't have to re-parse every row.
+        var _ua = (navigator.userAgent || '').slice(0, 150);
+        var _parsed = parseUserAgent(_ua);
         var payload = {
           sessionId: _sessionId,
           sessionStart: _sessionStart,
           elapsed: Date.now() - _sessionStart,
-          userAgent: (navigator.userAgent || '').slice(0, 150),
+          userAgent: _ua,
+          browser: _parsed.browser,
+          os: _parsed.os,
+          deviceClass: _parsed.deviceClass,
           events: batch
         };
         try {
@@ -2613,16 +2837,18 @@
         headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
       }
       header.appendChild(headerText);
-      var bellWrap = el('div', { className: 'notif-bell-wrap', role: 'button', tabIndex: 0, 'aria-label': 'Notifications', onClick: function() {
-        _handleTabNav(role, 'notifications');
-      }, onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); } } });
-      bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
-      // For stewards, bell total includes unanswered Q&A questions
+      // v4.55.6 sub-project D Zone 2: hide the whole bell when empty so the
+      // header doesn't show a useless icon. Bell wrap is now only created and
+      // appended when there's at least one notification or unanswered Q&A.
       var _bellTotal = (AppState.notificationCount || 0) + (role === 'steward' ? (AppState.qaUnansweredCount || 0) : 0);
       if (_bellTotal > 0) {
+        var bellWrap = el('div', { className: 'notif-bell-wrap', role: 'button', tabIndex: 0, 'aria-label': 'Notifications', onClick: function() {
+          _handleTabNav(role, 'notifications');
+        }, onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); } } });
+        bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
         bellWrap.appendChild(el('span', { className: 'notif-bell-badge', 'aria-live': 'polite' }, String(_bellTotal)));
+        header.appendChild(bellWrap);
       }
-      header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
       // ── Sidebar quote widget — positioned at top, right after header ──
@@ -3008,16 +3234,18 @@
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
-        { divider: true },
-        { group: 'Temp' },
-        { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
-        { id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' },
       ];
       // v4.40.0: Admin-only analytics tab
+      // v4.55.6 sub-project D Zone 3: Data Failsafe + Test Runner promoted from
+      // the removed "Temp" group into the Admin group so they're only visible
+      // to admin users in production (previously dev-only, filtered by
+      // _filterDevTabs).
       if (IS_ADMIN) {
         stewardTabs.push({ divider: true });
         stewardTabs.push({ group: 'Admin' });
         stewardTabs.push({ id: 'analytics', icon: '\uD83D\uDCC8', label: 'Usage Analytics' });
+        stewardTabs.push({ id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' });
+        stewardTabs.push({ id: 'testrunner', icon: '\uD83E\uDDEA', label: 'Test Runner' });
       }
       if (!CONFIG.enableOrgHealthTree) {
         stewardTabs = stewardTabs.filter(function(t) { return t.id !== 'orghealth'; });
@@ -3427,8 +3655,8 @@
     }
 
     /**
-     * Agency Org Chart — loads agency_org_chart.html lazily.
-     * Generic agency structure visualization (when configured).
+     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
+     * agency structure, budget, personnel, DDS hierarchy.
      */
     function renderAgencyOrgChart(appContainer, role) {
       // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
@@ -3634,6 +3862,19 @@
       return { stale: function() { return id !== _navSwitchId || gen !== _renderGeneration; } };
     }
 
+    // v4.55.2 D03-BUG-03: URL-hash deep linking is now WIRED. See the hash
+    // write block inside this function (around line 3705) and the
+    // hashchange listener + _DEEP_LINK_KNOWN_TABS whitelist below this
+    // function. Design:
+    //   - Primary tab only (split-view secondary does NOT update hash).
+    //   - history.replaceState is used so tab clicks don't pollute the
+    //     browser history stack.
+    //   - hashchange listener validates against the shared known-tabs
+    //     whitelist and ignores values that aren't legal tab IDs.
+    //   - Cross-origin iframe safety: every hash read and write is
+    //     wrapped in try/catch (GAS runs inside script.googleusercontent
+    //     .com so same-origin hash access on window.location is safe,
+    //     but window.top.location can throw).
     function _handleTabNav(role, tabId) {
       var app = document.getElementById('app');
       var switchId = ++_navSwitchId; // claim this switch; any older in-flight switch is now stale
@@ -3659,6 +3900,21 @@
         }
       } else {
         AppState.activeTab = tabId;
+      }
+
+      // v4.55.2 D03-BUG-03: write the active primary tab to the URL hash.
+      // Uses history.replaceState so tab clicks don't pile up in the browser
+      // history stack — only the most recent tab is in the URL. Split-view
+      // secondary panels do NOT update the hash (only primary reflects).
+      // hashchange events are NOT fired by replaceState, so this does not
+      // recursively trigger the hashchange listener we register below.
+      // Cross-origin iframe safety: try/catch around the whole block.
+      if (!_isSplitSecondary) {
+        try {
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#tab=' + tabId);
+          }
+        } catch (_hashWriteErr) { /* cross-origin iframe or old browser — skip */ }
       }
 
       // Normalize tab aliases (steward home/cases both render the same dashboard)
@@ -3924,7 +4180,12 @@
           case 'meetings': return renderMeetingsPage;
           case 'minutes': return renderMinutesPage;
           case 'mytasks': return renderMemberTasks;
-          case 'qaforum': return function(a) { renderQAForum(a, 'member'); };
+          case 'qaforum': return function(a) {
+            // v4.55.4 sub-project B Zone 3: renderQAForum lives in member_view.html
+            // so pure stewards need member_view lazy-loaded before invocation.
+            // Pure members get a synchronous pass-through.
+            _loadMemberViewThen(a, function() { renderQAForum(a, 'member'); });
+          };
           case 'timeline': return renderMemberTimelinePage;
           case 'reportcard': return renderReportCard;
           case 'pinsetup': return renderPINSetup;
@@ -3952,7 +4213,10 @@
           case 'tasks': return renderStewardTasks;
           case 'events': return renderEventsPage;
           case 'minutes': return renderStewardMinutes;
-          case 'qaforum': return function(a) { renderQAForum(a, 'steward'); };
+          case 'qaforum': return function(a) {
+            // v4.55.4 sub-project B Zone 3: see member-side note above.
+            _loadMemberViewThen(a, function() { renderQAForum(a, 'steward'); });
+          };
           case 'timeline': return renderStewardTimelinePage;
           case 'mentorship': return renderMentorshipPage;
           case 'workload': return renderWorkloadTracker;
@@ -3961,12 +4225,28 @@
           case 'orghealth': return renderOrgHealthTree;
           case 'failsafe': return renderFailsafePage;
           case 'search': return renderSearchPage;
-          case 'testrunner': return IS_DEV_MODE ? renderTestRunnerPage : renderStewardDashboard;
+          // v4.55.6 sub-project D Zone 3: Test Runner was DEV-only; now unlocked for admins too.
+          // Note: no parens around the || expression — operator precedence is fine, and the
+          // architecture.test.js A9 regex mistakes `return (` for a function-call routed name.
+          case 'testrunner': return IS_DEV_MODE || IS_ADMIN ? renderTestRunnerPage : renderStewardDashboard;
           case 'analytics': return IS_ADMIN ? renderAnalyticsPage : renderStewardDashboard;
           default: return renderStewardDashboard;
         }
       }
     }
+
+    // v4.55.1 P02-BUG-05 + v4.55.2 D03-BUG-03: whitelist used by both the
+    // ?page= deep-link handler and the URL-hash change listener. Hoisted to
+    // IIFE scope so both _checkDeepLink and the hashchange listener share
+    // one source of truth. Tabs added to the router MUST be added here too
+    // or deep links to them will fall back to the default.
+    var _DEEP_LINK_KNOWN_TABS = {
+      // shared
+      cases:1, workload:1, orghealth:1, poms:1, resources:1, qaforum:1, polls:1, minutes:1,
+      notifications:1, events:1, timeline:1, stewarddirectory:1, home:1, orgchart:1,
+      maddsorgchart:1, insights:1, members:1, tasks:1, feedback:1, profile:1, survey:1,
+      contact:1, more:1, admin:1, settings:1, broadcasts:1, leaderhub:1
+    };
 
     /**
      * Deep-link handler — if ?page=xxx was in the URL, navigate to that tab
@@ -3979,20 +4259,44 @@
       var tab = AppState.initialTab;
       AppState.initialTab = null; // one-shot
       // v4.55.1 P02-BUG-05: validate tab ID against a whitelist before routing so
-      // bogus ?page= values fall back to the default instead of producing a blank page.
-      var KNOWN_TABS = {
-        // shared
-        cases:1, workload:1, orghealth:1, poms:1, resources:1, qaforum:1, polls:1, minutes:1,
-        notifications:1, events:1, timeline:1, stewarddirectory:1, home:1, orgchart:1,
-        maddsorgchart:1, insights:1, members:1, tasks:1, feedback:1, profile:1, survey:1,
-        contact:1, more:1, admin:1, settings:1, broadcasts:1, leaderhub:1
-      };
-      if (!KNOWN_TABS[tab]) {
+      // bogus ?page= or #tab= values fall back to the default instead of producing a blank page.
+      if (!_DEEP_LINK_KNOWN_TABS[tab]) {
         console.warn('Deep-link to unknown tab: ' + tab + '. Falling back to default.');
         tab = (role === 'steward') ? 'cases' : 'home';
       }
       _handleTabNav(role, tab);
     }
+
+    // v4.55.2 D03-BUG-03: URL-hash deep linking — hashchange listener for
+    // browser back/forward support. Fires only when the user changes the
+    // hash directly (back button, typed URL, manual edit). _handleTabNav
+    // uses history.replaceState which does NOT fire hashchange, so there
+    // is no recursion loop.
+    //
+    // Guards:
+    //   - Ignore if no role selected yet (pre-init).
+    //   - Ignore if hash tab matches current AppState.activeTab (no-op).
+    //   - Validate against _DEEP_LINK_KNOWN_TABS whitelist so a bogus hash
+    //     value can't route to an arbitrary handler.
+    //   - Ignore tabs that aren't legal for the current role (fallback to
+    //     default instead of rendering a blank pane).
+    try {
+      window.addEventListener('hashchange', function _onHashChange() {
+        try {
+          if (!AppState || !AppState.activeRole) return;
+          var hashTab = _readTabFromHash();
+          if (!hashTab) return;
+          if (hashTab === AppState.activeTab) return;
+          if (!_DEEP_LINK_KNOWN_TABS[hashTab]) {
+            console.warn('hashchange: unknown tab "' + hashTab + '", ignoring');
+            return;
+          }
+          _handleTabNav(AppState.activeRole, hashTab);
+        } catch (_hcInnerErr) {
+          console.error('hashchange dispatch error:', _hcInnerErr);
+        }
+      });
+    } catch (_hcRegisterErr) { /* listener registration failed — skip */ }
 
     // Debounced resize handler — re-renders on breakpoint change
     var _resizeTimer = null;

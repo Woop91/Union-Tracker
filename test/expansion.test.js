@@ -70,12 +70,21 @@ describe('seedWeeklyQuestions', () => {
 // ============================================================================
 
 describe('dataGetEngagementStats (live sheet reads)', () => {
+  // v4.55.2 Wave 27 / B-16: centralize _resolveCallerEmail save/restore so
+  // the manual try/finally-style restore pattern can't leak a jest.fn()
+  // into later tests if an assertion throws before the restore line.
+  let _origResolveCallerEmail;
+  beforeEach(() => {
+    _origResolveCallerEmail = global._resolveCallerEmail;
+    global._resolveCallerEmail = jest.fn(() => 'steward@test.com');
+  });
+  afterEach(() => {
+    global._resolveCallerEmail = _origResolveCallerEmail;
+  });
+
   test('returns engagement data from sheet when members exist', () => {
     // dataGetEngagementStats now reads directly from sheets (not PropertiesService).
-    // Mock _resolveCallerEmail for auth and provide a Member Directory with active members.
-    const origResolve = global._resolveCallerEmail;
-    global._resolveCallerEmail = jest.fn(() => 'steward@test.com');
-
+    // _resolveCallerEmail is already stubbed in beforeEach.
     const memberData = [
       ['Email', 'Name', 'Dues Status', 'Hire Date'],
       ['alice@test.com', 'Alice', 'Active', '2025-01-15'],
@@ -103,7 +112,5 @@ describe('dataGetEngagementStats (live sheet reads)', () => {
     expect(typeof result.surveyParticipation).toBe('number');
     expect(result.membershipTrends).toBeDefined();
     expect(Array.isArray(result.membershipTrends)).toBe(true);
-
-    global._resolveCallerEmail = origResolve;
   });
 });

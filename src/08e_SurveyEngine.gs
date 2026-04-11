@@ -313,8 +313,8 @@ function openNewSurveyPeriod(callerEmail) {
       return { success: true, periodId: periodId, message: periodName + ' is now open.' };
 
     } catch(e) {
-      log_('openNewSurveyPeriod error', e.message);
-      return { success: false, periodId: null, message: 'Error opening period: ' + e.message };
+      log_('openNewSurveyPeriod error', e.message + (e.stack ? '\n' + e.stack : ''));
+      return { success: false, periodId: null, message: 'Could not open the survey period. Please try again.' };
     }
   }, 30);
 }
@@ -813,7 +813,7 @@ function pushSurveyOpenNotification_(periodName) {
         message:   'The ' + periodName + ' is now open. Your feedback is anonymous and helps shape your union. Complete it in the Member Portal.',
         priority:  'Normal',
         sentBy:    'system',
-        sentByName:'SolidBase',
+        sentByName:'Union Dashboard',
         // No expiry — stays until member dismisses or period closes
         expiresDate: '',
         recipient: 'All'

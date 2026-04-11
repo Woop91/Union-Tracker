@@ -112,23 +112,24 @@ describe('EngagementService.computeScoreForMember', () => {
     expect(result.scores.qa).toBe(100);
   });
 
-  test('computes contact score based on freshness', () => {
+  // v4.55.1 T12-BUG-08: scores now interpolate linearly between anchors instead of
+  // using 25-point step cliffs at 14/30/60/90 days
+  test('computes high contact score for recent contact', () => {
     var now = new Date();
-    // Contact 5 days ago => 100
     var recentContact = new Date(now.getTime() - 5 * 86400000);
     var contactData = [
-      // [TIMESTAMP(col0), col1, MEMBER_EMAIL(col2)]
       [recentContact, '', 'user@test.com'],
     ];
     var result = EngagementService.computeScoreForMember('user@test.com', {
       contactData: contactData,
     });
-    expect(result.scores.contact).toBe(100);
+    // 5 days → 100 - (5/14)*15 ≈ 95
+    expect(result.scores.contact).toBeGreaterThanOrEqual(90);
+    expect(result.scores.contact).toBeLessThanOrEqual(100);
   });
 
   test('contact score degrades with older contacts', () => {
     var now = new Date();
-    // Contact 45 days ago => 50
     var oldContact = new Date(now.getTime() - 45 * 86400000);
     var contactData = [
       [oldContact, '', 'user@test.com'],
@@ -136,12 +137,14 @@ describe('EngagementService.computeScoreForMember', () => {
     var result = EngagementService.computeScoreForMember('user@test.com', {
       contactData: contactData,
     });
-    expect(result.scores.contact).toBe(50);
+    // 45 days → 60 - ((45-30)/30)*25 = 47.5 ≈ 48
+    expect(result.scores.contact).toBeGreaterThanOrEqual(40);
+    expect(result.scores.contact).toBeLessThanOrEqual(55);
   });
 
-  test('contact score is 0 for very old contacts (>90 days)', () => {
+  test('contact score is 0 for very old contacts (>120 days)', () => {
     var now = new Date();
-    var veryOldContact = new Date(now.getTime() - 120 * 86400000);
+    var veryOldContact = new Date(now.getTime() - 140 * 86400000);
     var contactData = [
       [veryOldContact, '', 'user@test.com'],
     ];

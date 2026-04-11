@@ -135,16 +135,21 @@ function enableDashboardMemberAuth() {
  * When disabled, dashboards are accessible without member login (default)
  */
 function disableDashboardMemberAuth() {
+  // v4.55.1 D10-BUG-04: refuse to proceed without an interactive confirmation.
+  // Previously the try/catch silently allowed auth to be disabled from non-UI contexts
+  // (time-driven triggers, web app, scripted contexts), which is a security foot-gun.
+  var ui;
   try {
-    var ui = SpreadsheetApp.getUi();
-    var response = ui.alert('Disable Dashboard Authentication',
-      'This will remove the PIN login requirement for ALL dashboard pages.\n\n' +
-      'Members will be able to access dashboards without authentication. Continue?',
-      ui.ButtonSet.YES_NO);
-    if (response !== ui.Button.YES) return;
+    ui = SpreadsheetApp.getUi();
   } catch (_uiErr) {
-    // UI not available (e.g., triggered from time-driven or web app context) — proceed without prompt
+    log_('disableDashboardMemberAuth', 'Blocked: no interactive UI context. This function must be run from the Sheets menu.');
+    throw new Error('disableDashboardMemberAuth must be run from the Sheets menu (interactive UI required).');
   }
+  var response = ui.alert('Disable Dashboard Authentication',
+    'This will remove the PIN login requirement for ALL dashboard pages.\n\n' +
+    'Members will be able to access dashboards without authentication. Continue?',
+    ui.ButtonSet.YES_NO);
+  if (response !== ui.Button.YES) return;
 
   var props = PropertiesService.getScriptProperties();
   props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'false');
@@ -365,8 +370,10 @@ function checkWebAppAuthorization(requiredRole, sessionToken) {
     return result;
 
   } catch (e) {
-    result.message = 'Authorization check failed: ' + e.message;
-    log_('checkWebAppAuthorization', 'Authorization error: ' + e.message);
+    // Return a generic message to the client — e.message can expose sheet names,
+    // file paths, or library internals to unauthenticated callers. Log detail server-side.
+    result.message = 'Authorization check failed. Please try again.';
+    log_('checkWebAppAuthorization', 'Authorization error: ' + e.message + (e.stack ? '\n' + e.stack : ''));
     return result;
   }
 }

@@ -136,7 +136,10 @@ function renderOrgHealthTree(appRoot) {
 
         for (var bi = 0; bi < branchCount; bi++) {
           var steward = stewards[bi];
-          var angle = startAngle - (branchCount > 1 ? (bi / (branchCount - 1)) * angleSpread : 0);
+          // v4.55.5 sub-project E: fallback uses angleSpread/2 (fan midpoint)
+          // so a single-branch tree points straight up (pi/2) instead of
+          // upper-left (7pi/8). branchCount>=2 behavior unchanged.
+          var angle = startAngle - (branchCount > 1 ? (bi / (branchCount - 1)) * angleSpread : angleSpread / 2);
           var branchLen = Math.min(height * 0.5, 150 + steward.members.length * 5);
           var bx = trunkX + Math.cos(angle) * branchLen;
           var by = (trunkY - 60) - Math.sin(angle) * branchLen;
@@ -181,6 +184,15 @@ function renderOrgHealthTree(appRoot) {
             var lx = trunkX + Math.cos(leafAngle) * leafDist;
             var ly = (trunkY - 60) - Math.sin(leafAngle) * leafDist;
 
+            // v4.55.1 T06-BUG-04: invisible larger hit target (r=22 ≈ 44px) so mobile taps
+            // meet the WCAG touch target minimum while the visual leaf stays at r=10.
+            var leafHit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            leafHit.setAttribute('cx', lx);
+            leafHit.setAttribute('cy', ly);
+            leafHit.setAttribute('r', 22);
+            leafHit.setAttribute('fill', 'transparent');
+            leafHit.style.cursor = 'pointer';
+
             var leaf = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             leaf.setAttribute('cx', lx);
             leaf.setAttribute('cy', ly);
@@ -191,29 +203,38 @@ function renderOrgHealthTree(appRoot) {
               leaf.setAttribute('stroke-width', '1.5');
             }
             leaf.style.cursor = 'pointer';
+            leaf.style.pointerEvents = 'none'; // hit events go to leafHit
 
             // Tooltip on hover
             (function(member, leafEl, leafX, leafY) {
               leafEl.addEventListener('mouseenter', function(e) {
+                // Escape server-supplied member data before innerHTML to prevent XSS via a maliciously named member.
+                var _esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); };
                 var lines = [];
-                if (member.name) lines.push('<strong>' + member.name + '</strong>');
-                lines.push('Score: ' + member.score);
-                lines.push('Engage: ' + member.engagement + ' | Profile: ' + member.profile + ' | Griev: ' + member.grievance);
+                if (member.name) lines.push('<strong>' + _esc(member.name) + '</strong>');
+                lines.push('Score: ' + _esc(member.score));
+                lines.push('Engage: ' + _esc(member.engagement) + ' | Profile: ' + _esc(member.profile) + ' | Griev: ' + _esc(member.grievance));
                 tooltip.innerHTML = lines.join('<br>');
                 tooltip.style.display = '';
-                tooltip.style.left = (leafX - 60) + 'px';
-                tooltip.style.top = (leafY - 50) + 'px';
+                // v4.55.1 A08-BUG-05: convert SVG coords to CSS pixels via getBoundingClientRect
+                // so tooltips stay anchored when the SVG viewBox is scaled (e.g. narrow screens)
+                var svgEl = leafEl.ownerSVGElement;
+                var rect = leafEl.getBoundingClientRect();
+                var parentRect = svgEl && svgEl.parentElement ? svgEl.parentElement.getBoundingClientRect() : { left: 0, top: 0 };
+                tooltip.style.left = (rect.left - parentRect.left - 60) + 'px';
+                tooltip.style.top = (rect.top - parentRect.top - 50) + 'px';
               });
               leafEl.addEventListener('mouseleave', function() {
                 tooltip.style.display = 'none';
               });
-              // Touch support
-              leafEl.addEventListener('touchstart', function(e) {
-                e.preventDefault();
+              // v4.55.1 T06-BUG-03: passive listener so scrolling is not blocked when a
+              // touch starts on a leaf. preventDefault() removed; tooltip shows on tap without
+              // stopping the scroll.
+              leafEl.addEventListener('touchstart', function() {
                 leafEl.dispatchEvent(new Event('mouseenter'));
                 setTimeout(function() { tooltip.style.display = 'none'; }, 3000);
-              });
-            })(m, leaf, lx, ly);
+              }, { passive: true });
+            })(m, leafHit, lx, ly);
 
             // Name label for own branch
             if (isOwnBranch && m.name) {
@@ -228,6 +249,9 @@ function renderOrgHealthTree(appRoot) {
               g.appendChild(nameLabel);
             }
 
+            // v4.55.1 T06-BUG-04: append invisible hit target first so it's beneath the
+            // visible leaf, then the leaf. Touch events bubble to leafHit.
+            g.appendChild(leafHit);
             g.appendChild(leaf);
           }
 
@@ -314,10 +338,11 @@ function renderOrgHealthTree(appRoot) {
           // Tooltip
           (function(member, leafEl, leafX, leafY) {
             leafEl.addEventListener('mouseenter', function() {
+              var _esc = (typeof escapeHtml === 'function') ? escapeHtml : function(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); };
               var lines = [];
-              if (member.name) lines.push('<strong>' + member.name + '</strong>');
-              lines.push('Score: ' + member.score);
-              lines.push('Engage: ' + member.engagement + ' | Profile: ' + member.profile + ' | Griev: ' + member.grievance);
+              if (member.name) lines.push('<strong>' + _esc(member.name) + '</strong>');
+              lines.push('Score: ' + _esc(member.score));
+              lines.push('Engage: ' + _esc(member.engagement) + ' | Profile: ' + _esc(member.profile) + ' | Griev: ' + _esc(member.grievance));
               tooltip.innerHTML = lines.join('<br>');
               tooltip.style.display = '';
               tooltip.style.left = (leafX - 60) + 'px';

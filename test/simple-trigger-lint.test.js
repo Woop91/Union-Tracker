@@ -73,18 +73,19 @@ describe('ST1 — onOpen must not call forbidden ScriptApp/Mail APIs', () => {
 });
 
 describe('ST2 — onEdit must not call forbidden ScriptApp/Mail APIs', () => {
-  const MAINTENANCE_SRC = fs.readFileSync(path.join(SRC_DIR, '06_Maintenance.gs'), 'utf8');
-  const MAINTENANCE_STRIPPED = stripComments(MAINTENANCE_SRC);
-  const body = extractFunctionBody(MAINTENANCE_STRIPPED, 'onEdit');
+  // onEdit lives in 10_Main.gs. The previous version of this test looked in
+  // 06_Maintenance.gs and silently test.skip()ed when it wasn't found there,
+  // which meant the forbidden-API guards evaporated the moment onEdit moved.
+  // Now we search 10_Main.gs and FAIL if onEdit is missing.
+  const body = extractFunctionBody(MAIN_STRIPPED, 'onEdit');
 
-  // onEdit may not exist in this file — skip gracefully
-  if (!body) {
-    test.skip('onEdit not found — skipping', () => {});
-    return;
-  }
+  test('onEdit function is found in 10_Main.gs', () => {
+    expect(body).not.toBeNull();
+  });
 
   FORBIDDEN_IN_SIMPLE.forEach(api => {
     test(`onEdit must not call ${api}`, () => {
+      if (!body) return; // separate assertion already failed above
       expect(body).not.toContain(api);
     });
   });

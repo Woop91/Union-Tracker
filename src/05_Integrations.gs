@@ -1477,16 +1477,23 @@ function getOrCreateDeadlinesCalendar() {
  * Syncs all grievance deadlines to calendar
  * @return {Object} Result with sync count
  */
-function syncDeadlinesToCalendar() {
+function syncDeadlinesToCalendar(grievanceIdFilter) {
   try {
     const calendar = getOrCreateDeadlinesCalendar();
     const openGrievances = getOpenGrievances();
+
+    // When a specific grievance ID is passed, only sync that one. Without the
+    // filter, every single-grievance caller fired a full org-wide sync — a
+    // calendar-quota burning bug from syncSingleGrievanceToCalendar(grievanceId).
+    const targetGrievances = grievanceIdFilter
+      ? openGrievances.filter(function(g) { return g['Grievance ID'] === grievanceIdFilter; })
+      : openGrievances;
 
     let synced = 0;
     let skipped = 0;
     const startTime = new Date().getTime();
 
-    for (const grievance of openGrievances) {
+    for (const grievance of targetGrievances) {
       // Check time limit
       if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - BATCH_LIMITS.EXECUTION_BUFFER_MS) {
         break;
@@ -1629,7 +1636,14 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
  * @param {Object} options - MailApp.sendEmail options (to, subject, body, etc.)
  * @returns {boolean} true if sent, false if quota exceeded
  */
+// Legacy no-underscore wrapper kept as a thin shim that forwards to
+// safeSendEmail_ (the canonical, quota-aware implementation in 00_Security.gs)
+// so callers that still reference the old name get the same quota protections.
 function safeSendEmail(options) {
+  if (typeof safeSendEmail_ === 'function') {
+    var _result = safeSendEmail_(options);
+    return _result && _result.success !== false;
+  }
   if (MailApp.getRemainingDailyQuota() < 1) {
     log_('Email quota exceeded, skipping', (options.subject || 'no subject'));
     return false;
@@ -3304,13 +3318,15 @@ function addWebAppResource(sessionToken, data) {
       var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
       var addedBy = auth.email || 'unknown';
 
-      // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+      // CR-FORMULA: Escape all user-supplied fields to prevent formula injection.
+      // Summary/content are multi-line, so use the newline-preserving variant
+      // or long-form content would be silently flattened to spaces on save.
       var newRow = [
         nextId,
         escapeForFormula(data.title),
         escapeForFormula(data.category || 'General'),
-        escapeForFormula(data.summary || ''),
-        escapeForFormula(data.content || ''),
+        escapeForFormulaPreserveNewlines(data.summary || ''),
+        escapeForFormulaPreserveNewlines(data.content || ''),
         escapeForFormula(data.url || ''),
         escapeForFormula(data.icon || '\uD83D\uDCC4'),
         data.sortOrder || 999,
@@ -3353,8 +3369,8 @@ function updateWebAppResource(sessionToken, resourceId, data) {
           // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
           if (data.title !== undefined)     setCol_(rowData, RESOURCES_COLS.TITLE, escapeForFormula(data.title));
           if (data.category !== undefined)  setCol_(rowData, RESOURCES_COLS.CATEGORY, escapeForFormula(data.category));
-          if (data.summary !== undefined)   setCol_(rowData, RESOURCES_COLS.SUMMARY, escapeForFormula(data.summary));
-          if (data.content !== undefined)   setCol_(rowData, RESOURCES_COLS.CONTENT, escapeForFormula(data.content));
+          if (data.summary !== undefined)   setCol_(rowData, RESOURCES_COLS.SUMMARY, escapeForFormulaPreserveNewlines(data.summary));
+          if (data.content !== undefined)   setCol_(rowData, RESOURCES_COLS.CONTENT, escapeForFormulaPreserveNewlines(data.content));
           if (data.url !== undefined)       setCol_(rowData, RESOURCES_COLS.URL, escapeForFormula(data.url));
           if (data.icon !== undefined)      setCol_(rowData, RESOURCES_COLS.ICON, escapeForFormula(data.icon));
           if (data.sortOrder !== undefined) setCol_(rowData, RESOURCES_COLS.SORT_ORDER, data.sortOrder);
@@ -3668,9 +3684,9 @@ function addKnowledgeContent(sessionToken, data) {
         escapeForFormula(data.type || 'Tip'),
         escapeForFormula(data.category || 'General'),
         escapeForFormula(data.title || ''),
-        escapeForFormula(data.content || ''),
+        escapeForFormulaPreserveNewlines(data.content || ''),
         escapeForFormula(data.attribution || ''),
-        escapeForFormula(bullets),
+        escapeForFormulaPreserveNewlines(bullets),
         escapeForFormula(data.audience || 'All'),
         escapeForFormula(data.placement || 'Home Widget'),
         escapeForFormula(data.active || 'Yes'),
@@ -3744,11 +3760,11 @@ function updateKnowledgeContent(sessionToken, contentId, data) {
           if (data.type !== undefined)        setCol_(rowData, KNOWLEDGE_COLS.TYPE, escapeForFormula(data.type));
           if (data.category !== undefined)    setCol_(rowData, KNOWLEDGE_COLS.CATEGORY, escapeForFormula(data.category));
           if (data.title !== undefined)       setCol_(rowData, KNOWLEDGE_COLS.TITLE, escapeForFormula(data.title));
-          if (data.content !== undefined)     setCol_(rowData, KNOWLEDGE_COLS.CONTENT, escapeForFormula(data.content));
+          if (data.content !== undefined)     setCol_(rowData, KNOWLEDGE_COLS.CONTENT, escapeForFormulaPreserveNewlines(data.content));
           if (data.attribution !== undefined) setCol_(rowData, KNOWLEDGE_COLS.ATTRIBUTION, escapeForFormula(data.attribution));
           if (data.bullets !== undefined) {
             var bullets = Array.isArray(data.bullets) ? data.bullets.join('|') : String(data.bullets);
-            setCol_(rowData, KNOWLEDGE_COLS.BULLETS, escapeForFormula(bullets));
+            setCol_(rowData, KNOWLEDGE_COLS.BULLETS, escapeForFormulaPreserveNewlines(bullets));
           }
           if (data.audience !== undefined)    setCol_(rowData, KNOWLEDGE_COLS.AUDIENCE, escapeForFormula(data.audience));
           if (data.placement !== undefined)   setCol_(rowData, KNOWLEDGE_COLS.PLACEMENT, escapeForFormula(data.placement));
@@ -4193,7 +4209,7 @@ function sendWebAppNotification(sessionToken, data) {
       escapeForFormula(data.recipient || 'All Members'),
       escapeForFormula(data.type || 'Steward Message'),
       escapeForFormula(data.title),
-      escapeForFormula(data.message),
+      escapeForFormulaPreserveNewlines(data.message),
       escapeForFormula(data.priority || 'Normal'),
       stewardEmail,
       escapeForFormula(stewardName),
@@ -5196,12 +5212,12 @@ function initiateGrievance(stewardEmail, data, idemKey) {
     setCol_(rowData, GRIEVANCE_COLS.MEMBER_EMAIL, escapeForFormula(memberData.email));
     setCol_(rowData, GRIEVANCE_COLS.LOCATION, escapeForFormula(memberData.workLocation));
     setCol_(rowData, GRIEVANCE_COLS.STEWARD, escapeForFormula(stewardEmail));
-    // Write description to DESCRIPTION column (primary), and RESOLUTION as initial value
-    // so legacy code that reads RESOLUTION still sees the original complaint text.
+    // Preserve newlines in the original complaint — grievance descriptions
+    // are typically multi-paragraph.
     if (GRIEVANCE_COLS.DESCRIPTION) {
-      setCol_(rowData, GRIEVANCE_COLS.DESCRIPTION, escapeForFormula(data.description || ''));
+      setCol_(rowData, GRIEVANCE_COLS.DESCRIPTION, escapeForFormulaPreserveNewlines(data.description || ''));
     }
-    setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(data.description || ''));
+    setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormulaPreserveNewlines(data.description || ''));
     setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, new Date());
     if (GRIEVANCE_COLS.ACTION_TYPE) {
       setCol_(rowData, GRIEVANCE_COLS.ACTION_TYPE, 'Grievance');
@@ -5407,6 +5423,23 @@ function getGrievanceFormOptions() {
         if (val) result[key].push(val);
       }
     }
+
+    // Expose bargaining unit and per-location addresses to the printable form
+    // so the values aren't hardcoded in grievance_form.html (SolidBase safety).
+    // These Config columns are optional — the form shows "—" / empty until added.
+    result.bargainingUnit = '';
+    result.locationAddresses = {};
+    try {
+      if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.BARGAINING_UNIT) {
+        result.bargainingUnit = String(getConfigValue_(CONFIG_COLS.BARGAINING_UNIT, '') || '').trim();
+      }
+    } catch (_buErr) { /* leave as empty */ }
+    try {
+      if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.LOCATION_ADDRESSES) {
+        var locAddrRaw = String(getConfigValue_(CONFIG_COLS.LOCATION_ADDRESSES, '') || '').trim();
+        if (locAddrRaw) result.locationAddresses = JSON.parse(locAddrRaw);
+      }
+    } catch (_laErr) { /* leave as empty */ }
 
     return result;
   } catch (e) {

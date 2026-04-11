@@ -175,7 +175,8 @@ var TrendAlertService = (function () {
         var rowCount = 0;
         for (var c = 1; c < data[i].length; c++) {
           var val = parseFloat(data[i][c]);
-          if (!isNaN(val) && val >= 1 && val <= 5) {
+          // v4.55.1: satisfaction survey uses 1-10 scale; previously filtered 1-5 and silently dropped half the responses
+          if (!isNaN(val) && val >= 1 && val <= 10) {
             rowSum += val;
             rowCount++;
           }
@@ -383,8 +384,10 @@ var TrendAlertService = (function () {
           escapeForFormula(alert.data || ''),
           new Date(),
           'Active',
-          '',
-          ''
+          '',  // Acknowledged By
+          '',  // Acknowledged At
+          '',  // Resolved By — match 12-col HEADERS layout
+          ''   // Resolved At — match 12-col HEADERS layout
         ]);
         written++;
       }

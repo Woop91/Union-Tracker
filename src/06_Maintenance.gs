@@ -1793,26 +1793,18 @@ function logAuditEvent(eventType, details) {
       auditSheet.appendRow(headerRow);
       auditSheet.setFrozenRows(1);
     } else {
-      // Ensure Integrity Hash header exists (upgrade path for existing sheets)
+      // Ensure Integrity Hash + Email Hash headers exist (upgrade path).
+      // Re-read headers after each append so we don't double-add a column
+      // whose existence was masked by a stale snapshot.
       var headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
-      var hasIntegrityCol = false;
-      for (var h = 0; h < headers.length; h++) {
-        if (String(headers[h]).trim() === 'Integrity Hash') {
-          hasIntegrityCol = true;
-          break;
-        }
-      }
+      var hasIntegrityCol = headers.some(function(h) { return String(h).trim() === 'Integrity Hash'; });
       if (!hasIntegrityCol) {
-        var nextCol = auditSheet.getLastColumn() + 1;
-        auditSheet.getRange(1, nextCol).setValue('Integrity Hash');
+        auditSheet.getRange(1, auditSheet.getLastColumn() + 1).setValue('Integrity Hash');
+        headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
       }
-      var hasEmailHashCol = false;
-      for (var eh = 0; eh < headers.length; eh++) {
-        if (String(headers[eh]).trim() === 'Email Hash') { hasEmailHashCol = true; break; }
-      }
+      var hasEmailHashCol = headers.some(function(h) { return String(h).trim() === 'Email Hash'; });
       if (!hasEmailHashCol) {
-        var nextCol2 = auditSheet.getLastColumn() + 1;
-        auditSheet.getRange(1, nextCol2).setValue('Email Hash');
+        auditSheet.getRange(1, auditSheet.getLastColumn() + 1).setValue('Email Hash');
       }
     }
 
@@ -1843,8 +1835,11 @@ function logAuditEvent(eventType, details) {
 
     var integrityHash = '';
     if (typeof computeAuditRowHash_ === 'function') {
-      // Use rawEmail (not masked) in integrity hash so hash chain remains verifiable
-      integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
+      // Hash the masked user string (same value stored in the User Email column)
+      // so verifyAuditLogIntegrity can reconstruct the chain from sheet data.
+      // Previously this hashed rawEmail, which made the chain unverifiable once
+      // the sheet was the only source of truth.
+      integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, user, detailsJson, sessionId);
     }
 
     var emailHash = '';
@@ -1860,6 +1855,20 @@ function logAuditEvent(eventType, details) {
     // Field Name, Old Value, New Value, Record ID, Action Type, Integrity Hash.
     // For event-level logging, Sheet/Row/Column/Field Name are empty; details go
     // in New Value, sessionId in Record ID, eventType in Action Type.
+    //
+    // Resolve Integrity Hash / Email Hash column indices from the header row
+    // instead of assuming fixed positions 11/12. The upgrade path above appends
+    // those columns to lastColumn+1, which is usually 11/12 — but if a manual
+    // schema change pushed them earlier, positional writes would land in the
+    // wrong cells.
+    var _headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+    var _integrityCol = -1;
+    var _emailHashCol = -1;
+    for (var _hi = 0; _hi < _headers.length; _hi++) {
+      var _h = String(_headers[_hi]).trim();
+      if (_h === 'Integrity Hash') _integrityCol = _hi + 1;
+      else if (_h === 'Email Hash') _emailHashCol = _hi + 1;
+    }
     auditSheet.appendRow([
       timestamp,           // Timestamp
       user,                // User Email
@@ -1870,10 +1879,12 @@ function logAuditEvent(eventType, details) {
       '',                  // Old Value (N/A for events)
       detailsJson,         // New Value (event details JSON)
       sessionId,           // Record ID (session key)
-      eventType,           // Action Type (event type)
-      integrityHash,       // Integrity Hash
-      emailHash            // Email Hash (SHA-256)
+      eventType            // Action Type (event type)
     ]);
+    // Explicit writes to the resolved hash columns so reorders don't misplace them.
+    var _newRow = auditSheet.getLastRow();
+    if (_integrityCol > 0) auditSheet.getRange(_newRow, _integrityCol).setValue(integrityHash);
+    if (_emailHashCol > 0) auditSheet.getRange(_newRow, _emailHashCol).setValue(emailHash);
 
     // Archive-before-trim: ensure no rows are permanently deleted without a Drive backup
     var rowCount = auditSheet.getLastRow();
@@ -3099,9 +3110,19 @@ function archiveOldAuditLogs_(daysOld) {
     var file = backupFolder.createFile(fileName, csv, 'text/csv');
     log_('Audit log archive backup', file.getId() + ' (' + rowsToArchive.length + ' rows)');
 
-    // Delete rows bottom-up to avoid index shifting
-    for (var d = deleteIndices.length - 1; d >= 0; d--) {
-      auditSheet.deleteRow(deleteIndices[d]);
+    // Batch delete contiguous runs bottom-up. The prior per-row deleteRow loop
+    // took ~300-500ms each, easily exceeding the 6-minute trigger limit on
+    // large archives.
+    deleteIndices.sort(function(a, b) { return a - b; });
+    for (var d = deleteIndices.length - 1; d >= 0; ) {
+      var runEnd = deleteIndices[d];
+      var runStart = runEnd;
+      while (d > 0 && deleteIndices[d - 1] === runStart - 1) {
+        d--;
+        runStart = deleteIndices[d];
+      }
+      auditSheet.deleteRows(runStart, runEnd - runStart + 1);
+      d--;
     }
 
     logAuditEvent('AUDIT_LOG_ARCHIVED', rowsToArchive.length + ' entries archived (>' + daysOld + ' days). Backup: ' + file.getId());

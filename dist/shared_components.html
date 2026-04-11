@@ -8,6 +8,31 @@ var _TB = 'ds-gradient-btn ga-gradient-btn ac-gradient-btn';
 var _TI = 'ds-input ga-input ac-input';                      
 var _TG = 'ds-bento ga-bento ac-bento';                       
 
+function _validateContactFieldsClient(email, phone) {
+ var blocked = (typeof CONFIG !== 'undefined' && CONFIG.blockedEmailDomains) || ['.gov', '.us', '.ma'];
+ if (typeof blocked === 'string') blocked = blocked.split(',').map(function(d) { return d.trim().toLowerCase(); });
+ if (email && email.trim()) {
+ var emailLower = email.trim().toLowerCase();
+ var atIdx = emailLower.lastIndexOf('@');
+ if (atIdx > -1) {
+  var domain = emailLower.substring(atIdx + 1);
+  for (var i = 0; i < blocked.length; i++) {
+  var suffix = blocked[i].toLowerCase();
+  if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
+   return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
+  }
+  }
+ }
+ }
+ if (phone && phone.trim()) {
+ var digits = phone.replace(/[\s\-\(\)\.]/g, '');
+ if (digits.indexOf('617654') === 0) {
+  return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
+ }
+ }
+ return { valid: true };
+}
+
 function renderKPIStrip(container, items, options) {
  options = options || {};
  var cols = options.columns || items.length;
@@ -389,16 +414,22 @@ function show2FAModal(onVerified, options) {
  var reason = options.reason || 'This action requires email verification for security.';
 
  
+ 
  var overlay = el('div', {
- style: { position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.6)', zIndex: '9999', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }
+ style: { position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', background: 'rgba(0,0,0,0.6)', zIndex: '9999', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' },
+ role: 'presentation'
  });
 
+ var _modalTitleId = '_2fa_title_' + Date.now();
  var modal = el('div', {
- style: { background: 'var(--cardBg, #1e1e1e)', borderRadius: '16px', padding: '28px 24px', maxWidth: '380px', width: '100%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }
+ style: { background: 'var(--cardBg, #1e1e1e)', borderRadius: '16px', padding: '28px 24px', maxWidth: '380px', width: '100%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' },
+ role: 'dialog',
+ 'aria-modal': 'true',
+ 'aria-labelledby': _modalTitleId
  });
 
- modal.appendChild(el('div', { style: { fontSize: '36px', marginBottom: '12px' } }, '\uD83D\uDD12'));
- modal.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' } }, title));
+ modal.appendChild(el('div', { style: { fontSize: '36px', marginBottom: '12px' }, 'aria-hidden': 'true' }, '\uD83D\uDD12'));
+ modal.appendChild(el('div', { id: _modalTitleId, style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' } }, title));
  modal.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '16px', lineHeight: '1.5' } }, reason));
 
  var statusArea = el('div', { style: { fontSize: '13px', color: 'var(--accent)', marginBottom: '12px', minHeight: '20px' } }, 'Sending verification code...');
@@ -501,9 +532,17 @@ function show2FAModal(onVerified, options) {
  document.body.appendChild(overlay);
 
  
+ // can't Tab out of the modal into the page behind it.
  overlay.setAttribute('tabindex', '-1');
  overlay.addEventListener('keydown', function(e) {
- if (e.key === 'Escape') overlay.remove();
+ if (e.key === 'Escape') { overlay.remove(); return; }
+ if (e.key !== 'Tab') return;
+ var focusables = modal.querySelectorAll('input,button,select,textarea,[href],[tabindex]:not([tabindex="-1"])');
+ if (!focusables.length) { e.preventDefault(); return; }
+ var first = focusables[0];
+ var last = focusables[focusables.length - 1];
+ if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+ else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
  });
  overlay.focus();
 

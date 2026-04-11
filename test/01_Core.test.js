@@ -300,3 +300,101 @@ describe('col_ and setCol_ helpers', () => {
     expect(col_(row, MEMBER_COLS.FIRST_NAME)).toBe('Jane');
   });
 });
+
+// ============================================================================
+// _isGrievancesEnabled — Auditor-Alpha AA-13
+// ============================================================================
+//
+// This toggle gates 15+ grievance wrapper endpoints in
+// 21d_WebDashDataWrappers.gs. A regression that inverted the check,
+// added an extra branch, or misread the config column would silently
+// serve disabled data to every caller. Pre-v4.55.2 the function had
+// zero dedicated tests.
+// ============================================================================
+
+describe('_isGrievancesEnabled (AA-13)', () => {
+  var _origGetConfigValue;
+
+  beforeEach(() => {
+    _origGetConfigValue = global.getConfigValue_;
+  });
+
+  afterEach(() => {
+    global.getConfigValue_ = _origGetConfigValue;
+  });
+
+  test('returns true when config value is undefined (default enabled)', () => {
+    global.getConfigValue_ = jest.fn(() => undefined);
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true when config value is null', () => {
+    global.getConfigValue_ = jest.fn(() => null);
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true when config value is empty string', () => {
+    global.getConfigValue_ = jest.fn(() => '');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true when config value is whitespace only', () => {
+    global.getConfigValue_ = jest.fn(() => '   ');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true when config value is "yes"', () => {
+    global.getConfigValue_ = jest.fn(() => 'yes');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true for "YES" (case-insensitive)', () => {
+    global.getConfigValue_ = jest.fn(() => 'YES');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true for "Yes" (mixed case)', () => {
+    global.getConfigValue_ = jest.fn(() => 'Yes');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns true for arbitrary non-"no" string', () => {
+    global.getConfigValue_ = jest.fn(() => 'enabled');
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('returns false when config value is exactly "no"', () => {
+    global.getConfigValue_ = jest.fn(() => 'no');
+    expect(_isGrievancesEnabled()).toBe(false);
+  });
+
+  test('returns false for "NO" (case-insensitive)', () => {
+    global.getConfigValue_ = jest.fn(() => 'NO');
+    expect(_isGrievancesEnabled()).toBe(false);
+  });
+
+  test('returns false for "No" (mixed case)', () => {
+    global.getConfigValue_ = jest.fn(() => 'No');
+    expect(_isGrievancesEnabled()).toBe(false);
+  });
+
+  test('returns false for "no" with surrounding whitespace', () => {
+    global.getConfigValue_ = jest.fn(() => '  no  ');
+    expect(_isGrievancesEnabled()).toBe(false);
+  });
+
+  test('fail-open: returns true when getConfigValue_ throws', () => {
+    global.getConfigValue_ = jest.fn(() => {
+      throw new Error('Config sheet missing');
+    });
+    // Per the implementation, the catch block returns true so a broken
+    // Config sheet does not invisibly lock users out of grievance features.
+    expect(_isGrievancesEnabled()).toBe(true);
+  });
+
+  test('passes the SHOW_GRIEVANCES config column constant', () => {
+    global.getConfigValue_ = jest.fn(() => 'yes');
+    _isGrievancesEnabled();
+    expect(global.getConfigValue_).toHaveBeenCalledWith(CONFIG_COLS.SHOW_GRIEVANCES);
+  });
+});

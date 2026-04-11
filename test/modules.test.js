@@ -40,28 +40,10 @@ describe('HIDDEN_SHEETS', () => {
   });
 });
 
-// ============================================================================
-// removeDeprecatedTabs prefix-only matching
-// ============================================================================
-
-describe('removeDeprecatedTabs prefix-only matching', () => {
-  // The bug was: substring match would incorrectly match sheets
-  // that contained deprecated names as substrings.
-  // Fix: only match if sheet name starts with the deprecated prefix.
-
-  test('deprecated sheet names are prefix-matched only', () => {
-    const deprecatedPrefixes = [SHEETS.DASHBOARD, SHEETS.SATISFACTION];
-
-    // These should match (start with the prefix)
-    expect(SHEETS.DASHBOARD.indexOf('💼')).toBe(0);
-    expect(SHEETS.SATISFACTION.indexOf('📊')).toBe(0);
-
-    // A sheet like "My 💼 Dashboard" should NOT match
-    const testName = 'My 💼 Dashboard';
-    const matches = deprecatedPrefixes.some(prefix => testName.indexOf(prefix) === 0);
-    expect(matches).toBe(false);
-  });
-});
+// The removeDeprecatedTabs prefix-only matching test previously exercised
+// test-local substring logic instead of the production code in 06_Maintenance.gs.
+// It has been removed pending a real integration test that loads the actual
+// removeDeprecatedTabs function against a mock spreadsheet.
 
 // ============================================================================
 // Satisfaction Q9 mapping
@@ -92,74 +74,55 @@ describe('Sheet reordering', () => {
 });
 
 // ============================================================================
-// Checklist ID generation logic
+// generateChecklistId_ — real integration test against 12_Features.gs
 // ============================================================================
 
-describe('Checklist ID generation', () => {
-  // Simulate generateChecklistId_ logic
-  function formatChecklistId(maxNum, offset) {
-    offset = offset || 0;
-    return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
+describe('generateChecklistId_ (real production function)', () => {
+  const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
+
+  // Load 12_Features.gs once. It depends on SHEETS/CHECKLIST_COLS from 01_Core
+  // (already loaded above).
+  beforeAll(() => {
+    loadSources(['12_Features.gs']);
+  });
+
+  function seedChecklist(existingIds) {
+    var header = new Array(Math.max(CHECKLIST_COLS.CHECKLIST_ID || 1, 2)).fill('col');
+    header[(CHECKLIST_COLS.CHECKLIST_ID || 1) - 1] = 'Checklist ID';
+    var rows = [header];
+    existingIds.forEach(function(id) {
+      var row = new Array(header.length).fill('');
+      row[(CHECKLIST_COLS.CHECKLIST_ID || 1) - 1] = id;
+      rows.push(row);
+    });
+    var sheet = createMockSheet(SHEETS.CASE_CHECKLIST || '_Case_Checklist', rows);
+    var ss = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+    // Stub getOrCreateChecklistSheet so generateChecklistId_ uses our mock.
+    global.getOrCreateChecklistSheet = jest.fn().mockReturnValue(sheet);
+    return sheet;
   }
 
-  test('generates correctly formatted IDs', () => {
-    expect(formatChecklistId(0)).toBe('CL-00001');
-    expect(formatChecklistId(5)).toBe('CL-00006');
-    expect(formatChecklistId(99999)).toBe('CL-100000');
+  test('returns CL-00001 when the sheet has only a header row', () => {
+    seedChecklist([]);
+    expect(generateChecklistId_()).toBe('CL-00001');
   });
 
-  test('offset parameter increments correctly for batch creation', () => {
-    expect(formatChecklistId(10, 0)).toBe('CL-00011');
-    expect(formatChecklistId(10, 1)).toBe('CL-00012');
-    expect(formatChecklistId(10, 2)).toBe('CL-00013');
+  test('increments past the max existing CL-### id', () => {
+    seedChecklist(['CL-00001', 'CL-00002', 'CL-00005']);
+    expect(generateChecklistId_()).toBe('CL-00006');
   });
 
-  test('first ID with empty sheet is CL-00001', () => {
-    expect(formatChecklistId(0, 0)).toBe('CL-00001');
-  });
-});
-
-// ============================================================================
-// caseId sanitization for JS embedding
-// ============================================================================
-
-describe('caseId sanitization for JS embedding', () => {
-  // Simulate the sanitization from 12_Features.gs
-  function sanitizeCaseId(caseId) {
-    return String(caseId || '').replace(/['"\\<>&]/g, '');
-  }
-
-  test('removes dangerous characters', () => {
-    expect(sanitizeCaseId("GRV'; DROP TABLE;--")).toBe('GRV; DROP TABLE;--');
-    expect(sanitizeCaseId('GRV"<script>')).toBe('GRVscript');
-    expect(sanitizeCaseId('GRV\\n')).toBe('GRVn');
+  test('offset parameter adds to the max id for batch creation', () => {
+    seedChecklist(['CL-00010']);
+    expect(generateChecklistId_(0)).toBe('CL-00011');
+    expect(generateChecklistId_(1)).toBe('CL-00012');
+    expect(generateChecklistId_(2)).toBe('CL-00013');
   });
 
-  test('preserves normal grievance IDs', () => {
-    expect(sanitizeCaseId('GRV-2026-001')).toBe('GRV-2026-001');
-    expect(sanitizeCaseId('CL-00001')).toBe('CL-00001');
-  });
-
-  test('handles null/undefined', () => {
-    expect(sanitizeCaseId(null)).toBe('');
-    expect(sanitizeCaseId(undefined)).toBe('');
-  });
-});
-
-// ============================================================================
-// Undo/redo batch value logic
-// ============================================================================
-
-describe('Undo/redo batch value', () => {
-  // Bug was: undo used c.oldValue instead of c.value for BATCH_UPDATE
-  // The fix ensures that undo restores oldValue and redo restores value
-  test('change object has distinct value and oldValue', () => {
-    const change = { value: 'new', oldValue: 'old' };
-    // Undo should use oldValue
-    expect(change.oldValue).not.toBe(change.value);
-    // Redo should use value
-    expect(change.value).toBe('new');
-    expect(change.oldValue).toBe('old');
+  test('ignores non-CL- rows when computing the max', () => {
+    seedChecklist(['', 'notes', 'CL-00003', 'xyz']);
+    expect(generateChecklistId_()).toBe('CL-00004');
   });
 });
 

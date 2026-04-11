@@ -453,36 +453,41 @@ var Auth = (function () {
   }
 
   function _validateMagicToken(token) {
-    var props = PropertiesService.getScriptProperties();
-    var raw = props.getProperty(TOKEN_PREFIX + token);
-
-    if (!raw) return null;
-
+    // Wrap the get+delete in a LockService lock so concurrent magic-link
+    // clicks can't both claim the same token. Previously the TOCTOU window
+    // was documented and accepted, but a 1-second lock is cheap insurance
+    // against an attacker who intercepts a magic link racing the victim's
+    // browser (and against the user's own browser pre-fetching the URL).
+    var lock = null;
+    try { lock = LockService.getScriptLock(); } catch (_lockInitErr) {}
+    if (lock && !lock.tryLock(1000)) {
+      // Lock contention is itself a signal of a potential race — return null
+      // so the caller retries / redirects to the auth page.
+      return null;
+    }
     try {
-      var data = JSON.parse(raw);
-
-      // CR-03: Reject already-used tokens (prevent replay)
+      var props = PropertiesService.getScriptProperties();
+      var raw = props.getProperty(TOKEN_PREFIX + token);
+      if (!raw) return null;
+      var data;
+      try { data = JSON.parse(raw); }
+      catch (_parseErr) {
+        log_('Auth._validateMagicToken', 'token JSON parse failed: ' + _parseErr.message);
+        return null;
+      }
       if (data.used === true) {
         props.deleteProperty(TOKEN_PREFIX + token);
         return null;
       }
-
-      // Check expiry
       if (data.expiry < Date.now()) {
         props.deleteProperty(TOKEN_PREFIX + token);
         return null;
       }
-
-      // C1+C4: Immediately delete token after successful validation.
-      // KNOWN LIMITATION: PropertiesService get+delete is not atomic.
-      // Two concurrent requests could both validate the same token.
-      // Risk is minimal: magic links are single-use email tokens, window is milliseconds.
-      // LockService was considered but rejected for latency on the hot auth path.
+      // Delete the token atomically while we still hold the lock.
       props.deleteProperty(TOKEN_PREFIX + token);
-
       return data.email;
-    } catch (_e) {
-      return null;
+    } finally {
+      if (lock) { try { lock.releaseLock(); } catch (_relErr) {} }
     }
   }
 

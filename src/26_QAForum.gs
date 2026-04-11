@@ -83,11 +83,20 @@ var QAForum = (function () {
    */
   function _getCachedSheetData(sheetName, maxAgeSec) {
     maxAgeSec = maxAgeSec || 60;
+    var cache = null;
+    var cacheKey = 'qa_sheet_' + sheetName;
+    // v4.55.1 R04-BUG-04: on parse failure, purge the corrupt cache entry so the next
+    // call rebuilds it from the sheet instead of repeatedly failing the JSON.parse.
     try {
-      var cache = CacheService.getScriptCache();
-      var cacheKey = 'qa_sheet_' + sheetName;
+      cache = CacheService.getScriptCache();
       var cached = cache.get(cacheKey);
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        try { return JSON.parse(cached); }
+        catch (_parseErr) {
+          log_('QAForum._getCachedSheetData', 'Corrupt cache entry for ' + sheetName + ', purging');
+          try { cache.remove(cacheKey); } catch (_rmErr) {}
+        }
+      }
     } catch (_e) { log_('QAForum._getCachedSheetData', 'Error reading cache: ' + (_e.message || _e)); }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return null;
@@ -96,7 +105,14 @@ var QAForum = (function () {
     var data = sheet.getDataRange().getValues();
     try {
       var jsonStr = JSON.stringify(data);
-      if (jsonStr.length < 90000) { // CacheService 100KB limit per key — leave margin
+      // CacheService limit is 100KB of UTF-8 BYTES, not characters. For
+      // ASCII content these are equal, but multi-byte unicode (names with
+      // accents, emoji) could silently blow the limit and trigger a
+      // CacheService exception. Measure actual byte length.
+      var _byteLen;
+      try { _byteLen = Utilities.newBlob(jsonStr).getBytes().length; }
+      catch (_blobErr) { _byteLen = jsonStr.length; }
+      if (_byteLen < 95000) {
         cache.put(cacheKey, jsonStr, maxAgeSec);
       }
       // If too large, skip caching — data will be read fresh each time
@@ -276,6 +292,80 @@ var QAForum = (function () {
       }
 
       return { success: true, questionId: id, notificationSent: notificationSent };
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  /**
+   * v4.55.2 RAY-UX-02: Allow the author of a question to edit its text.
+   *
+   * Only the original author can edit their own question — stewards use
+   * moderateQuestion (delete/flag) for moderation actions rather than
+   * directly rewriting user content. Edits update the question text and
+   * the lastUpdated timestamp; upvotes, answers, and status are preserved.
+   *
+   * Anonymous questions can still be edited — ownership is tracked by the
+   * stored email (column 1) which is independent of the isAnonymous flag.
+   *
+   * Rate-limited to 5 edits per hour per user (same ceiling as new question
+   * submissions) to prevent abuse.
+   *
+   * @param {string} email - Caller's email (from _resolveCallerEmail).
+   * @param {string} questionId - ID of the question to edit.
+   * @param {string} newText - New question body (max 2000 chars, sanitized).
+   * @returns {{success: boolean, message?: string}}
+   */
+  function editQuestion(email, questionId, newText) {
+    if (!email || !questionId || !newText || !newText.trim()) {
+      return { success: false, message: 'Missing required fields.' };
+    }
+    newText = _sanitize(newText.trim().substring(0, 2000));
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet unavailable.' };
+    var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return { success: false, message: 'Question not found.' };
+    }
+
+    // Rate limit: max 5 edits per hour per user (separate cache key from
+    // new-question submissions so edits don't block new posts and vice versa).
+    var cache = CacheService.getScriptCache();
+    var cacheKey = 'qa_edit_rate_' + email.toLowerCase().trim();
+    var count = parseInt(cache.get(cacheKey) || '0', 10);
+    if (count >= 5) {
+      return { success: false, message: 'Edit rate limit reached. Please wait before editing again.' };
+    }
+
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) {
+      return { success: false, message: 'System busy. Please try again in a moment.' };
+    }
+    try {
+      var data = sheet.getDataRange().getValues();
+      var callerLc = String(email).toLowerCase().trim();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] !== questionId) continue;
+        var ownerLc = String(data[i][1] || '').toLowerCase().trim();
+        if (ownerLc !== callerLc) {
+          return { success: false, message: 'You can only edit your own questions.' };
+        }
+        var status = String(data[i][5] || 'active').toLowerCase().trim();
+        if (status === 'deleted') {
+          return { success: false, message: 'Deleted questions cannot be edited.' };
+        }
+        // Column 4 is the question text, column 10 is lastUpdated.
+        // Use escapeForFormula to prevent =FORMULA injection on reads.
+        sheet.getRange(i + 1, 5).setValue(escapeForFormula(newText));
+        sheet.getRange(i + 1, 11).setValue(new Date());
+        _invalidateCache(SHEETS.QA_FORUM);
+        cache.put(cacheKey, String(count + 1), 3600);
+        logAuditEvent('QA_QUESTION_EDITED',
+          'Question ' + questionId + ' edited by ' + maskEmail(email));
+        return { success: true };
+      }
+      return { success: false, message: 'Question not found.' };
     } finally {
       lock.releaseLock();
     }
@@ -723,7 +813,22 @@ var QAForum = (function () {
 
   /**
    * Returns questions visible across all units (org-wide collaboration).
-   * All questions are shared — filtering is done client-side by unit badge.
+   *
+   * DESIGN NOTE (R04-BUG-01 resolution): All Q&A questions are intentionally
+   * shared org-wide — there is NO server-side partition by unit. The "My Unit
+   * / Cross-Unit / All" scope pills in the client UI are cosmetic toggles
+   * that drive client-side badge rendering, not a backend filter. This
+   * function exists as an explicit alias of getQuestions() so that (a) the
+   * scope toggle has a distinct endpoint name for future schema evolution
+   * (e.g. if we add a per-question unit tag) and (b) analytics can
+   * distinguish "org-wide" intent from "default list" intent without
+   * changing the response shape today.
+   *
+   * The 14-agent review (R04-BUG-01) flagged this as "cosmetic scope
+   * toggle with no backend filtering"; that is accurate but INTENTIONAL
+   * under the current single-unit deployment model. If and when we ship
+   * multi-unit scoping, this is the function to specialize.
+   *
    * @param {string} userEmail - Caller's email for ownership detection.
    * @param {number} [page] - Page number (1-based).
    * @param {number} [pageSize] - Results per page.
@@ -731,7 +836,9 @@ var QAForum = (function () {
    * @returns {{questions: Object[], total: number, page: number, pageSize: number}}
    */
   function getOrgWideQuestions(userEmail, page, pageSize, sort, showResolved) {
-    // Reuse existing getQuestions — pass through user's showResolved preference
+    // Intentional alias — see DESIGN NOTE above. Do NOT silently diverge
+    // this from getQuestions() without also updating the scope-badge logic
+    // in steward_view.html / member_view.html.
     return getQuestions(userEmail, page, pageSize, sort, showResolved);
   }
 
@@ -746,6 +853,7 @@ var QAForum = (function () {
     getQuestionDetail: getQuestionDetail,
     getUnansweredCount: getUnansweredCount,
     submitQuestion: submitQuestion,
+    editQuestion: editQuestion,
     submitAnswer: submitAnswerWithNotify,
     upvoteQuestion: upvoteQuestion,
     moderateQuestion: moderateQuestion,
@@ -766,6 +874,8 @@ function qaGetQuestions(sessionToken, page, pageSize, sort, showResolved) { var 
 function qaGetQuestionDetail(sessionToken, questionId) { var e = _resolveCallerEmail(sessionToken); if (!e) return null; return QAForum.getQuestionDetail(e, questionId); }
 /** @param {string} sessionToken @param {string} name @param {string} text @param {boolean} isAnonymous @returns {Object} Submission result. */
 function qaSubmitQuestion(sessionToken, name, text, isAnonymous) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, message: 'Not authenticated.' }; return QAForum.submitQuestion(e, name, text, isAnonymous); }
+/** v4.55.2 RAY-UX-02: @param {string} sessionToken @param {string} questionId @param {string} newText @returns {Object} Edit result (owner-only). */
+function qaEditQuestion(sessionToken, questionId, newText) { var e = _resolveCallerEmail(sessionToken); if (!e) return { success: false, authError: true, message: 'Not authenticated.' }; return QAForum.editQuestion(e, questionId, newText); }
 /** @param {string} sessionToken @param {string} name @param {string} questionId @param {string} text @param {boolean} isSteward @returns {Object} Submission result (steward-only). */
 function qaSubmitAnswer(sessionToken, name, questionId, text, isSteward) { var e = _requireStewardAuth(sessionToken); if (!e) return { success: false, message: 'Steward access required.' }; return QAForum.submitAnswer(e, name, questionId, text, true); }
 /** @param {string} sessionToken @param {string} questionId @returns {Object} Toggle result with new count. */

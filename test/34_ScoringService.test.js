@@ -143,19 +143,28 @@ describe('ScoringService.calculateProfileScore', function() {
 // ============================================================================
 
 describe('ScoringService.calculateGrievanceScore — Negative direction', function() {
+  // v4.55.1 A08-BUG-01: progressive scaling replaced the 0/40/70 step function.
+  // New anchors (negative direction, hasOpenGrievance=true):
+  //   < 0 days  → 0 (overdue)
+  //   0-7 days  → 30..40 (linear)
+  //   7-30 days → 50..70 (linear)
+  //  30-90 days → 70..85 (linear)
+  //    > 90     → 90
   test('no open grievance gives 100', function() {
     var score = ScoringService.calculateGrievanceScore(false, '', 30, 'Negative');
     expect(score).toBe(100);
   });
 
-  test('open grievance with 10+ days to deadline gives 70', function() {
+  test('open grievance with 10 days to deadline scales between 50 and 70', function() {
     var score = ScoringService.calculateGrievanceScore(true, 'Open', 10, 'Negative');
-    expect(score).toBe(70);
+    expect(score).toBeGreaterThanOrEqual(50);
+    expect(score).toBeLessThanOrEqual(70);
   });
 
-  test('open grievance with less than 7 days gives 40', function() {
+  test('open grievance with less than 7 days gives 30-40', function() {
     var score = ScoringService.calculateGrievanceScore(true, 'Open', 5, 'Negative');
-    expect(score).toBe(40);
+    expect(score).toBeGreaterThanOrEqual(30);
+    expect(score).toBeLessThanOrEqual(40);
   });
 
   test('open grievance with negative days gives 0 (overdue)', function() {
@@ -163,9 +172,15 @@ describe('ScoringService.calculateGrievanceScore — Negative direction', functi
     expect(score).toBe(0);
   });
 
-  test('open grievance with exactly 7 days gives 70', function() {
+  test('open grievance with exactly 7 days gives 40', function() {
     var score = ScoringService.calculateGrievanceScore(true, 'Open', 7, 'Negative');
-    expect(score).toBe(70);
+    expect(score).toBe(40);
+  });
+
+  test('open grievance with 60 days scores higher than 8 days (progressive scaling)', function() {
+    var short = ScoringService.calculateGrievanceScore(true, 'Open', 8, 'Negative');
+    var longD = ScoringService.calculateGrievanceScore(true, 'Open', 60, 'Negative');
+    expect(longD).toBeGreaterThan(short);
   });
 });
 

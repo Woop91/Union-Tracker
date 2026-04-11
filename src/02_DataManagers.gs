@@ -411,7 +411,10 @@ function syncMemberGrievanceData() {
       }
       grievanceCounts[memberId].total++;
       var status = col_(grievances[i], GRIEVANCE_COLS.STATUS);
-      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING_INFO) {
+      // Active = anything that isn't a closed/resolved status. Previously we
+      // only counted OPEN + PENDING_INFO, silently undercounting grievances in
+      // Appealed or In Arbitration (which are still in-progress).
+      if (typeof GRIEVANCE_CLOSED_STATUSES !== 'undefined' && GRIEVANCE_CLOSED_STATUSES.indexOf(status) === -1 && status) {
         grievanceCounts[memberId].active++;
       }
     }
@@ -882,6 +885,9 @@ function removeFromConfigDropdown_(configCol, value) {
  * Can be called manually from the menu or automatically via triggers.
  */
 function syncStewardStatus() {
+  // Wrap the bidirectional Member↔Config sync in a script lock so concurrent
+  // syncs can't produce duplicate steward entries or race on the Config column.
+  return withScriptLock_(function() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -944,9 +950,9 @@ function syncStewardStatus() {
   }
 
   // If IS_STEWARD != Yes but name IS in Config, remove from Config
-  for (name in configNameSet) {
-    if (memberMap[name] && !memberMap[name].isSteward) {
-      configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
+  for (var _stName in configNameSet) {
+    if (memberMap[_stName] && !memberMap[_stName].isSteward) {
+      configSheet.getRange(configNameSet[_stName], CONFIG_COLS.STEWARDS).clearContent();
       changes++;
     }
   }
@@ -971,6 +977,7 @@ function syncStewardStatus() {
     ? '✅ Steward status synced (' + changes + ' change' + (changes > 1 ? 's' : '') + ')'
     : '✅ Steward status already in sync',
     COMMAND_CONFIG.SYSTEM_NAME, 5);
+  });  // end withScriptLock_
 }
 
 /**
@@ -1356,10 +1363,23 @@ function getExistingMemberKeys() {
  * @returns {Object} Result with imported/skipped counts for this batch
  */
 function importMembersBatch(batchData, mapping) {
-  var caller = Session.getEffectiveUser().getEmail();
+  // getEffectiveUser() returns the script owner in web app context, making
+  // the previous "if (!caller)" check tautological. Use getActiveUser() so
+  // the identity is the actual caller (works from Sheets menu; empty in web
+  // app means we reject correctly).
+  var caller = '';
+  try { caller = Session.getActiveUser().getEmail(); } catch (_) {}
   if (!caller) {
     log_('importMembersBatch', 'Unauthorized batch import attempt');
     return { success: false, message: 'Not authorized' };
+  }
+  // Verify the caller is actually a steward/admin via the role check
+  if (typeof getUserRole_ === 'function') {
+    var _role = getUserRole_(caller);
+    if (_role !== 'admin' && _role !== 'steward' && _role !== 'both') {
+      log_('importMembersBatch', 'Unauthorized (role=' + _role + ')');
+      return { success: false, message: 'Steward access required.' };
+    }
   }
   return withScriptLock_(function() {
     try {
@@ -1876,6 +1896,12 @@ function advanceGrievanceStep(grievanceId, options) {
       return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
+    // v4.55.1 H07-BUG-04: reject advancement on already-closed grievances
+    var currentStatus = String(col_(data[rowIndex - 1], GRIEVANCE_COLS.STATUS) || '').trim();
+    if (GRIEVANCE_CLOSED_STATUSES.indexOf(currentStatus) !== -1) {
+      return errorResponse('Grievance is already closed and cannot be advanced', 'advanceGrievanceStep');
+    }
+
     const currentStepNum = normalizeStepToNumber_(col_(data[rowIndex - 1], GRIEVANCE_COLS.CURRENT_STEP));
     if (!currentStepNum || currentStepNum < 1) {
       return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
@@ -1939,6 +1965,18 @@ function advanceGrievanceStep(grievanceId, options) {
       advancedBy: Session.getActiveUser().getEmail()
     });
 
+    // v4.55.2 H-UX-01: in-app notification to the affected member. Guarded by
+    // typeof so tests that don't mock the Notifications sheet still pass.
+    if (typeof _notifyGrievanceMember_ === 'function') {
+      var _stepLabel = stepNumberToLabel_(nextStepNum);
+      _notifyGrievanceMember_(
+        rowData,
+        'Your grievance advanced to ' + _stepLabel,
+        'Grievance ' + grievanceId + ' has moved to ' + _stepLabel + '. ' +
+        'Check the Grievances tab for next steps and any deadlines.'
+      );
+    }
+
     return {
       success: true,
       grievanceId: grievanceId,
@@ -1961,9 +1999,11 @@ function getStepColumnSet(step) {
   var stepNum = normalizeStepToNumber_(step);
   switch (stepNum) {
     case 1: return {
-      filed: GRIEVANCE_COLS.STEP1_RCVD,
+      // Step 1 due date is computed from DATE_FILED (when the grievance was filed),
+      // not STEP1_RCVD (which is when management's response came back).
+      filed: GRIEVANCE_COLS.DATE_FILED,
       due:   GRIEVANCE_COLS.STEP1_DUE,
-      rcvd:  null  // Step 1 has no separate received column
+      rcvd:  GRIEVANCE_COLS.STEP1_RCVD
     };
     case 2: return {
       filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED,
@@ -2029,13 +2069,13 @@ function recalcAllGrievancesBatched() {
 
   }
 
-  // Batch write all updates
+  // Write only the touched cells. The previous implementation overwrote the
+  // entire sheet (including the header row) from a stale in-memory snapshot,
+  // silently clobbering any concurrent edits that landed between getValues
+  // and setValues.
   for (let u = 0; u < pendingUpdates.length; u++) {
     var update = pendingUpdates[u];
-    data[update.row - 1][update.col - 1] = update.value;
-  }
-  if (pendingUpdates.length > 0) {
-    sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    sheet.getRange(update.row, update.col).setValue(update.value);
   }
 
   logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
@@ -2063,6 +2103,12 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   var authResult = checkWebAppAuthorization('steward');
   if (!authResult.isAuthorized) {
     return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
+  }
+
+  // v4.55.1 H07-BUG-06: validate newStatus against GRIEVANCE_STATUS values
+  var validStatuses = Object.keys(GRIEVANCE_STATUS).map(function(k) { return GRIEVANCE_STATUS[k]; });
+  if (!newStatus || validStatuses.indexOf(String(newStatus).trim()) === -1) {
+    return errorResponse('Invalid grievance status: ' + String(newStatus), 'bulkUpdateGrievanceStatus');
   }
 
   try {
@@ -2392,7 +2438,10 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       const today = new Date();
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-      // Build combined resolution text
+      // Build combined resolution text, preserving any existing advancement notes
+      // that were appended to RESOLUTION by advanceGrievanceStep(). Overwriting
+      // would permanently lose the per-step audit trail stored in that column.
+      var existingResolution = String(col_(data[rowIndex - 1], GRIEVANCE_COLS.RESOLUTION) || '').trim();
       var resolutionText = outcome || '';
       if (resolution) {
         resolutionText += (resolutionText ? ': ' : '') + resolution;
@@ -2400,6 +2449,9 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       if (notes) {
         resolutionText += (resolutionText ? '\n' : '') +
                           '[' + timestamp + '] ' + notes;
+      }
+      if (existingResolution) {
+        resolutionText = existingResolution + (resolutionText ? '\n' + resolutionText : '');
       }
       // H-29: Use outcome parameter to determine status instead of always 'Settled'
       var validOutcomes = {
@@ -2414,19 +2466,31 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       // M-PERF: Batch write — read row, apply 4 updates, write back in single call
       var totalCols = sheet.getLastColumn();
       var rowData = sheet.getRange(rowIndex, 1, 1, totalCols).getValues()[0];
-      setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormula(resolutionText));
+      setCol_(rowData, GRIEVANCE_COLS.RESOLUTION, escapeForFormulaPreserveNewlines(resolutionText));
       setCol_(rowData, GRIEVANCE_COLS.STATUS, resolvedStatus);
       setCol_(rowData, GRIEVANCE_COLS.DATE_CLOSED, today);
       setCol_(rowData, GRIEVANCE_COLS.LAST_UPDATED, today);
       sheet.getRange(rowIndex, 1, 1, totalCols).setValues([rowData]);
 
-      // Log the resolution
-      logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
+      // v4.55.1 H07-BUG-01: log as GRIEVANCE_RESOLVED so audit queries can distinguish
+      // resolutions from generic updates
+      logAuditEvent(AUDIT_EVENTS.GRIEVANCE_RESOLVED, {
         grievanceId: grievanceId,
         action: 'RESOLVED',
         outcome: outcome,
         resolvedBy: Session.getActiveUser().getEmail()
       });
+
+      // v4.55.2 H-UX-01: in-app notification to the affected member. Guarded by
+      // typeof so tests that don't mock the Notifications sheet still pass.
+      if (typeof _notifyGrievanceMember_ === 'function') {
+        _notifyGrievanceMember_(
+          rowData,
+          'Your grievance has been resolved',
+          'Grievance ' + grievanceId + ' was resolved as "' + outcome + '". ' +
+          'Open the Grievances tab to review the outcome and any resolution notes.'
+        );
+      }
 
       return {
         success: true,
@@ -2903,10 +2967,17 @@ function getSelectedGrievanceRows() {
  * @returns {{success: boolean, count: number, error: string}}
  */
 function bulkFlagGrievances(rowNumbers) {
-  var caller = Session.getEffectiveUser().getEmail();
+  var caller = '';
+  try { caller = Session.getActiveUser().getEmail(); } catch (_) {}
   if (!caller) {
     log_('bulkFlagGrievances', 'Unauthorized bulk flag attempt');
     return { success: false, message: 'Not authorized' };
+  }
+  if (typeof getUserRole_ === 'function') {
+    var _role = getUserRole_(caller);
+    if (_role !== 'admin' && _role !== 'steward' && _role !== 'both') {
+      return { success: false, message: 'Steward access required.' };
+    }
   }
   if (!rowNumbers || !rowNumbers.length) {
     return errorResponse('No rows selected');
@@ -2950,10 +3021,17 @@ function bulkFlagGrievances(rowNumbers) {
  * @returns {{success: boolean, data: {sent: number, failed: number, skipped: number}, error: string}}
  */
 function bulkEmailGrievanceMembers(rowNumbers, subject, body) {
-  var caller = Session.getEffectiveUser().getEmail();
+  var caller = '';
+  try { caller = Session.getActiveUser().getEmail(); } catch (_) {}
   if (!caller) {
     log_('bulkEmailGrievanceMembers', 'Unauthorized bulk email attempt');
     return { success: false, message: 'Not authorized' };
+  }
+  if (typeof getUserRole_ === 'function') {
+    var _role = getUserRole_(caller);
+    if (_role !== 'admin' && _role !== 'steward' && _role !== 'both') {
+      return { success: false, message: 'Steward access required.' };
+    }
   }
   if (!rowNumbers || !rowNumbers.length) {
     return errorResponse('No rows selected');
@@ -2983,12 +3061,20 @@ function bulkEmailGrievanceMembers(rowNumbers, subject, body) {
         }
 
         try {
-          var emailSent = safeSendEmail({
+          // Route through safeSendEmail_ (the quota-aware version in 00_Security.gs).
+          // safeSendEmail (no underscore) in 05_Integrations is a legacy path that
+          // bypasses MailApp quota checking.
+          var _sendResult = safeSendEmail_({
             to: String(email).trim(),
             subject: subject,
             body: body
           });
-          if (emailSent) { sent++; } else { failed++; }
+          if (_sendResult && _sendResult.success !== false) {
+            sent++;
+          } else {
+            failed++;
+            if (_sendResult && _sendResult.error && /quota/i.test(_sendResult.error)) break;
+          }
         } catch (emailErr) {
           log_('bulkEmailGrievanceMembers', 'failed for row ' + row + ': ' + emailErr.message);
           failed++;
@@ -3014,10 +3100,17 @@ function bulkEmailGrievanceMembers(rowNumbers, subject, body) {
  * @returns {{success: boolean, message: string, error: string}}
  */
 function bulkExportGrievancesToCsv(rowNumbers) {
-  var caller = Session.getEffectiveUser().getEmail();
+  var caller = '';
+  try { caller = Session.getActiveUser().getEmail(); } catch (_) {}
   if (!caller) {
     log_('bulkExportGrievancesToCsv', 'Unauthorized bulk export attempt');
     return { success: false, message: 'Not authorized' };
+  }
+  if (typeof getUserRole_ === 'function') {
+    var _role = getUserRole_(caller);
+    if (_role !== 'admin' && _role !== 'steward' && _role !== 'both') {
+      return { success: false, message: 'Steward access required.' };
+    }
   }
   if (!rowNumbers || !rowNumbers.length) {
     return errorResponse('No rows selected');
@@ -3055,7 +3148,7 @@ function bulkExportGrievancesToCsv(rowNumbers) {
     var csvContent = csvRows.join('\r\n');
     var blob = Utilities.newBlob(csvContent, 'text/csv', 'grievance_export_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmmss') + '.csv');
 
-    safeSendEmail({
+    safeSendEmail_({
       to: userEmail,
       subject: 'Grievance Export — ' + rowNumbers.length + ' records',
       body: 'Attached is a CSV export of ' + rowNumbers.length + ' selected grievance record(s).\n\nExported on: ' + new Date().toLocaleString(),
@@ -3139,4 +3232,61 @@ function clearAllSelections() {
       return errorResponse(e.message, 'clearAllSelections');
     }
   });
+}
+
+/**
+ * v4.55.2 H-UX-01: Server-initiated in-app notification for a grievance member.
+ * Writes directly to the Notifications sheet (bypassing sendWebAppNotification
+ * because that function requires a steward session token we don't have inside
+ * a server-side lifecycle helper). Silently no-ops on any error — grievance
+ * lifecycle operations must never fail because a notification row couldn't
+ * be written.
+ *
+ * @param {Array} grievanceRowData - The grievance row (0-indexed, as returned by getValues)
+ * @param {string} title - Notification title (<=200 chars)
+ * @param {string} message - Notification message body (<=1000 chars)
+ * @returns {boolean} true if a notification row was appended
+ * @private
+ */
+function _notifyGrievanceMember_(grievanceRowData, title, message) {
+  try {
+    if (!grievanceRowData || !GRIEVANCE_COLS || !GRIEVANCE_COLS.MEMBER_EMAIL) return false;
+    var email = String(col_(grievanceRowData, GRIEVANCE_COLS.MEMBER_EMAIL) || '').trim().toLowerCase();
+    if (!email || email.indexOf('@') === -1) return false;
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return false;
+    var notifSheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!notifSheet) return false;
+
+    // Timestamped unique ID — collision-proof without scanning existing rows.
+    var notifId = 'NOTIF-SYS-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var expires = Utilities.formatDate(
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), tz, 'yyyy-MM-dd'
+    );
+
+    // Row order must match NOTIFICATIONS_HEADER_MAP_ in 01_Core.gs.
+    var row = [
+      notifId,                                                              // NOTIFICATION_ID
+      email,                                                                // RECIPIENT
+      'Grievance Update',                                                   // TYPE
+      escapeForFormula(String(title || '').substring(0, 200)),              // TITLE
+      escapeForFormulaPreserveNewlines(String(message || '').substring(0, 1000)), // MESSAGE
+      'Normal',                                                             // PRIORITY
+      'system',                                                             // SENT_BY
+      'Grievance System',                                                   // SENT_BY_NAME
+      today,                                                                // CREATED_DATE
+      expires,                                                              // EXPIRES_DATE
+      '',                                                                   // DISMISSED_BY
+      'Active',                                                             // STATUS
+      'Dismissible'                                                         // DISMISS_MODE
+    ];
+    notifSheet.appendRow(row);
+    return true;
+  } catch (err) {
+    if (typeof log_ === 'function') log_('_notifyGrievanceMember_', err.message || String(err));
+    return false;
+  }
 }
