@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes">
+  <!-- v4.55.1 T06-BUG-02: viewport-fit=cover enables env(safe-area-inset-*) on notched iPhones for the bottom nav -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -13,6 +14,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <meta name="theme-color" content="#6366f1">
+
+  <!-- v4.55.1 Bug 5: Home screen icon. Embedded as a data URL in app_icon.html so we
+       don't depend on external Drive hosting. Read once into a scriptlet variable
+       to avoid double file-read on render. iOS Safari may not honor this when the
+       app lives inside the GAS sandbox iframe — see app_icon.html for the limitation.
+       Apple PWA meta tags improve standalone-mode behavior when "Add to Home Screen"
+       is invoked from Safari directly. -->
+  <? var _appIconUrl = include('app_icon'); ?>
+  <link rel="icon" type="image/png" href="<?!= _appIconUrl ?>">
+  <link rel="apple-touch-icon" href="<?!= _appIconUrl ?>">
+  <link rel="apple-touch-icon-precomposed" href="<?!= _appIconUrl ?>">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dashboard">
+  <meta name="mobile-web-app-capable" content="yes">
+
   <!-- PERF: Non-render-blocking font load — prevents font CSS from blocking first paint.
        display=swap ensures text is visible immediately with fallback fonts. -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -137,6 +154,22 @@
       } catch (_dkErr) {}
     }
 
+    // v4.55.1 D03-BUG-01: on auth view, hide body immediately until we know whether we're
+    // redirecting via a stored session token. This prevents the brief auth-form flash
+    // that the user saw before the session restore redirect kicked in.
+    if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
+      try {
+        var _storedTokPeek = null;
+        try { _storedTokPeek = localStorage.getItem('dashboardSessionToken'); } catch (_pErr) {}
+        if (_storedTokPeek && !PAGE_DATA.error && !PAGE_DATA.tokenChecked) {
+          // We're about to redirect — hide body to avoid the flash
+          document.documentElement.style.visibility = 'hidden';
+          // Failsafe: if redirect doesn't happen within 2s, show the page anyway
+          setTimeout(function() { document.documentElement.style.visibility = ''; }, 2000);
+        }
+      } catch (_hideErr) {}
+    }
+
     // On auth page: try to restore session from localStorage
     if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
       try {
@@ -151,12 +184,13 @@
         } else {
           var storedToken = localStorage.getItem('dashboardSessionToken');
           if (storedToken) {
-            // Redirect-loop guard: max 2 attempts before clearing stale token.
-            // Without this, Chrome's aggressive caching + stale localStorage token
-            // can cause an infinite redirect cycle (works in incognito because
-            // localStorage starts empty).
+            // Redirect-loop guard: max 5 attempts before clearing stale token.
+            // v4.55.1 Bug 1: Bumped from 2 → 5. The original guard was so tight it
+            // could clear a perfectly valid token after a couple of transient
+            // server errors (CacheService blip, PropertiesService rate limit, cold
+            // start). At 5 attempts, we still bound the loop but tolerate flakes.
             var redirectCount = parseInt(localStorage.getItem('dashboardSessionRedirectCount') || '0', 10);
-            if (redirectCount >= 2) {
+            if (redirectCount >= 5) {
               // Too many redirects — token is likely expired/invalid, clear it
               localStorage.removeItem('dashboardSessionToken');
               localStorage.removeItem('dashboardSessionRedirectCount');
@@ -2823,12 +2857,30 @@
           className: 'sidebar-item',
           style: { fontSize: '12px', opacity: isDefault ? '0.5' : '0.75', paddingLeft: '20px' },
           onClick: isDefault ? function() {} : function() {
+            // v4.55.1 G13-BUG-02: roll back optimistic UI on server failure and surface a toast
+            var _prevLabel = defaultLabelEl.textContent;
+            var _prevOpacity = this.style.opacity;
+            var _prevDefault = AppState.defaultView;
+            var _rowEl = this;
             AppState.defaultView = role;
             defaultLabelEl.textContent = '\u2713 Default view';
-            this.style.opacity = '0.5';
+            _rowEl.style.opacity = '0.5';
             serverCall()
-              .withSuccessHandler(function() {})
-              .withFailureHandler(function(err) { console.error('Failed to save default view:', err); })
+              .withSuccessHandler(function(result) {
+                if (result && result.success === false) {
+                  AppState.defaultView = _prevDefault;
+                  defaultLabelEl.textContent = _prevLabel;
+                  _rowEl.style.opacity = _prevOpacity;
+                  if (typeof showToast === 'function') showToast('Could not save default view. Please try again.', 'error');
+                }
+              })
+              .withFailureHandler(function(err) {
+                console.error('Failed to save default view:', err);
+                AppState.defaultView = _prevDefault;
+                defaultLabelEl.textContent = _prevLabel;
+                _rowEl.style.opacity = _prevOpacity;
+                if (typeof showToast === 'function') showToast('Could not save default view. Please try again.', 'error');
+              })
               .dataSetDefaultView(SESSION_TOKEN, role);
           }
         }, [
@@ -3196,11 +3248,16 @@
     // ══════════════════════════════════════════════════════════════════════
     var _memberViewLoaded = typeof initMemberView === 'function';
     var _memberViewLoading = false; // loading fence: prevents concurrent fetches
+    var _memberViewPendingCallbacks = []; // v4.55.1: queue of callbacks that arrive during load
+    var _memberViewLoadSwitchId = -1; // v4.55.1: nav switch id captured at load start (stale-guard)
 
     function _loadMemberViewThen(container, callback) {
       if (_memberViewLoaded) { callback(); return; }
-      if (_memberViewLoading) return; // already in-flight — first callback wins
+      // v4.55.1 G13-BUG-01 / N14-BUG-11: queue subsequent callbacks instead of silently dropping them
+      if (_memberViewLoading) { _memberViewPendingCallbacks.push(callback); return; }
       _memberViewLoading = true;
+      _memberViewPendingCallbacks = [callback];
+      _memberViewLoadSwitchId = (typeof _navSwitchId === 'number') ? _navSwitchId : -1;
       showLoading(container, 'kpi');
       google.script.run
         .withSuccessHandler(function(html) {
@@ -3222,6 +3279,7 @@
           if (typeof initMemberView !== 'function') {
             console.error('Member view scripts loaded but initMemberView not defined. html length:', (html || '').length);
             _memberViewLoading = false;
+            _memberViewPendingCallbacks = []; // v4.55.1: drop queued callbacks on load failure
             container.innerHTML = '';
             var errCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
             errCard.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '12px' } }, '\u26A0\uFE0F'));
@@ -3236,8 +3294,16 @@
           }
           _memberViewLoaded = true;
           _memberViewLoading = false;
+          // v4.55.1 G13-BUG-01: stale-guard — if user switched roles during load, don't fire callbacks
+          var _queued = _memberViewPendingCallbacks;
+          _memberViewPendingCallbacks = [];
+          if (typeof _navSwitchId === 'number' && _memberViewLoadSwitchId !== -1 && _navSwitchId !== _memberViewLoadSwitchId) {
+            return; // user navigated away during load; discard stale callbacks
+          }
           try {
-            callback();
+            for (var _qi = 0; _qi < _queued.length; _qi++) {
+              try { _queued[_qi](); } catch (_cqErr) { console.error('Member view queued callback error:', _cqErr); }
+            }
           } catch (cbErr) {
             console.error('Member view render error:', cbErr);
             container.innerHTML = '';
@@ -3254,6 +3320,7 @@
         })
         .withFailureHandler(function(err) {
           _memberViewLoading = false;
+          _memberViewPendingCallbacks = []; // v4.55.1: drop queued callbacks on failure
           console.error('Failed to load member view:', err);
           container.innerHTML = '';
           var errCard = el('div', { style: { textAlign: 'center', padding: '40px' } });
@@ -3360,8 +3427,8 @@
     }
 
     /**
-     * Agency Org Chart (MADDS) — loads agency_org_chart.html lazily.
-     * MassAbility agency structure, budget, personnel, DDS hierarchy.
+     * Agency Org Chart — loads agency_org_chart.html lazily.
+     * Generic agency structure visualization (when configured).
      */
     function renderAgencyOrgChart(appContainer, role) {
       // v4.51.1: Graceful fallback if feature file is absent (SolidBase)
@@ -3911,6 +3978,19 @@
       if (AppState.activeRole && AppState.activeRole !== role) { AppState.initialTab = null; return; }
       var tab = AppState.initialTab;
       AppState.initialTab = null; // one-shot
+      // v4.55.1 P02-BUG-05: validate tab ID against a whitelist before routing so
+      // bogus ?page= values fall back to the default instead of producing a blank page.
+      var KNOWN_TABS = {
+        // shared
+        cases:1, workload:1, orghealth:1, poms:1, resources:1, qaforum:1, polls:1, minutes:1,
+        notifications:1, events:1, timeline:1, stewarddirectory:1, home:1, orgchart:1,
+        maddsorgchart:1, insights:1, members:1, tasks:1, feedback:1, profile:1, survey:1,
+        contact:1, more:1, admin:1, settings:1, broadcasts:1, leaderhub:1
+      };
+      if (!KNOWN_TABS[tab]) {
+        console.warn('Deep-link to unknown tab: ' + tab + '. Falling back to default.');
+        tab = (role === 'steward') ? 'cases' : 'home';
+      }
       _handleTabNav(role, tab);
     }
 
@@ -4507,7 +4587,7 @@
         if (existing) { existing.remove(); return; }
 
         var shortcuts = [
-          ['n', 'Go to Cases / New Grievance'],
+          ['n', 'Go to Cases list'],
           ['/', 'Focus search input'],
           ['j', 'Next item in list'],
           ['k', 'Previous item in list'],

@@ -301,6 +301,14 @@ function openNewSurveyPeriod(callerEmail) {
       // Push survey-open notification to all active members
       pushSurveyOpenNotification_(periodName);
 
+      // Invalidate cached survey questions payload so members see the new period
+      // immediately rather than waiting up to 5 min for CacheService to expire.
+      try {
+        var _cache = CacheService.getScriptCache();
+        _cache.remove('surveyQuestions_v1');
+        _cache.remove('surveyQuestions_v2');
+      } catch (_cErr) { log_('openNewSurveyPeriod cache clear', _cErr.message); }
+
       log_('openNewSurveyPeriod', 'Opened ' + periodId);
       return { success: true, periodId: periodId, message: periodName + ' is now open.' };
 
@@ -441,6 +449,14 @@ function archiveSurveyPeriod_(periodId) {
     rowData[C.ARCHIVE_URL - 1] = pastFolderUrl;
     periodsSheet.getRange(periodRow, 1, 1, 8).setValues([rowData]);
 
+    // Invalidate cached survey questions payload so members stop seeing the
+    // archived period as Active on their next survey load.
+    try {
+      var _arcCache = CacheService.getScriptCache();
+      _arcCache.remove('surveyQuestions_v1');
+      _arcCache.remove('surveyQuestions_v2');
+    } catch (_acErr) { log_('archiveSurveyPeriod_ cache clear', _acErr.message); }
+
     log_('archiveSurveyPeriod_', 'Archived ' + periodId + ' → ' + (pastFolderUrl || '(no Drive URL)'));
 
   } catch(e) {
@@ -450,11 +466,29 @@ function archiveSurveyPeriod_(periodId) {
 
 /**
  * Increments the response count for a period in _Survey_Periods.
+ * v4.55.1 T12-BUG-06: retries on lock timeout and queues a pending increment to a
+ * PropertiesService buffer so counts are never silently dropped under load.
  * @param {string} periodId
  */
 function incrementPeriodResponseCount_(periodId) {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) return;
+  var acquired = false;
+  // Try three times with exponential backoff before giving up
+  for (var attempt = 0; attempt < 3 && !acquired; attempt++) {
+    try { acquired = lock.tryLock(10000); } catch (_le) { acquired = false; }
+    if (!acquired && attempt < 2) Utilities.sleep(500 * (attempt + 1));
+  }
+  if (!acquired) {
+    // v4.55.1: queue increment to a buffer the nightly reconcile can flush
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var bufKey = 'survey_period_pending_' + periodId;
+      var bufVal = parseInt(props.getProperty(bufKey) || '0', 10);
+      props.setProperty(bufKey, String(bufVal + 1));
+      log_('incrementPeriodResponseCount_', 'Lock timeout — queued +1 for period ' + periodId);
+    } catch (_qErr) { log_('incrementPeriodResponseCount_', 'Lock timeout AND queue failed: ' + (_qErr.message || _qErr)); }
+    return;
+  }
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HIDDEN_SHEETS.SURVEY_PERIODS);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -463,7 +497,14 @@ function incrementPeriodResponseCount_(periodId) {
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][C.PERIOD_ID - 1]) === periodId) {
         var countCell = sheet.getRange(i + 2, C.RESPONSE_COUNT);
-        countCell.setValue((parseInt(countCell.getValue(), 10) || 0) + 1);
+        // Also flush any pending buffered increments for this period
+        var pendingDelta = 0;
+        try {
+          var bufKey2 = 'survey_period_pending_' + periodId;
+          pendingDelta = parseInt(PropertiesService.getScriptProperties().getProperty(bufKey2) || '0', 10);
+          if (pendingDelta > 0) PropertiesService.getScriptProperties().deleteProperty(bufKey2);
+        } catch (_fErr) { pendingDelta = 0; }
+        countCell.setValue((parseInt(countCell.getValue(), 10) || 0) + 1 + pendingDelta);
         return;
       }
     }
@@ -772,7 +813,7 @@ function pushSurveyOpenNotification_(periodName) {
         message:   'The ' + periodName + ' is now open. Your feedback is anonymous and helps shape your union. Complete it in the Member Portal.',
         priority:  'Normal',
         sentBy:    'system',
-        sentByName:'Union Dashboard',
+        sentByName:'SolidBase',
         // No expiry — stays until member dismisses or period closes
         expiresDate: '',
         recipient: 'All'
@@ -1025,6 +1066,7 @@ function menuToggleRTOSection() {
   try {
     var cache = CacheService.getScriptCache();
     cache.remove('surveyQuestions_v1');
+    cache.remove('surveyQuestions_v2');
     cache.remove('satisfactionColMap_v1');
   } catch (_c) { log_('_c', (_c.message || _c)); }
 

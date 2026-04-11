@@ -166,8 +166,14 @@ function doGetWebDashboard(e) {
       // Can be disabled via config.allowBootstrapAdmin = false once directory is stable.
       var allowBootstrapAdmin = config.allowBootstrapAdmin !== false; // default true
       try {
-        var ownerEmail = Session.getActiveUser().getEmail().toLowerCase();
-        if (allowBootstrapAdmin && user.email && user.email.toLowerCase() === ownerEmail) {
+        // Use getEffectiveUser() — the actual script owner. getActiveUser()
+        // returns the accessing user's email for same-domain SSO, so
+        // user.email === Session.getActiveUser().getEmail() was a tautology
+        // that granted admin to any same-domain user whenever the Member
+        // Directory was empty (fresh install, migration, accidental clear).
+        // getEffectiveUser() is the constant script owner under "Execute as Me".
+        var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+        if (allowBootstrapAdmin && user.email && ownerEmail && user.email.toLowerCase() === ownerEmail) {
           userRecord = {
             email: user.email,
             name: 'Admin',
@@ -206,6 +212,16 @@ function doGetWebDashboard(e) {
       var ssoToken = Auth.createSessionToken(user.email, 'sso');
       if (ssoToken && typeof ssoToken === 'object' && ssoToken.error) {
         log_('SSO auto-session storage failed', ssoToken.message);
+        // v4.55.1 Bug 1: Escalate so this isn't lost in the silent log. If users
+        // are re-authing every visit, this is one of the three suspect paths.
+        if (typeof recordSecurityEvent === 'function') {
+          try {
+            recordSecurityEvent('SESSION_CREATE_FAILED', 'HIGH',
+              'SSO session token creation failed — user will not be remembered. ' +
+              'Likely cause: PropertiesService quota exhausted or write contention.',
+              { email: user.email, reason: ssoToken.message });
+          } catch (_) {}
+        }
       } else {
         sessionToken = ssoToken;
       }
@@ -214,6 +230,17 @@ function doGetWebDashboard(e) {
       // C3: Handle session storage failure — createSessionToken may return error object
       if (tokenResult && typeof tokenResult === 'object' && tokenResult.error) {
         log_('Session token storage failed', tokenResult.message);
+        // v4.55.1 Bug 1: Same as SSO path — escalate so we can correlate with the
+        // user complaint. If this fires, hypothesis B (PropertiesService quota) is
+        // confirmed and the fix is to evict old session entries before writing.
+        if (typeof recordSecurityEvent === 'function') {
+          try {
+            recordSecurityEvent('SESSION_CREATE_FAILED', 'HIGH',
+              'Magic-link session token creation failed — user will need to re-link every visit. ' +
+              'Likely cause: PropertiesService quota exhausted or write contention.',
+              { email: user.email, reason: tokenResult.message });
+          } catch (_) {}
+        }
         // Proceed without remember-me; user will need to re-authenticate next visit
       } else {
         sessionToken = tokenResult;
@@ -249,6 +276,19 @@ function doGetWebDashboard(e) {
  * @param {string} [authError] - Optional auth error code (e.g. 'sso_failed')
  */
 function _serveAuth(config, e, authError) {
+  // v4.55.1 Bug 1: If we landed on the auth view despite a sessionToken being
+  // provided, the token was rejected by Auth.resolveUser. Surface this loudly
+  // in the audit trail so the actual rejection reason (logged in _getSessionData)
+  // can be correlated with the user-facing failure timing.
+  if (e.parameter.sessionToken && typeof recordSecurityEvent === 'function') {
+    try {
+      recordSecurityEvent('SESSION_TOKEN_REJECTED', 'MEDIUM',
+        'Auth view served despite sessionToken in URL — token failed Auth.resolveUser validation. ' +
+        'Check Auth._getSessionData log entries for the specific reason.',
+        { tokenPrefix: String(e.parameter.sessionToken).substring(0, 8) + '...' });
+    } catch (_recErr) { log_('_serveAuth recordSecurityEvent', _recErr.message); }
+  }
+
   var template = HtmlService.createTemplateFromFile('index');
   template.view = 'auth';
 
@@ -403,7 +443,7 @@ function _sanitizeConfig(config) {
     driveFolderUrl: _buildDriveUrl(config.driveFolderId),
     // surveyFormUrl removed v4.22.7 — survey is native webapp (renderSurveyFormPage in member_view.html)
     orgWebsite: config.orgWebsite || '',
-    broadcastScopeAll: (String(config.broadcastScopeAll || '').trim().toLowerCase() === 'yes'),
+    broadcastScopeAll: (config.broadcastScopeAll === true || ['yes','true','1','on'].indexOf(String(config.broadcastScopeAll || '').trim().toLowerCase()) !== -1),
     // H8: v4.31.0 — replaced raw folder IDs with pre-built URLs and boolean flags
     minutesFolderUrl: _buildDriveUrl(config.minutesFolderId),
     hasMinutesFolder: !!config.minutesFolderId,
@@ -813,11 +853,15 @@ function include(filename) {
 
 /**
  * Client-callable: Returns the member view HTML for lazy-loading.
- * For dual-role users (steward + member), member_view.html is NOT included
- * in the initial template to stay under the GAS ~820KB HtmlOutput limit.
- * Loaded on-demand when the user switches to member view.
+ * For dual-role users (view === 'both'), the initial template only includes
+ * steward_view.html to stay under the GAS ~820KB HtmlOutput limit — the member
+ * view is fetched here on-demand the first time the user switches to member view.
+ * This is the active code path for all dual-role member-view transitions; it is
+ * NOT dead code. See index.html _loadMemberViewThen for the client side.
+ * v4.55.1 G13-BUG-03: JSDoc updated to correctly describe active usage.
+ *
  * @param {string} sessionToken - Session token for auth validation
- * @returns {string} Raw HTML content (<script> block defining member view functions)
+ * @returns {string} Raw HTML content with script block defining member view functions
  */
 function getMemberViewHtml(sessionToken) {
   try {

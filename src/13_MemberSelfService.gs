@@ -211,7 +211,6 @@ function assignMemberPIN(memberId, options) {
   var memberRow = -1;
   var memberEmail = null;
   var memberName = null;
-  var _memberPhone = null;
 
   for (var i = 1; i < data.length; i++) {
     var rowId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
@@ -219,7 +218,6 @@ function assignMemberPIN(memberId, options) {
       memberRow = i + 1;
       memberEmail = col_(data[i], MEMBER_COLS.EMAIL);
       memberName = ((col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '')).trim();
-      _memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -301,6 +299,19 @@ function requestPINReset(memberId) {
   }
 
   memberId = String(memberId).trim().toUpperCase();
+
+  // Rate limit per member ID to prevent email flooding and member enumeration.
+  // Returns the same generic success message on rate-limit so attackers cannot
+  // detect valid member IDs by timing.
+  try {
+    var _rateCache = CacheService.getScriptCache();
+    var _rateKey = 'PIN_RESET_RATE_' + memberId;
+    var _rateCount = parseInt(_rateCache.get(_rateKey) || '0', 10);
+    if (_rateCount >= 3) {
+      return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
+    }
+    _rateCache.put(_rateKey, String(_rateCount + 1), 900); // 15-minute window
+  } catch (_rlErr) { /* non-critical */ }
 
   // Find member and get their email
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -434,8 +445,20 @@ function completePINReset(memberId, token, newPin) {
     return errorResponse('Reset code has expired or is invalid. Please request a new one.');
   }
 
-  // Verify token matches
-  if (tokenData.token !== token || tokenData.memberId !== memberId) {
+  // Verify token matches using constant-time comparison. String !== would
+  // short-circuit on the first differing character and leak progressive
+  // information about the stored token. verifyPIN uses the same pattern.
+  var _storedToken = String(tokenData.token || '');
+  var _inputToken = String(token || '');
+  var _tokenMatches = _storedToken.length === _inputToken.length;
+  if (_tokenMatches) {
+    var _diff = 0;
+    for (var _ti = 0; _ti < _storedToken.length; _ti++) {
+      _diff |= (_storedToken.charCodeAt(_ti) ^ _inputToken.charCodeAt(_ti));
+    }
+    _tokenMatches = _diff === 0;
+  }
+  if (!_tokenMatches || tokenData.memberId !== memberId) {
     if (typeof secureLog === 'function') {
       secureLog('PINResetFailed', 'Invalid reset token', { memberId: memberId });
     }
@@ -477,6 +500,15 @@ function completePINReset(memberId, token, newPin) {
   // Clear any lockouts for this member
   _clearRateCount('pin_lockout_' + memberId);
   _clearRateCount('pin_attempts_' + memberId);
+
+  // Invalidate any existing session tokens for this member's email so a
+  // compromised session can't outlive the credential rotation.
+  try {
+    var _memberEmail = col_(data[memberRow - 1], MEMBER_COLS.EMAIL);
+    if (_memberEmail && typeof Auth !== 'undefined' && typeof Auth.invalidateAllSessionsForEmail === 'function') {
+      Auth.invalidateAllSessionsForEmail(_memberEmail);
+    }
+  } catch (_sessErr) { log_('completePINReset', 'session revoke: ' + _sessErr.message); }
 
   if (typeof secureLog === 'function') {
     secureLog('PINResetComplete', 'PIN successfully reset via email token', { memberId: memberId });
@@ -765,14 +797,12 @@ function generateMemberPINForSteward(memberId) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
   var memberName = '';
-  var _memberPhone = '';
 
   for (var i = 1; i < data.length; i++) {
     var rowMemberId = String(col_(data[i], MEMBER_COLS.MEMBER_ID) || '').trim().toUpperCase();
     if (rowMemberId === memberId) {
       memberRow = i + 1;
       memberName = (col_(data[i], MEMBER_COLS.FIRST_NAME) || '') + ' ' + (col_(data[i], MEMBER_COLS.LAST_NAME) || '');
-      _memberPhone = String(col_(data[i], MEMBER_COLS.PHONE) || '');
       break;
     }
   }
@@ -853,7 +883,7 @@ function showGeneratePINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your Self-Service Portal PIN',
@@ -948,7 +978,7 @@ function showResetPINDialog() {
     if (memberEmail && String(memberEmail).includes('@')) {
       try {
         var orgName = '';
-        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
         MailApp.sendEmail({
           to: String(memberEmail),
           subject: orgName + ' - Your PIN Has Been Reset',
@@ -1017,7 +1047,7 @@ function showBulkGeneratePINDialog() {
   var errors = [];
 
   var orgName = '';
-  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'SolidBase'; } catch (_e) { orgName = 'SolidBase'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
@@ -1372,7 +1402,36 @@ function dataCompleteOnboardingStep(sessionToken, step, data) {
       }
     }
     if (memberRow === -1) return { success: false, message: 'Account not found. Please contact your steward.' };
-    if (!memberId) return { success: false, message: 'Member ID required before setting PIN.' };
+
+    // v4.55.1: Self-heal missing Member ID. A row may exist with no Member ID
+    // (manual import, partial seed, legacy data). Rather than blocking PIN setup,
+    // generate one in our existing M-prefix format and write it back so the row
+    // becomes consistent with the rest of the directory. The hash seed must be
+    // stable across set/verify, so we use whatever ID lives on the row after this
+    // self-heal — never email, never row index.
+    if (!memberId) {
+      if (memberIdCol === -1) {
+        return { success: false, message: 'Directory schema error: Member ID column missing. Contact your steward.' };
+      }
+      var existingIds = {};
+      for (var ei = 1; ei < mData.length; ei++) {
+        var eid = String(mData[ei][memberIdCol] || '').trim();
+        if (eid) existingIds[eid] = true;
+      }
+      var generatedId = '';
+      for (var attempt = 0; attempt < 20; attempt++) {
+        var candidate = 'M' + Math.floor(100000 + Math.random() * 900000);
+        if (!existingIds[candidate]) { generatedId = candidate; break; }
+      }
+      if (!generatedId) {
+        return { success: false, message: 'Could not generate a unique Member ID. Please try again.' };
+      }
+      mSheet.getRange(memberRow, memberIdCol + 1).setValue(generatedId);
+      memberId = generatedId;
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('MEMBER_ID_AUTOGEN', { memberId: generatedId, email: e, reason: 'self_heal_pin_setup' });
+      }
+    }
     var hashSeed = memberId;
     var pinCol = pinHashCol >= 0 ? pinHashCol + 1 : PIN_CONFIG.PIN_COLUMN;
     var existingHash = mData[memberRow - 1][pinCol - 1];
@@ -1433,19 +1492,30 @@ function devAuthLoginByPIN(pin) {
 
   var startTime = Date.now();
 
-  // ── Global rate limit — prevent blind brute-force before any row is matched ─
-  // SECURITY NOTE: This function scans ALL members against a single PIN. Each guess
-  // effectively tests against the entire population (N members = N× attack surface).
-  // The global rate limit is the primary defense — keep it low. With 200 members and
-  // 5 attempts/15min, expected brute-force time is ~10+ days.
-  var globalRateKey = 'DEV_PIN_SCAN_RATE';
-  var globalAttempts = _getRateCount(globalRateKey);
+  // ── Rate limit — prevent blind brute-force before any row is matched ─────
+  // SECURITY NOTE: This function scans ALL members against a single PIN, so
+  // each guess tests the entire population. We gate with BOTH a per-session
+  // key and a global cap:
+  //   - Per-session key (getTemporaryActiveUserKey) prevents one attacker from
+  //     locking out every legitimate user by tripping the global limit.
+  //   - Global cap is a defense-in-depth ceiling.
+  // With 200 members and 5 per-session attempts / 15 min, brute force remains
+  // infeasible while legitimate users can still log in during an attack.
   var lockoutMinutes = (typeof PIN_CONFIG !== 'undefined' && PIN_CONFIG.LOCKOUT_MINUTES) || 15;
-  if (globalAttempts >= 5) {
+  var perSessionKey = 'DEV_PIN_SCAN_SESSION_' + (Session.getTemporaryActiveUserKey() || 'anon');
+  var perSessionAttempts = _getRateCount(perSessionKey);
+  if (perSessionAttempts >= 5) {
     Utilities.sleep(500 + Math.floor(Math.random() * 500));
     return { success: false, message: 'Too many attempts. Try again in ' + lockoutMinutes + ' minutes.' };
   }
-  _setRateCount(globalRateKey, globalAttempts + 1, 900); // 15 min window
+  var globalRateKey = 'DEV_PIN_SCAN_RATE';
+  var globalAttempts = _getRateCount(globalRateKey);
+  if (globalAttempts >= 50) {
+    Utilities.sleep(500 + Math.floor(Math.random() * 500));
+    return { success: false, message: 'System is temporarily rate-limited. Try again in ' + lockoutMinutes + ' minutes.' };
+  }
+  _setRateCount(perSessionKey, perSessionAttempts + 1, 900); // 15 min window
+  _setRateCount(globalRateKey, globalAttempts + 1, 900);
 
   // ── Sheet scan ────────────────────────────────────────────────────────────
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1530,7 +1600,9 @@ function devAuthLoginByPIN(pin) {
   if (typeof logAuditEvent === 'function') {
     logAuditEvent('DEV_PIN_LOGIN_FAIL', { reason: 'no_match' });
   }
-  var remaining = Math.max(0, 10 - (globalAttempts + 1));
+  // Report against the per-session limit (5) so the user sees an accurate
+  // countdown for their own session. Global limit is a defense-in-depth cap.
+  var remaining = Math.max(0, 5 - (perSessionAttempts + 1));
   return {
     success: false,
     message: remaining > 0
@@ -1691,6 +1763,23 @@ function memberSetOwnPIN(sessionToken, pin, idemKey) {
   if (!email) return { success: false, message: 'Authentication required.' };
   email = String(email).trim().toLowerCase();
 
+  // v4.55.1 N14-BUG-10: honor idemKey to prevent duplicate audit entries on double-click
+  if (idemKey) {
+    try {
+      var idemCache = CacheService.getScriptCache();
+      var idemCacheKey = 'pin_idem_' + email + '_' + idemKey;
+      var cached = idemCache.get(idemCacheKey);
+      if (cached) return JSON.parse(cached);
+      var resultBody = _memberSetOwnPINCore(email, pin, sessionToken);
+      try { idemCache.put(idemCacheKey, JSON.stringify(resultBody), 600); } catch (_ce) {}
+      return resultBody;
+    } catch (_idemErr) { /* fall through to non-idempotent path */ }
+  }
+  return _memberSetOwnPINCore(email, pin, sessionToken);
+}
+
+function _memberSetOwnPINCore(email, pin, sessionToken) {
+
   // ── Validate PIN ──────────────────────────────────────────────────────────
   pin = String(pin || '').trim();
   if (!/^\d{6}$/.test(pin)) {
@@ -1739,6 +1828,18 @@ function memberSetOwnPIN(sessionToken, pin, idemKey) {
   var action = hadPIN ? 'PIN_RESET_BY_MEMBER' : 'PIN_SET_BY_MEMBER';
   if (typeof logAuditEvent === 'function') {
     logAuditEvent(action, { memberId: memberId, memberEmail: email });
+  }
+
+  // Invalidate any OTHER session tokens for this email so a compromised
+  // session can't outlive the credential rotation. Keep the current session
+  // (the user just used it to set their PIN) — we do a targeted invalidate
+  // of all sessions, then let the caller re-authenticate if needed.
+  if (hadPIN) {
+    try {
+      if (typeof Auth !== 'undefined' && typeof Auth.invalidateAllSessionsForEmail === 'function') {
+        Auth.invalidateAllSessionsForEmail(email);
+      }
+    } catch (_sessErr) { log_('memberSetOwnPIN', 'session revoke: ' + _sessErr.message); }
   }
 
   return { success: true, message: hadPIN ? 'PIN updated successfully.' : 'PIN set successfully.' };

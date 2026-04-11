@@ -267,6 +267,7 @@ function clearSurveyQuestionsCache() {
   try {
     var cache = CacheService.getScriptCache();
     cache.remove('surveyQuestions_v1');
+    cache.remove('surveyQuestions_v2');
     cache.remove('satisfactionColMap_v1');
     log_('clearSurveyQuestionsCache', 'Cache cleared.');
     try {
@@ -1382,7 +1383,7 @@ function createNotificationsSheet(ss) {
       'NOTIF-001',
       'All Members',
       'Announcement',
-      'Welcome to the Union Dashboard',
+      'Welcome to SolidBase',
       'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
       'Normal',
       systemEmail,

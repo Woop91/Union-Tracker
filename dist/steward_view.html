@@ -1,30 +1,5 @@
 <script>
 
-function _validateContactFieldsClient(email, phone) {
- var blocked = CONFIG.blockedEmailDomains || ['.gov', '.us', '.ma'];
- if (typeof blocked === 'string') blocked = blocked.split(',').map(function(d) { return d.trim().toLowerCase(); });
- if (email && email.trim()) {
- var emailLower = email.trim().toLowerCase();
- var atIdx = emailLower.lastIndexOf('@');
- if (atIdx > -1) {
-  var domain = emailLower.substring(atIdx + 1);
-  for (var i = 0; i < blocked.length; i++) {
-  var suffix = blocked[i].toLowerCase();
-  if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
-   return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
-  }
-  }
- }
- }
- if (phone && phone.trim()) {
- var digits = phone.replace(/[\s\-\(\)\.]/g, '');
- if (digits.indexOf('617654') === 0) {
-  return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
- }
- }
- return { valid: true };
-}
-
 function initStewardView(container) {
  
  if (typeof _cleanupAuthEffects === 'function') _cleanupAuthEffects();
@@ -3919,6 +3894,11 @@ function renderSurveyTracking(appContainer) {
  content.appendChild(dataWrap);
 
  var activeScope = 'location';
+ 
+ 
+ var _showHistory = (function() {
+  try { return localStorage.getItem('dds_steward_show_history') !== '0'; } catch (_) { return true; }
+ })();
 
  function loadSurveyData(scope) {
   activeScope = scope;
@@ -4077,7 +4057,7 @@ function renderSurveyTracking(appContainer) {
    dataWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', margin: '12px 0 6px' } }, '\uD83D\uDCCD Nearby \u2014 Pending (' + nearbyMembers.length + ')'));
    dataWrap.appendChild(el('div', { className: 'text-xs-muted-mb-8' }, 'Members at your location with overlapping office days'));
    var nearbyContainer = el('div');
-   _surveyPaginate(nearbyContainer, nearbyMembers, true);
+   _surveyPaginate(nearbyContainer, nearbyMembers, true, _showHistory);
    dataWrap.appendChild(nearbyContainer);
   }
 
@@ -4093,7 +4073,7 @@ function renderSurveyTracking(appContainer) {
    otherHeader.firstChild.textContent = isOpen ? '\u25B6' : '\u25BC';
    };
    dataWrap.appendChild(otherHeader);
-   _surveyPaginate(otherContainer, otherPending, false);
+   _surveyPaginate(otherContainer, otherPending, false, _showHistory);
    dataWrap.appendChild(otherContainer);
   }
 
@@ -4109,7 +4089,7 @@ function renderSurveyTracking(appContainer) {
    compToggle.firstChild.textContent = isOpen ? '\u25B6' : '\u25BC';
    };
    dataWrap.appendChild(compToggle);
-   _surveyPaginate(compList, completedMembers, false);
+   _surveyPaginate(compList, completedMembers, false, _showHistory);
    dataWrap.appendChild(compList);
   }
 
@@ -4145,7 +4125,7 @@ function renderSurveyTracking(appContainer) {
  }).withFailureHandler(function() {}).dataGetPendingSurveyMembers(SESSION_TOKEN);
 
  
- var scopeRow = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } });
+ var scopeRow = el('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } });
  var scopes = [
   { id: 'assigned', label: 'My Members' },
   { id: 'location', label: 'My Location' },
@@ -4163,6 +4143,22 @@ function renderSurveyTracking(appContainer) {
   scopeBtns[s.id] = btn;
   scopeRow.appendChild(btn);
  });
+
+ 
+ var historyBtn = el('button', {
+  className: 'filter-tab' + (_showHistory ? ' active' : ''),
+  style: { marginLeft: 'auto', fontSize: '11px' },
+  title: 'Show or hide each member\u2019s past-quarter participation rate'
+ }, _showHistory ? '\uD83D\uDCC8 History: On' : '\uD83D\uDCC8 History: Off');
+ historyBtn.onclick = function() {
+  _showHistory = !_showHistory;
+  try { localStorage.setItem('dds_steward_show_history', _showHistory ? '1' : '0'); } catch (_) {}
+  historyBtn.className = 'filter-tab' + (_showHistory ? ' active' : '');
+  historyBtn.textContent = _showHistory ? '\uD83D\uDCC8 History: On' : '\uD83D\uDCC8 History: Off';
+  loadSurveyData(activeScope); 
+ };
+ scopeRow.appendChild(historyBtn);
+
  scopeWrap.appendChild(scopeRow);
 
  
@@ -4170,16 +4166,18 @@ function renderSurveyTracking(appContainer) {
  });
 }
 
-function _surveyPaginate(container, items, showProximity) {
+function _surveyPaginate(container, items, showProximity, showHistory) {
+ if (showHistory === undefined) showHistory = true;
  var pg = createPaginator({
  items: items,
  pageSize: 20,
- renderItem: function(listArea, m) { _renderSurveyMemberItem(listArea, m, showProximity); }
+ renderItem: function(listArea, m) { _renderSurveyMemberItem(listArea, m, showProximity, showHistory); }
  });
  container.appendChild(pg.container);
 }
 
-function _renderSurveyMemberItem(parentEl, m, showProximity) {
+function _renderSurveyMemberItem(parentEl, m, showProximity, showHistory) {
+ if (showHistory === undefined) showHistory = true;
  var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: '6px' } });
 
  var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } });
@@ -4218,8 +4216,8 @@ function _renderSurveyMemberItem(parentEl, m, showProximity) {
  topRow.appendChild(el('span', { style: { fontSize: '14px', color: m.completed ? 'var(--success)' : 'var(--muted)', flexShrink: '0' } }, m.completed ? '\u2705' : '\u23F3'));
  item.appendChild(topRow);
 
- 
- if (m.participationRate !== null) {
+ // Participation rate bar — gated by the steward's "Show History" toggle
+ if (showHistory && m.participationRate !== null) {
  var partRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '42px' } });
  var pRate = m.participationRate;
  var pColorClass = pRate >= 70 ? 'prog-fill--success' : pRate >= 40 ? 'prog-fill--warning' : 'prog-fill--danger';
@@ -6028,8 +6026,16 @@ function _buildExplorerUI(container, allMembers) {
   path.addEventListener('mouseenter', function() { path.setAttribute('fill-opacity', '0.65'); });
   path.addEventListener('mouseleave', function() { path.setAttribute('fill-opacity', '0.35'); });
   var t = document.createElementNS(ns, 'title');
-  t.textContent = p[0] + ' \u2192 ' + p[1] + ': ' + v;
+  var _tooltipText = p[0] + ' \u2192 ' + p[1] + ': ' + v;
+  t.textContent = _tooltipText;
   path.appendChild(t);
+  // v4.55.1 T06-BUG-05: mobile tap fallback — SVG <title> and mouseenter don't work
+  
+  path.style.cursor = 'pointer';
+  path.addEventListener('click', function() {
+   if (typeof showToast === 'function') showToast(_tooltipText, 'info', 3000);
+   else alert(_tooltipText);
+  });
   svg.appendChild(path);
   });
  }
@@ -9057,6 +9063,20 @@ function _renderTestResults(container, results, statusEl) {
  }
 }
 
+// production minified bundle. Leave a tiny stub so tab routing doesn't
+
+if (typeof renderTestRunnerPage === 'undefined') {
+ var renderTestRunnerPage = function(appContainer) {
+ renderPageLayout(appContainer, 'steward', 'testrunner', function(container) {
+  container.appendChild(el('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' } },
+  el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '🧪'),
+  el('div', { style: { fontSize: '16px', fontWeight: '600', marginBottom: '4px' } }, 'Test Runner disabled in production'),
+  el('div', { style: { fontSize: '13px' } }, 'Run the dev build (npm run build) to enable the in-app test runner.')
+  ));
+ });
+ };
+}
+
 function renderStewardTimelinePage(appContainer) {
  renderPageLayout(appContainer, 'steward', 'timeline', function(container) {
  container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title ' + _TD }, 'Timeline')));
@@ -9721,11 +9741,13 @@ function renderNewGrievanceForm(appContainer) {
   fld.articles = el('input', { type: 'text', className: 'form-input', placeholder: 'e.g., Art. 13 - Discipline, Art. 6 - Hours of Work' });
   artGroup.appendChild(fld.articles);
   
+  
+  
   if (formOptions.articles && formOptions.articles.length) {
-  var chipRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' } });
+  var chipRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' } });
   formOptions.articles.forEach(function(a) {
    var chip = el('button', {
-   style: { fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer' },
+   style: { fontSize: '13px', padding: '10px 14px', minHeight: '44px', borderRadius: '22px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer' },
    onClick: function() {
     var cur = fld.articles.value.trim();
     if (cur && cur.indexOf(a) === -1) fld.articles.value = cur + ', ' + a;
@@ -10111,30 +10133,19 @@ function _updateBulkToolbar() {
 
  var statusBtn = el('button', { className: 'btn btn-primary', onclick: function() { _bulkStatusChange(selected); }}, 'Change Status');
  var exportBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkExport(selected); }}, 'Export CSV');
- var emailBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkEmail(selected, emailBtn); }}, 'Email');
  var folderBtn = el('button', { className: 'btn btn-secondary', onclick: function() { _bulkCreateFolders(selected); }}, 'Create Folders');
  var closeBtn = el('button', { className: 'btn btn-ghost', 'aria-label': 'Clear selection', onclick: function() {
  document.querySelectorAll('.bulk-select-cb').forEach(function(cb) { cb.checked = false; });
  _updateBulkToolbar();
  }}, '\u2715');
 
- [countLabel, toggleBtn, statusBtn, exportBtn, emailBtn, folderBtn, closeBtn].forEach(function(b) { existing.appendChild(b); });
+ [countLabel, toggleBtn, statusBtn, exportBtn, folderBtn, closeBtn].forEach(function(b) { existing.appendChild(b); });
 }
 
 function _getSelectedCaseIds(selected) {
  var ids = [];
  selected.forEach(function(cb) { if (cb.dataset.caseId) ids.push(cb.dataset.caseId); });
  return ids;
-}
-
-function _getSelectedEmails(selected) {
- var emails = [];
- var seen = {};
- selected.forEach(function(cb) {
- var em = cb.dataset.memberEmail;
- if (em && !seen[em]) { emails.push(em); seen[em] = true; }
- });
- return emails;
 }
 
 function _bulkStatusChange(selected) {
@@ -10210,34 +10221,6 @@ function _bulkExport(selected) {
  }).dataBulkExportCsv(SESSION_TOKEN, caseIds);
  }
  _doBulkExport();
-}
-
-var _bulkEmailSending = false;
-function _bulkEmail(selected, triggerBtn) {
- if (_bulkEmailSending) return;
- var emails = _getSelectedEmails(selected);
- if (!emails.length) { alert('No member emails found for selected cases.'); return; }
- var subject = prompt('Email subject:');
- if (!subject) return;
- var body = prompt('Email body:');
- if (body === null) return; 
-
- _bulkEmailSending = true;
- if (triggerBtn) { triggerBtn.disabled = true; triggerBtn.textContent = 'Sending\u2026'; }
-
- serverCall().withSuccessHandler(function(result) {
- _bulkEmailSending = false;
- if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = 'Email'; }
- if (result && result.success) {
-  alert('Sent ' + result.sent + ' email(s).');
- } else {
-  alert((result && result.message) || 'Bulk email failed.');
- }
- }).withFailureHandler(function(err) {
- _bulkEmailSending = false;
- if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = 'Email'; }
- alert('Email error: ' + (err && err.message ? err.message : 'Unknown error'));
- }).dataBulkSendEmail(SESSION_TOKEN, emails, subject, body || '');
 }
 
 function _bulkCreateFolders(selected) {
@@ -10435,10 +10418,14 @@ function _loadMentorshipPairings(activeList) {
 function _buildMentorshipCard(p) {
  var card = el('div', { className: 'card', style: { padding: '16px', marginBottom: '8px' } });
 
+ 
+ 
+ var mentorDisplay = p.mentorName || (String(p.mentorEmail || '').split('@')[0]);
+ var menteeDisplay = p.menteeName || (String(p.menteeEmail || '').split('@')[0]);
  var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
  var info = el('div');
- info.appendChild(el('div', { style: { fontWeight: '600' } }, '\uD83C\uDF93 ' + escapeHtml(p.mentorEmail)));
- info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'mentoring \u2192 ' + escapeHtml(p.menteeEmail)));
+ info.appendChild(el('div', { style: { fontWeight: '600' } }, '\uD83C\uDF93 ' + escapeHtml(mentorDisplay)));
+ info.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'mentoring \u2192 ' + escapeHtml(menteeDisplay)));
  header.appendChild(info);
 
  var statusColor = p.status === 'active' ? 'var(--success, #22c55e)' : 'var(--border-subtle)';

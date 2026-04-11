@@ -1120,7 +1120,7 @@ function sendSurveyCompletionReminders() {
     var memberName = col_(data[i], SURVEY_TRACKING_COLS.MEMBER_NAME) || 'Member';
     var lastReminder = col_(data[i], SURVEY_TRACKING_COLS.LAST_REMINDER_SENT);
 
-    if (status === 'Completed' || !email || !email.includes('@')) continue;
+    if (String(status || '').trim().toLowerCase() === 'completed' || !email || !email.includes('@')) continue;
 
     // Skip if reminder was sent within cooldown period
     if (lastReminder) {
@@ -1189,7 +1189,7 @@ function getSurveyCompletionStats() {
   for (var i = 1; i < data.length; i++) {
     if (!col_(data[i], SURVEY_TRACKING_COLS.MEMBER_ID)) continue;
     total++;
-    if (col_(data[i], SURVEY_TRACKING_COLS.CURRENT_STATUS) === 'Completed') {
+    if (String(col_(data[i], SURVEY_TRACKING_COLS.CURRENT_STATUS) || '').trim().toLowerCase() === 'completed') {
       completed++;
     }
   }
@@ -1320,10 +1320,17 @@ function showSurveyTrackingDialog() {
  * @returns {{ questions: Array, sections: Array, sliderLabels: Object, period: Object|null }}
  */
 function getSurveyQuestions() {
-  var CACHE_KEY = 'surveyQuestions_v1';
+  // v2 cache key: cached payload no longer includes `period` — bumped to force-invalidate
+  // any v1 entries still in CacheService that had a stale period baked in.
+  var CACHE_KEY = 'surveyQuestions_v2';
   try {
     var cached = CacheService.getScriptCache().get(CACHE_KEY);
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      var parsed = JSON.parse(cached);
+      // Overlay live period — never trust cached period state.
+      parsed.period = getSurveyPeriod();
+      return parsed;
+    }
   } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
   try {
@@ -1444,17 +1451,23 @@ function getSurveyQuestions() {
       }
     });
 
-    var result = {
+    // Questions/sections/labels are cacheable — they rarely change.
+    // Period is NOT cached here — it must reflect live _Survey_Periods state so
+    // steward (uncached getSurveyPeriod) and member (this function) never disagree.
+    var cacheable = {
       questions:   questions,
       sections:    sections,
-      sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' },
-      period:      getSurveyPeriod()
+      sliderLabels: { min: 'Strongly Disagree', max: 'Strongly Agree' }
     };
 
-    // Cache 5 minutes
-    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(result), 300); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(cacheable), 300); } catch (_ce) { log_('_ce', (_ce.message || _ce)); }
 
-    return result;
+    return {
+      questions:   cacheable.questions,
+      sections:    cacheable.sections,
+      sliderLabels: cacheable.sliderLabels,
+      period:      getSurveyPeriod()
+    };
 
   } catch(e) {
     log_('getSurveyQuestions error', e.message);

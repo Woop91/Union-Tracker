@@ -280,6 +280,34 @@ var Auth = (function () {
   }
 
   /**
+   * Invalidates every session token belonging to an email. Used on PIN change
+   * / reset so a compromised session can't outlive the credential rotation.
+   * @param {string} email
+   * @returns {number} Count of sessions invalidated.
+   */
+  function invalidateAllSessionsForEmail(email) {
+    if (!email) return 0;
+    var target = String(email).toLowerCase().trim();
+    var props = PropertiesService.getScriptProperties();
+    var all = props.getProperties();
+    var removed = 0;
+    for (var key in all) {
+      if (key.indexOf(SESSION_PREFIX) !== 0) continue;
+      try {
+        var data = JSON.parse(all[key]);
+        if (data && data.email && String(data.email).toLowerCase() === target) {
+          props.deleteProperty(key);
+          removed++;
+        }
+      } catch (_) { /* skip malformed */ }
+    }
+    if (removed > 0) {
+      log_('Auth.invalidateAllSessionsForEmail', 'cleared ' + removed + ' session(s) for ' + (typeof maskEmail === 'function' ? maskEmail(target) : target));
+    }
+    return removed;
+  }
+
+  /**
    * Cleans up expired tokens from ScriptProperties.
    * Should be run periodically via a time-based trigger.
    */
@@ -465,17 +493,35 @@ var Auth = (function () {
    * @private
    */
   function _getSessionData(token) {
+    // v4.55.1 Bug 1: Instrumented to distinguish the three failure modes so the
+    // root cause of "every visit requires re-emailing the link" becomes diagnosable
+    // from the GAS execution log alone (no DevTools needed). Each `log_` line below
+    // records the SPECIFIC reason — not present, expired, or corrupt JSON — so the
+    // next failure tells us exactly which hypothesis is correct.
+    if (!token) {
+      log_('Auth._getSessionData', 'reject: empty token');
+      return null;
+    }
+    var tokenPrefix = String(token).substring(0, 8) + '...'; // hash for logs, never full token
     var props = PropertiesService.getScriptProperties();
     var raw = props.getProperty(SESSION_PREFIX + token);
-    if (!raw) return null;
+    if (!raw) {
+      log_('Auth._getSessionData', 'reject: not in PropertiesService — token=' + tokenPrefix +
+        ' (root cause candidates: createSessionToken silently failed, quota-evicted, or token mismatch from client)');
+      return null;
+    }
     try {
       var data = JSON.parse(raw);
       if (data.expiry < Date.now()) {
+        var ageMin = Math.round((Date.now() - data.expiry) / 60000);
+        log_('Auth._getSessionData', 'reject: expired ' + ageMin + ' min ago — token=' + tokenPrefix +
+          ' (cookieDurationMs config too short, or system clock drift)');
         props.deleteProperty(SESSION_PREFIX + token);
         return null;
       }
       return data;
     } catch (_e) {
+      log_('Auth._getSessionData', 'reject: corrupt JSON — token=' + tokenPrefix + ' err=' + _e.message);
       return null;
     }
   }
@@ -657,6 +703,7 @@ var Auth = (function () {
     sendMagicLink: sendMagicLink,
     createSessionToken: createSessionToken,
     invalidateSession: invalidateSession,
+    invalidateAllSessionsForEmail: invalidateAllSessionsForEmail,
     cleanupExpiredTokens: cleanupExpiredTokens,
     /**
      * Resolve a verified email from a session token.

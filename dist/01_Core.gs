@@ -292,7 +292,7 @@ function sendCriticalErrorNotification_(errorInfo) {
     try {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
     } catch (_e) {
-      systemName = 'Union Dashboard';
+      systemName = 'SolidBase';
     }
     // Mask PII in the email body
     var maskedUser = typeof maskEmail === 'function' ? maskEmail(errorInfo.user) : '[REDACTED]';
@@ -333,7 +333,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.55.0",
+  VERSION: "4.55.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -463,7 +463,7 @@ function getDriveRootFolderName_() {
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
 function getOrgNameFromConfig_() {
-  return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'Union Dashboard');
+  return _readConfigCell('orgName', CONFIG_COLS.ORG_NAME, 'SolidBase');
 }
 
 /**
@@ -543,7 +543,7 @@ function getVersionHistory_() {
   { version: '4.50.2', date: '2026-03-31', codename: 'Config Cache Fix', changes: 'Fixed stale ConfigReader cache after cold column-map sync. When RESOLVED_COL_MAPS cache expires and syncColumnMaps() re-resolves column positions, ConfigReader now force-refreshes instead of serving cached values built with wrong (array-order) positions. syncColumnMaps() also invalidates ORG_CONFIG_v2 cache key when columns change. Fixes org name showing as "yes" and steward label showing URL after cache expiry.' },
   { version: '4.50.0', date: '2026-03-31', codename: 'Non-Member Fields', changes: 'Added Union Name, Shirt Size, and Steward (Yes/No) columns to Non-Member Contacts tab. New fields in NMC_HEADER_MAP_, sheet creation validations (Shirt Size dropdown, Steward Yes/No dropdown), full CRUD support in DataService, steward_view.html modal and contact cards, and fallback modal in 03_UIComponents.gs.' },
   { version: '4.48.0', date: '2026-03-30', codename: 'Tab Modals', changes: 'Auto-opening contextual modals for 9 key sheet tabs: Config, Member Directory, Grievance Log, Case Checklist, Feedback & Development, Volunteer Hours, Meeting Attendance, Meeting Check-In Log, Resources. Each modal shows tab-specific quick actions and tips. Triggered on tab switch via onSelectionChange sheet-change detection. Config toggle ENABLE_TAB_MODALS (default: yes) for system-wide control. Per-user "Don\'t show again" dismissal via UserProperties. New Tools > Tab Modals submenu for manual access. TAB_MODAL_REGISTRY in 01_Core.gs maps sheets to modal functions.' },
-  { version: '4.45.0', date: '2026-03-28', codename: 'Phone PIN', changes: 'Phone-number-derived PINs: generateMemberPIN() now uses first 6 digits of member phone number when available, falling back to random. Email notifications hint at phone-based PIN without exposing it. PIN sessions blocked from poll submissions (wqSubmitPoolQuestion). Theme cleanup: removed 5 novelty themes (Comic, Brutalist, Retro OS, Liquid Pour, Blob Lava). Removed Lao Tzu duplicate quote from Knowledge Engine.' },
+  { version: '4.45.0', date: '2026-03-28', codename: 'PIN hardening', changes: 'generateMemberPIN() uses Utilities.getUuid() rejection sampling for uniform 6-digit PINs. (An earlier plan to derive PINs from member phone numbers was not shipped — production code is fully random.) PIN sessions blocked from poll submissions (wqSubmitPoolQuestion). Theme cleanup: removed 5 novelty themes (Comic, Brutalist, Retro OS, Liquid Pour, Blob Lava). Removed Lao Tzu duplicate quote from Knowledge Engine.' },
   { version: '4.44.0', date: '2026-03-28', codename: 'Idle Prefetch', changes: 'Performance optimization suite. (1) Dynamic tab prefetch: _recordTabFrequency() tracks per-role tab visit counts in localStorage (dds_tabFreq); _getTopTabs() determines user top 3; _PREFETCH_REGISTRY warms DataCache via requestIdleCallback. (2) Request deduplication: _dedupMap in _throttledServerCall coalesces identical in-flight server calls — if dataGetAllMembers is pending and another caller requests it, piggybacks on existing call. (3) Cases list converted to LazyList with IntersectionObserver auto-scroll (replaces manual Show More button). (4) Visibility-based refresh: visibilitychange listener silently re-fetches batch data when user returns after 30+ min away. (5) Extended caching: DataCache default 2min→15min, stable 5min→30min, new STATS_TTL 60min, SWR 30min→2hrs. Notifications tab now cacheable.' },
   { version: '4.43.1', date: '2026-03-27', codename: 'One-Tap Check-In', changes: 'In-app one-tap meeting check-in banner. When a steward activates a meeting, logged-in members and stewards see a green check-in banner at the top of their dashboard. One tap checks them in — no PIN re-entry needed (session-authenticated). Banner shows confirmed state after check-in or if already checked in. Active meeting data included in batch payloads for zero-latency display. dataWebAppCheckIn() endpoint with TOCTOU lock and audit logging (MEETING_WEBAPP_CHECKIN). New .checkin-banner CSS with slide-in animation.' },
   { version: '4.43.0', date: '2026-03-27', codename: 'QR Attendance', changes: 'QR code mobile attendance system. Stewards generate QR codes for meetings (Calendar & Meetings > QR Code Check-In). Members scan with phone, enter phone number + PIN to check in. New ?page=qr-checkin web route with dark/light mode mobile-optimized UI. processQRCheckIn() authenticates by phone number instead of email. getMeetingQRCode() generates QR via Google Charts API. createMeeting() now includes QR URL in response. Full security: PIN lockout, rate limiting, TOCTOU lock, audit logging (MEETING_QR_CHECKIN). Device key authentication enables biometric sign-in for all login methods. Remember-me defaults to ON. PIN auto-submits on 6th digit.' },
@@ -600,7 +600,7 @@ function getVersionHistory_() {
   { version: '4.21.0', date: '2026-03-05', codename: 'Native Survey Engine', changes: 'Deprecate Google Form integration entirely. Full webapp-native satisfaction survey: getSurveyQuestions() returns all 67 questions with types (slider-10, dropdown, radio, checkbox, paragraph), branching rules (Q5→3A/3B, Q36→6A), and slider labels. submitSurveyResponse() maps all 67 SATISFACTION_COLS, period-aware vault dedup per SURVEY_PERIODS sheet. New: getSurveyPeriod(), autoTriggerQuarterlyPeriod(), archiveSurveyPeriod_() (Drive export to Past Survey Questions/), getPendingSurveyMembers(), getSatisfactionSummary() (section averages as plain values). New hidden sheet _Survey_Periods (SURVEY_PERIODS_COLS, 8 cols). New Config cols: Survey Priority Options (Q64 dynamic), Past Surveys Folder ID. Quarterly time trigger installed via setupQuarterlyTrigger(). Survey-open notifications pushed to all active members on period start. Slider label: 1=Strongly Disagree / 10=Strongly Agree (universal across all 52 scale questions). Anonymity architecture preserved: three-layer separation (Satisfaction sheet=anonymous scores, _Survey_Vault=hashed PII only, _Survey_Tracking=completion status only).' },
   { version: '4.20.15', date: '2026-03-05', codename: 'FULL_CODE_REVIEW Final Fixes', changes: 'C-XSS-18: Fix el() boolean attribute handling — el() now uses property assignment (elem[key]=value) for boolean attrs (selected, disabled, checked) instead of setAttribute which would set attr="false" (truthy in DOM). C-XSS-6: Replace escapeHtml() with JSON.stringify() for memberId in onclick JS string context in 03_UIComponents.gs — HTML entities decoded by parser before JS executes, JSON.stringify produces correct escape sequences. LOW: Remove 6 unused _-prefixed variables (_lastRow, _pdfFile, _headers×2, _stepDays, _mgmtResponseDays, _mode, _ss×2) from 04b/04d/04e/05_Integrations.' },
   { version: '4.20.14', date: '2026-03-05', codename: 'Trigger Null Guards', changes: 'onOpenDeferred_ (10_Main.gs): add null guard after getActiveSpreadsheet() — returns null in web app context, would crash ss.toast(). onEditWithAuditLogging (06_Maintenance.gs): add !e || !e.range early return guard and wrap body in try/catch — trigger functions must not throw or GAS silently drops all subsequent edits.' },
-  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (SEIU 509, MassAbility DDS, SEIU Local in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
+  { version: '4.20.13', date: '2026-03-04', codename: 'Accessibility & Config Hardening', changes: 'Accessibility (WCAG 2.1 SC 1.4.4): Replace user-scalable=no with user-scalable=yes,maximum-scale=5.0 in all 12 viewport meta tags across 5 files (index.html, 04c, 04e, 05_Integrations x8, 14_MeetingCheckIn). Config hardening: Replace 4 hardcoded org names (in titles/survey subject/vCard ORG) with getConfigValue_(CONFIG_COLS.ORG_NAME). Replace 3 hardcoded sheet name strings in 21_WebDashDataService.gs (2x _Survey_Tracking → HIDDEN_SHEETS.SURVEY_TRACKING, Config → SHEETS.CONFIG). Remove redundant || ss.getSheetByName("_Dashboard_Calc") fallback in 04d_ExecutiveDashboard.gs. Modernize document.execCommand("copy") in 08c_FormsAndNotifications.gs (2 locations) with navigator.clipboard.writeText() + execCommand fallback for older environments.' },
   { version: '4.20.12', date: '2026-03-04', codename: 'Dead Code Removal — Testing Stubs', changes: 'Remove duplicate testing framework section from 06_Maintenance.gs (~84 lines): TEST_RESULTS var (zero callers), TEST_MAX_EXECUTION_MS/TEST_LARGE_DATASET_THRESHOLD (duplicates of 07_DevTools.gs), Assert object (duplicate of 07_DevTools.gs), 4 empty section headers, VALIDATION_PATTERNS/VALIDATION_MESSAGES (duplicates of 07_DevTools.gs), 2 orphaned JSDoc stubs with no function bodies. Active versions of all these remain in 07_DevTools.gs. 16 corresponding test assertions removed from 06_Maintenance.test.js.' },
   { version: '4.20.11', date: '2026-03-04', codename: 'Security & Logic Fixes', changes: 'H-12: Replace vault/reminders/userMeta/archive hideSheet() with setSheetVeryHidden_() in 25_WorkloadService.gs — API-level hide that persists on Google Sheets mobile (previously only UI-layer hide). H-16: Fix contact log sort in getMemberContactHistory and getStewardContactLog (21_WebDashDataService.gs) — was sorting by formatted date string (wrong alphabetical order); now stores _ts timestamp field, sorts numerically, deletes _ts before returning. H-20: Fix win rate denominator in getStewardWorkloadDetailed (02_DataManagers.gs) — was dividing wonCases by totalCases (includes active cases); now uses resolvedCases = Won+Denied+Settled+Withdrawn, matching the formula in getDashboardStats.' },
   { version: '4.20.10', date: '2026-03-04', codename: 'Performance & Data Integrity Fixes', changes: 'H-7: Batch 4 individual configSheet.getValue() calls in getDeadlineRules() into a single getValues() range read — 4 API calls → 1. H-2: sortGrievanceLogByStatus now captures cell notes via getNotes() before sort and restores them via setNotes() after setValues() — preserves user-added notes that would otherwise be silently discarded by the sort.' },
@@ -1563,7 +1563,12 @@ function _isGrievancesEnabled() {
     var val = getConfigValue_(CONFIG_COLS.SHOW_GRIEVANCES);
     if (!val || String(val).trim() === '') return true;
     return String(val).toLowerCase().trim() !== 'no';
-  } catch (_e) { return true; }
+  } catch (_e) {
+    // Fail-open is intentional — default to showing grievances — but log the
+    // real error so a silent config-read failure doesn't stay hidden.
+    if (typeof log_ === 'function') log_('_isGrievancesEnabled', 'config read failed: ' + (_e.message || _e));
+    return true;
+  }
 }
 
 // ============================================================================
@@ -2367,7 +2372,11 @@ function persistColumnMaps_() {
       SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
       SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
       STEWARD_PERF_COLS: STEWARD_PERF_COLS,
-      CHECKLIST_COLS: CHECKLIST_COLS
+      CHECKLIST_COLS: CHECKLIST_COLS,
+      // Ensure syncColumnMaps() resolutions for these sheets persist across
+      // execution contexts too; otherwise onEdit/doGet load stale positions.
+      RESOURCES_COLS: (typeof RESOURCES_COLS !== 'undefined') ? RESOURCES_COLS : undefined,
+      RESOURCE_CONFIG_COLS: (typeof RESOURCE_CONFIG_COLS !== 'undefined') ? RESOURCE_CONFIG_COLS : undefined
     };
     CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours (max)
   } catch (_e) {
@@ -2402,6 +2411,8 @@ function loadCachedColumnMaps_() {
       STEWARD_PERF_COLS: STEWARD_PERF_COLS,
       CHECKLIST_COLS: CHECKLIST_COLS
     };
+    if (typeof RESOURCES_COLS !== 'undefined') targets.RESOURCES_COLS = RESOURCES_COLS;
+    if (typeof RESOURCE_CONFIG_COLS !== 'undefined') targets.RESOURCE_CONFIG_COLS = RESOURCE_CONFIG_COLS;
 
     var changed = false;
     for (var name in targets) {
@@ -2592,6 +2603,7 @@ var GRIEVANCE_STATUS_PRIORITY = {
  * @const {Object}
  */
 var GRIEVANCE_STATUS = {
+  DRAFT: 'Draft',                     // v4.55.1 H07-BUG-05: used by DataService.startGrievanceDraft
   OPEN: 'Open',
   PENDING: 'Pending Info',
   PENDING_INFO: 'Pending Info',       // Alias for PENDING — used in 02_DataManagers.gs
@@ -2688,13 +2700,14 @@ function getDeadlineRules() {
       var colStart = CONFIG_COLS.FILING_DEADLINE_DAYS;
       var colEnd   = CONFIG_COLS.ARBITRATION_DEMAND_DAYS;
       var dVals    = configSheet.getRange(3, colStart, 1, colEnd - colStart + 1).getValues()[0];
-      var filing     = Number(dVals[0]);
-      var s1Resp     = Number(dVals[CONFIG_COLS.STEP1_RESPONSE_DAYS - colStart]);
-      var s2Appeal   = Number(dVals[CONFIG_COLS.STEP2_APPEAL_DAYS   - colStart]);
-      var s2Resp     = Number(dVals[CONFIG_COLS.STEP2_RESPONSE_DAYS - colStart]);
-      var s3Appeal   = Number(dVals[CONFIG_COLS.STEP3_APPEAL_DAYS   - colStart]);
-      var s3Resp     = Number(dVals[CONFIG_COLS.STEP3_RESPONSE_DAYS - colStart]);
-      var arbDemand  = Number(dVals[CONFIG_COLS.ARBITRATION_DEMAND_DAYS - colStart]);
+      // parseFloat returns NaN for "" so isNaN() fallbacks fire; Number("") === 0 bypassed the fallbacks.
+      var filing     = parseFloat(dVals[0]);
+      var s1Resp     = parseFloat(dVals[CONFIG_COLS.STEP1_RESPONSE_DAYS - colStart]);
+      var s2Appeal   = parseFloat(dVals[CONFIG_COLS.STEP2_APPEAL_DAYS   - colStart]);
+      var s2Resp     = parseFloat(dVals[CONFIG_COLS.STEP2_RESPONSE_DAYS - colStart]);
+      var s3Appeal   = parseFloat(dVals[CONFIG_COLS.STEP3_APPEAL_DAYS   - colStart]);
+      var s3Resp     = parseFloat(dVals[CONFIG_COLS.STEP3_RESPONSE_DAYS - colStart]);
+      var arbDemand  = parseFloat(dVals[CONFIG_COLS.ARBITRATION_DEMAND_DAYS - colStart]);
       return {
         FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
         STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
@@ -2762,6 +2775,8 @@ var AUDIT_EVENTS = {
   GRIEVANCE_STEP_ADVANCED: 'GRIEVANCE_STEP_ADVANCED',
   GRIEVANCE_RESOLVED: 'GRIEVANCE_RESOLVED',
   GRIEVANCE_CLOSED: 'GRIEVANCE_CLOSED',
+  // v4.55.1 H07-BUG-02: Constant previously referenced by 05_Integrations.gs via `||` fallback
+  GRIEVANCE_SIGNED: 'GRIEVANCE_SIGNED',
 
   // Member events
   MEMBER_ADDED: 'MEMBER_ADDED',

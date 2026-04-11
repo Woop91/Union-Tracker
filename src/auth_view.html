@@ -378,6 +378,15 @@ function showAuthChoose(container) {
       style: { fontSize: '11px', color: '#d97706', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.15)', marginBottom: '16px' }
     }, 'This sign-in link has expired or was already used. Please request a new one below.'));
   }
+  // v4.55.1 Bug 1: Surface session token rejection so the user understands why
+  // they're back at the sign-in page. tokenChecked is set true by the server
+  // when ?sessionToken=X was supplied but Auth.resolveUser rejected it.
+  // Suppressed when there's a louder error already on screen.
+  if (PAGE_DATA && PAGE_DATA.tokenChecked && !ssoError) {
+    card.appendChild(el('div', {
+      style: { fontSize: '11px', color: '#6b7280', textAlign: 'center', lineHeight: '1.5', padding: '10px 16px', background: 'rgba(107,114,128,0.08)', borderRadius: '8px', border: '1px solid rgba(107,114,128,0.15)', marginBottom: '16px' }
+    }, 'Your previous sign-in session has expired. Sign in below to continue \u2014 you only need to do this when your saved session times out.'));
+  }
 
   // ── Smart default: biometric (returning) vs email (new) ──
   var btns = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' } });
@@ -597,8 +606,8 @@ function showAuthPIN(container) {
           statusMsg.textContent = '\u2713 Matched. Signing you in\u2026';
           statusMsg.style.color = '#059669';
 
-          // Save credential for password manager + biometric autofill
-          var credName = result.name || result.memberId || 'Member';
+          // v4.55.1 M01-BUG-01: server returns memberName, not name — use memberName first
+          var credName = result.memberName || result.name || result.memberId || 'Member';
           usernameInput.value = credName;
           _trySaveCredential(credName, pin);
 
@@ -773,7 +782,8 @@ function showAuthSent(container, email, rememberMe) {
   var desc = el('div', { className: 'auth-muted', style: { fontSize: '13px', marginTop: '8px', lineHeight: '1.6' } });
   desc.appendChild(document.createTextNode('Sign-in link sent to'));
   desc.appendChild(document.createElement('br'));
-  desc.appendChild(el('span', { style: { color: '#1f4a43', fontWeight: '600' } }, email));
+  // v4.55.1 M01-BUG-03: theme-aware color (was hardcoded #1f4a43 which was invisible in dark mode)
+  desc.appendChild(el('span', { style: { color: 'var(--accent, #1f4a43)', fontWeight: '600' } }, email));
   wrapper._sentDesc = desc;
   card.appendChild(desc);
 

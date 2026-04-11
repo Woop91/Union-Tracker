@@ -1,30 +1,5 @@
 <script>
 
-function _validateContactFieldsClient(email, phone) {
- var blocked = CONFIG.blockedEmailDomains || ['.gov', '.us', '.ma'];
- if (typeof blocked === 'string') blocked = blocked.split(',').map(function(d) { return d.trim().toLowerCase(); });
- if (email && email.trim()) {
- var emailLower = email.trim().toLowerCase();
- var atIdx = emailLower.lastIndexOf('@');
- if (atIdx > -1) {
-  var domain = emailLower.substring(atIdx + 1);
-  for (var i = 0; i < blocked.length; i++) {
-  var suffix = blocked[i].toLowerCase();
-  if (domain === suffix.replace(/^\./, '') || domain.endsWith(suffix)) {
-   return { valid: false, field: 'email', error: 'Government email addresses (' + blocked.join(', ') + ') cannot be used. Please enter a personal email.' };
-  }
-  }
- }
- }
- if (phone && phone.trim()) {
- var digits = phone.replace(/[\s\-\(\)\.]/g, '');
- if (digits.indexOf('617654') === 0) {
-  return { valid: false, field: 'phone', error: 'This phone number cannot be used. Please enter a personal phone number.' };
- }
- }
- return { valid: true };
-}
-
 function _renderPINRestricted(appContainer, sectionLabel) {
  if (typeof IS_PIN_SESSION === 'undefined' || !IS_PIN_SESSION) return false;
  renderPageLayout(appContainer, 'member', AppState.activeTab || 'home', function(container) {
@@ -197,7 +172,7 @@ function _renderOnboardingWizard(container) {
  var STEPS = [
  { key: 'welcome', title: 'Welcome!', desc: 'Let\'s get your account set up in a few quick steps.' },
  { key: 'pin', title: 'Set Your PIN', desc: 'Create a 6-digit PIN for quick access to your account.' },
- { key: 'contact', title: 'Contact Info', desc: 'Add your phone number or address so your steward can reach you.' },
+ { key: 'contact', title: 'Contact Info', desc: 'Please add at least your phone number or address so your steward can reach you. You can edit these later.' },
  { key: 'notifications', title: 'Notification Preferences', desc: 'Choose how often you\'d like to receive updates.' },
  { key: 'complete', title: 'You\'re All Set!', desc: 'Your account is ready. Welcome to the dashboard.' }
  ];
@@ -509,14 +484,26 @@ function renderMemberHome(appContainer) {
  _renderMemberWelcome(container);
 
  
+ // v4.55.1 D03-BUG-02: cache the "complete" result in localStorage so veteran members
+ // don't pay a server round-trip on every home render. The server is still consulted once
+ 
  if (!IS_PIN_SESSION) {
-  serverCall().withSuccessHandler(function(status) {
-  if (status && !status.isComplete) {
-   _renderOnboardingWizard(container);
-  }
-  }).withFailureHandler(function() {
+  var onboardingCacheKey = 'onboarding_complete_' + (CURRENT_USER && CURRENT_USER.email ? CURRENT_USER.email : 'anon');
+  var onboardingCached = null;
+  try { onboardingCached = window.localStorage && window.localStorage.getItem(onboardingCacheKey); } catch (_lsErr) {}
+  if (onboardingCached === '1') {
   
+  } else {
+  serverCall().withSuccessHandler(function(status) {
+   if (status && !status.isComplete) {
+   _renderOnboardingWizard(container);
+   } else if (status && status.isComplete) {
+   try { window.localStorage && window.localStorage.setItem(onboardingCacheKey, '1'); } catch (_lsErr2) {}
+   }
+  }).withFailureHandler(function() {
+   
   }).dataGetOnboardingStatus(SESSION_TOKEN);
+  }
  }
 
  
@@ -998,7 +985,12 @@ function renderGrievanceDetail(appContainer, g) {
  var steps = [];
  if (g.filed) steps.push({ date: g.filed, event: 'Grievance filed', done: true });
  if (g.step) {
-  var currentStepNum = parseInt(g.step.replace(/\D/g, '')) || 1;
+  // Roman-numeral labels ('Step II', 'Step III') contain no digits so
+  // .replace(/\D/g, '') yielded '' and parseInt('') === NaN → always 1.
+  
+  var _stepNumMap = { 'informal': 1, 'step i': 1, 'step ii': 2, 'step iii': 3, 'mediation': 4, 'arbitration': 4 };
+  var _rawStepLabel = String(g.step).trim().toLowerCase();
+  var currentStepNum = _stepNumMap[_rawStepLabel] || parseInt(_rawStepLabel.replace(/\D/g, '')) || 1;
   for (var s = 1; s <= currentStepNum; s++) {
   if (s < currentStepNum) steps.push({ date: '', event: 'Step ' + s + ' completed', done: true });
   else steps.push({ date: g.deadline || '', event: g.step + ' \u2014 in progress', done: false });
@@ -2223,9 +2215,10 @@ function renderUpdateProfile(appContainer) {
   form.appendChild(consentWrap);
 
   var chipStyle = el('style');
+  
   chipStyle.textContent = '.chip-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}' +
-  '.chip-btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;' +
-  'padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;' +
+  '.chip-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;' +
+  'padding:8px 14px;border-radius:22px;border:1.5px solid var(--border);background:transparent;' +
   'color:var(--text-secondary);font-family:var(--fontBody);font-size:0.8125rem;cursor:pointer;' +
   'user-select:none;transition:background .15s,color .15s,border-color .15s;-webkit-tap-highlight-color:transparent;}' +
   '.chip-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}' +
@@ -2335,7 +2328,7 @@ function renderUpdateProfile(appContainer) {
 function renderPINSetup(appContainer) {
  if (_renderPINRestricted(appContainer, 'PIN Setup')) return;
  renderPageLayout(appContainer, 'member', 'pinsetup', function(container) {
- // ── Blue-themed "DDS Dashboard" header ────────────────────────────────
+ // ── Blue-themed "SolidBase" header ────────────────────────────────────
  var header = el('div', {
   style: {
   background: 'linear-gradient(135deg, #1565C0, #1E88E5)',
@@ -2737,8 +2730,10 @@ function renderSurveyFormPage(appContainer) {
    content.appendChild(doneCard);
    return;
   }
+  _renderSurveyAnonymityCard(content);
   _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
   }).withFailureHandler(function() {
+  _renderSurveyAnonymityCard(content);
   _renderSurveyWizard(content, questions, sectionMeta, sliderLabels, period, appContainer);
   }).dataGetSurveyStatus(SESSION_TOKEN);
 
@@ -2751,6 +2746,50 @@ function renderSurveyFormPage(appContainer) {
   content.appendChild(errCard);
  }).dataGetSurveyQuestions(SESSION_TOKEN);
  });
+}
+
+function _renderSurveyAnonymityCard(content) {
+ var card = el('div', {
+ className: 'card card-glass fade-in',
+ style: {
+  padding: '18px 20px',
+  marginBottom: '14px',
+  borderLeft: '3px solid var(--accent)',
+  background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(6,214,160,0.04))'
+ }
+ });
+
+ var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } });
+ headerRow.appendChild(el('span', { style: { fontSize: '22px', flexShrink: '0' } }, '\uD83D\uDD12'));
+ headerRow.appendChild(el('div', {
+ style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)' }
+ }, 'Your responses are anonymous'));
+ card.appendChild(headerRow);
+
+ card.appendChild(el('div', {
+ style: { fontSize: '13px', color: 'var(--text)', lineHeight: '1.55', marginBottom: '10px' }
+ }, 'Your answers are stored in a separate encrypted vault with no link back to you. Your steward, the union admin, and even the system itself cannot trace any individual response to a person — by design.'));
+
+ var trackedRow = el('div', {
+ style: {
+  fontSize: '12px',
+  color: 'var(--muted)',
+  lineHeight: '1.55',
+  paddingTop: '10px',
+  borderTop: '1px solid var(--border)',
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '8px'
+ }
+ });
+ trackedRow.appendChild(el('span', { style: { flexShrink: '0' } }, '\u2139\uFE0F'));
+ trackedRow.appendChild(el('div', {}, [
+ el('strong', { style: { color: 'var(--text)' } }, 'What stewards can see:'),
+ document.createTextNode(' whether you completed the survey (so they can send reminders), and the percentage of members in their unit who have responded. They cannot see ' + String.fromCharCode(8212) + ' ever ' + String.fromCharCode(8212) + ' your individual answers.')
+ ]));
+ card.appendChild(trackedRow);
+
+ content.appendChild(card);
 }
 
 function _fireConfetti(targetEl) {
@@ -3982,10 +4021,12 @@ function renderWorkloadTracker(appContainer) {
  });
 }
 
+// "DDS" token so the DDS→SolidBase sync scrub can't mangle them. These are
+
 var WT_SUB_CATS = {
  priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
-    'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
-    'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
+    'Presumptive Disability','COBRA','Agency Aged','SOAR Involvement',
+    'MC/WW','100% P&T','Public Inquiry','Agency Important (High)','Agency Important (Medium)'],
  pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
     'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
  unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],
@@ -4918,8 +4959,10 @@ function renderEventsPage(appContainer) {
    onClick: function() {
    var _pad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
    var _toICS = function(d) { return d.getUTCFullYear() + _pad2(d.getUTCMonth() + 1) + _pad2(d.getUTCDate()) + 'T' + _pad2(d.getUTCHours()) + _pad2(d.getUTCMinutes()) + _pad2(d.getUTCSeconds()) + 'Z'; };
+   // ICS PRODID pulled from CONFIG so SolidBase/other deployments don't leak DDS branding.
+   var _icsProdId = 'PRODID:-//' + ((CONFIG && (CONFIG.orgAbbrev || CONFIG.systemName)) || 'Dashboard') + '//EN';
    var icsContent = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DDS-Dashboard//EN', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', _icsProdId, 'BEGIN:VEVENT',
     'DTSTART:' + _toICS(startDate), 'DTEND:' + _toICS(endDate),
     'SUMMARY:' + (ev.title || '').replace(/[,;\\]/g, function(c) { return '\\' + c; }),
     ev.location ? 'LOCATION:' + ev.location.replace(/[,;\\]/g, function(c) { return '\\' + c; }) : '',
@@ -6660,7 +6703,7 @@ function renderQAForum(appContainer, role) {
  var currentPage = 1;
  var currentSort = 'recent';
  var showResolved = false;
- var qaScope = 'My Unit'; 
+ 
 
  function refreshSubTabs() {
   subTabBar.innerHTML = '';
@@ -6684,22 +6727,10 @@ function renderQAForum(appContainer, role) {
  function _renderQABrowse(cont) {
   cont.innerHTML = '';
 
+  // v4.55.1 R04-BUG-01: scope toggle removed. Previously "My Unit" / "Cross-Unit" /
+  // "All" were displayed but the server always returned the same (org-wide) dataset,
   
-  var scopeToggle = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
-  ['My Unit', 'Cross-Unit', 'All'].forEach(function(label) {
-  var isActive = qaScope === label;
-  var scopeBtn = el('button', {
-   className: 'btn ' + (isActive ? 'btn-primary' : 'btn-ghost'),
-   style: { fontSize: '13px' },
-   onclick: function() {
-   qaScope = label;
-   currentPage = 1;
-   _renderQABrowse(cont);
-   }
-  }, label);
-  scopeToggle.appendChild(scopeBtn);
-  });
-  cont.appendChild(scopeToggle);
+  
 
   
   var sortBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } });
@@ -6724,8 +6755,7 @@ function renderQAForum(appContainer, role) {
   cont.appendChild(listArea);
   showLoading(listArea);
 
-  // Choose server call based on scope — "Cross-Unit" and "All" use org-wide endpoint
-  var useOrgWide = (qaScope === 'Cross-Unit' || qaScope === 'All');
+  
   var caller = serverCall().withSuccessHandler(function(result) {
   listArea.innerHTML = '';
   var questions = result ? result.questions || [] : [];
@@ -6767,11 +6797,7 @@ function renderQAForum(appContainer, role) {
   listArea.appendChild(el('div', { className: 'empty-state-danger' }, 'Failed to load questions.'));
   });
   
-  if (useOrgWide) {
-  caller.qaGetOrgWideQuestions(SESSION_TOKEN, currentPage, 20, currentSort, showResolved);
-  } else {
   caller.qaGetQuestions(SESSION_TOKEN, currentPage, 20, currentSort, showResolved);
-  }
  }
 
  function _renderQuestionDetail(cont, questionId) {
@@ -7374,6 +7400,15 @@ function renderLeaderHub(appContainer) {
   if (mentor.started) info.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)' } }, 'Since ' + escapeHtml(String(mentor.started))));
   banner.appendChild(info);
   mentorBanner.appendChild(banner);
+  } else {
+  // v4.55.1 K11-BUG-05: show explicit "no mentor" card instead of an empty container
+  var emptyBanner = el('div', { className: 'card ' + _TC, style: { padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' } });
+  emptyBanner.appendChild(el('span', { style: { fontSize: '20px' } }, '\u2139\uFE0F'));
+  var emptyInfo = el('div');
+  emptyInfo.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-secondary)' } }, 'No Mentor Assigned'));
+  emptyInfo.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)' } }, 'Ask your steward to pair you with an experienced leader.'));
+  emptyBanner.appendChild(emptyInfo);
+  mentorBanner.appendChild(emptyBanner);
   }
  }).withFailureHandler(function() {}).dataGetLeaderMentor(SESSION_TOKEN);
 

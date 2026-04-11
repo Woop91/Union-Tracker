@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.55.1] - 2026-04-10
+
+### Fixed
+- **Survey steward/member visibility mismatch** — `getSurveyQuestions()` was caching the entire payload (including `period`) for 5 min via CacheService. Steward view (which calls `getSurveyPeriod()` directly) saw live state; members saw stale `period: null`. Stripped `period` from the cached payload, bumped cache key v1 → v2 to invalidate stale entries, and overlay live `getSurveyPeriod()` on every call. Added cache invalidation in `openNewSurveyPeriod()` and `archiveSurveyPeriod_()` so period lifecycle changes propagate to members immediately.
+- **PIN setup blocked by missing Member ID** — `dataCompleteOnboardingStep('pin', ...)` rejected with "Member ID required before setting PIN" when the email-matched row had an empty Member ID cell (legacy data, manual import, partial seed). Now self-heals: generates a unique `M` + 6-digit ID (collision-checked against existing IDs), writes it back to the row, audit-logs `MEMBER_ID_AUTOGEN`, and proceeds with the hash.
+- **Session persistence — multi-pronged diagnostic** — Bumped redirect-loop guard in `index.html` from 2 → 5 attempts. Instrumented `Auth._getSessionData` with three-way failure logging (not present / expired / corrupt JSON). `_serveAuth` now records `SESSION_TOKEN_REJECTED` (MEDIUM) security event when a sessionToken fails validation. SSO and magic-link `createSessionToken` failures now escalate to `SESSION_CREATE_FAILED` (HIGH) security events instead of dying silently in `log_`.
+
+### Added
+- **Survey anonymity disclosure card** — New `_renderSurveyAnonymityCard(content)` helper in `member_view.html` prepended to the survey wizard. Two-part honest disclosure: (1) "your answers are stored in a separate encrypted vault with no link back to you, by design" and (2) "what stewards CAN see: completion status and unit-level percentages — never your individual answers."
+- **Steward survey "History: On/Off" toggle** — Added a toggle pill in the survey tracking scope filter row. When off, hides the per-member historical participation rate bar in `_renderSurveyMemberItem`. State persists in localStorage. Default ON.
+- **Home screen icon scaffolding** — Added Apple PWA meta tags (`apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `mobile-web-app-capable`) and `<link rel="apple-touch-icon">` references in `index.html` `<head>`. New `app_icon.html` ships with a 1×1 transparent PNG placeholder data URL — replace its content with your organization's actual icon (180×180 PNG, base64-encoded with `data:image/png;base64,` prefix) when ready. **Caveat:** iOS Safari may still ignore this on home-screen install because GAS web apps live inside a `script.googleusercontent.com` iframe and iOS reads icons from the parent frame.
+- **Auth view "previous session expired" hint** — Non-alarming explainer surfaced on the auth page when `PAGE_DATA.tokenChecked === true`, so users understand WHY they're being asked to email a new link.
+
+### Changed
+- **`getSurveyQuestions()` cache key** — Bumped `surveyQuestions_v1` → `surveyQuestions_v2`. The v2 payload no longer contains `period`. Both `clearSurveyQuestionsCache()` and the inline cache-clear now remove both keys for a clean transition.
+- **Redirect-loop guard tolerance** — `dashboardSessionRedirectCount` threshold raised from 2 to 5 in `index.html`.
+
 ## [4.50.4] - 2026-04-01
 
 ### Fixed

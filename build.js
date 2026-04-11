@@ -102,6 +102,7 @@ const HTML_FILES = [
   'member_hub_styles.html',
   'member_hub_view.html',
   'org_health_tree.html',
+  'app_icon.html',
 ];
 
 /**
