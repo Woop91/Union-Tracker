@@ -40,7 +40,9 @@
 var WeeklyQuestions = (function () {
 
   // ── Column indices (0-based) ─────────────────────────────────────────────
-  var Q_COLS = { ID: 0, TEXT: 1, OPTIONS: 2, SOURCE: 3, SUBMITTED_BY: 4, WEEK_START: 5, ACTIVE: 6, CREATED: 7 };
+  // v4.56.0: TARGET_ROLE + RESULTS_PUBLIC added for Targeted Polls. Rows missing
+  // these columns (existing data) read as 'all' + TRUE via lazy defaults below.
+  var Q_COLS = { ID: 0, TEXT: 1, OPTIONS: 2, SOURCE: 3, SUBMITTED_BY: 4, WEEK_START: 5, ACTIVE: 6, CREATED: 7, TARGET_ROLE: 8, RESULTS_PUBLIC: 9 };
   var R_COLS = { ID: 0, QUESTION_ID: 1, EMAIL_HASH: 2, RESPONSE: 3, TIMESTAMP: 4 };
   var P_COLS = { ID: 0, TEXT: 1, OPTIONS: 2, SUBMITTED_BY_HASH: 3, STATUS: 4, CREATED: 5 };
 
@@ -53,7 +55,7 @@ var WeeklyQuestions = (function () {
   function initWeeklyQuestionSheets() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) throw new Error('Spreadsheet unavailable.');
-    _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS,  ['ID','Text','Options','Source','Submitted By','Week Start','Active','Created']);
+    _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS,  ['ID','Text','Options','Source','Submitted By','Week Start','Active','Created','Target Role','Results Public']);
     _ensureSheet(ss, SHEETS.WEEKLY_RESPONSES,  ['ID','Question ID','Email Hash','Response','Timestamp']);
     _ensureSheet(ss, SHEETS.QUESTION_POOL,     ['ID','Text','Options','Submitted By Hash','Status','Created']);
   }
@@ -215,9 +217,17 @@ var WeeklyQuestions = (function () {
    * options = [] always returned (needed before voting).
    * counts/total = aggregate only; no individual mapping.
    */
-  function getActiveQuestions(email) {
+  function getActiveQuestions(email, userRole) {
     var thisPeriod = _periodKey();
     var emailHash = _hashEmail(email);
+
+    // v4.56.0: resolve role server-side if wrapper didn't pass one. 'stewards'-
+    // targeted polls are only returned to stewards/admins.
+    var role = userRole || null;
+    if (!role && typeof getUserRole_ === 'function') {
+      try { role = getUserRole_(email); } catch (_e) { role = null; }
+    }
+    var isStewardOrAdmin = role === 'steward' || role === 'admin' || role === 'both';
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [] };
@@ -228,14 +238,25 @@ var WeeklyQuestions = (function () {
       var wk = qData[i][Q_COLS.WEEK_START];
       if (wk instanceof Date) wk = wk.toISOString().split('T')[0];
       var isActive = String(qData[i][Q_COLS.ACTIVE]).toLowerCase();
-      if (String(wk) === thisPeriod && (isActive === 'true' || isActive === 'yes' || isActive === '1')) {
-        active.push({
-          id:      String(qData[i][Q_COLS.ID]),
-          text:    String(qData[i][Q_COLS.TEXT]),
-          options: _parseOptions(qData[i][Q_COLS.OPTIONS]),
-          source:  String(qData[i][Q_COLS.SOURCE] || 'steward'),
-        });
-      }
+      if (String(wk) !== thisPeriod || !(isActive === 'true' || isActive === 'yes' || isActive === '1')) continue;
+
+      // v4.56.0: audience targeting. Default 'all' when col is missing (back-compat).
+      var targetRole = String(qData[i][Q_COLS.TARGET_ROLE] || 'all').toLowerCase();
+      if (targetRole === 'stewards' && !isStewardOrAdmin) continue;
+
+      // v4.56.0: results-visibility flag. Default TRUE when col is missing. FALSE is
+      // stored either as the string 'FALSE' or boolean false; anything else is TRUE.
+      var rawPublic = qData[i][Q_COLS.RESULTS_PUBLIC];
+      var resultsPublic = !(rawPublic === false || String(rawPublic).toLowerCase() === 'false');
+
+      active.push({
+        id:            String(qData[i][Q_COLS.ID]),
+        text:          String(qData[i][Q_COLS.TEXT]),
+        options:       _parseOptions(qData[i][Q_COLS.OPTIONS]),
+        source:        String(qData[i][Q_COLS.SOURCE] || 'steward'),
+        targetRole:    targetRole,
+        resultsPublic: resultsPublic,
+      });
     }
 
     // Build response stats in one pass
@@ -254,8 +275,10 @@ var WeeklyQuestions = (function () {
         counts[resp] = (counts[resp] || 0) + 1;
         if (responses[r][R_COLS.EMAIL_HASH] === emailHash) q.hasResponded = true;
       }
-      // T6-2: Only expose vote counts after user has voted (prevent strategic voting)
-      if (q.hasResponded) {
+      // v4.56.0: resultsPublic=TRUE (default for new polls) makes counts visible to
+      // everyone. resultsPublic=FALSE keeps the T6-2 hasResponded gate (strategic-vote
+      // prevention) for sensitive steward-only polls.
+      if (q.resultsPublic || q.hasResponded) {
         q.stats = { total: total, counts: counts };
       } else {
         q.stats = { total: total, counts: null };
@@ -320,9 +343,18 @@ var WeeklyQuestions = (function () {
    * @param {string} stewardEmail - verified server-side by wrapper
    * @param {string} text         - question text
    * @param {string[]} options    - 2–5 answer strings
+   * @param {string} [targetRole='all'] - 'all' | 'stewards' audience filter (v4.56.0)
+   * @param {boolean} [resultsPublic=true] - whether non-voters can see tallies (v4.56.0)
    */
-  function setStewardQuestion(stewardEmail, text, options) {
+  function setStewardQuestion(stewardEmail, text, options, targetRole, resultsPublic) {
     if (!stewardEmail || !text) return { success: false, message: 'Missing fields.' };
+
+    // v4.56.0: validate + normalize targeting inputs
+    var target = String(targetRole || 'all').toLowerCase();
+    if (target !== 'all' && target !== 'stewards') {
+      return { success: false, message: 'Invalid targetRole — use "all" or "stewards".' };
+    }
+    var publicFlag = resultsPublic === undefined || resultsPublic === null ? true : Boolean(resultsPublic);
 
     text = text.trim().substring(0, 500);
     if (!text) return { success: false, message: 'Question text required.' };
@@ -357,10 +389,11 @@ var WeeklyQuestions = (function () {
 
       var id = _id();
       qSheet.appendRow([id, escapeForFormula(text), JSON.stringify(options), 'steward',
-                        callerEmail, thisPeriod, 'TRUE', new Date()]);
+                        callerEmail, thisPeriod, 'TRUE', new Date(),
+                        target, publicFlag ? 'TRUE' : 'FALSE']);
 
       if (typeof logAuditEvent === 'function') {
-        logAuditEvent('POLL_STEWARD_CREATE', { steward: callerEmail, weekStart: thisPeriod });
+        logAuditEvent('POLL_STEWARD_CREATE', { steward: callerEmail, weekStart: thisPeriod, targetRole: target, resultsPublic: publicFlag });
       }
       return { success: true, message: 'Poll created for this week.', id: id };
     });
@@ -462,8 +495,9 @@ var WeeklyQuestions = (function () {
     }
 
     var newId = _id();
+    // v4.56.0: community polls are always audience=all + results public
     qSheet.appendRow([newId, escapeForFormula(String(selected.text)), selected.options, 'community',
-                      '', thisPeriod, 'TRUE', new Date()]);
+                      '', thisPeriod, 'TRUE', new Date(), 'all', 'TRUE']);
 
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('POLL_COMMUNITY_DRAW', { weekStart: thisPeriod, poolId: selected.id });
@@ -632,7 +666,9 @@ function wqGetActiveQuestions(sessionToken) {
     var rec = DataService.findUserByEmail(e);
     if (rec && rec.duesPaying === false) return { questions: [] };
   }
-  return WeeklyQuestions.getActiveQuestions(e);
+  // v4.56.0: resolve role for targeted-poll filtering
+  var role = (typeof getUserRole_ === 'function') ? getUserRole_(e) : null;
+  return WeeklyQuestions.getActiveQuestions(e, role);
 }
 
 /**
@@ -664,6 +700,21 @@ function wqSetStewardQuestion(sessionToken, text, options) {
   var e = _requireStewardAuth(sessionToken);
   if (!e) return { success: false, message: 'Steward access required.' };
   return WeeklyQuestions.setStewardQuestion(e, text, options);
+}
+
+/**
+ * v4.56.0 — Targeted Polls: steward creates a poll with audience + results-visibility.
+ * @param {string} sessionToken
+ * @param {string} text
+ * @param {string[]} options
+ * @param {string} targetRole - 'all' | 'stewards'
+ * @param {boolean} resultsPublic - true → visible to everyone, false → hidden until voted
+ * @returns {Object} { success, message, id? }
+ */
+function wqSetTargetedQuestion(sessionToken, text, options, targetRole, resultsPublic) {
+  var e = _requireStewardAuth(sessionToken);
+  if (!e) return { success: false, message: 'Steward access required.' };
+  return WeeklyQuestions.setStewardQuestion(e, text, options, targetRole, resultsPublic);
 }
 
 /**
@@ -733,7 +784,9 @@ function wqGetPollData(sessionToken) {
     if (rec && rec.duesPaying === false) return { frequency: freq, questions: [] };
   }
   try {
-    var result = WeeklyQuestions.getActiveQuestions(e);
+    // v4.56.0: pass role for targeted-poll filtering
+    var role = (typeof getUserRole_ === 'function') ? getUserRole_(e) : null;
+    var result = WeeklyQuestions.getActiveQuestions(e, role);
     if (!result) return { frequency: freq, questions: [] };
     result.frequency = freq;
     return result;

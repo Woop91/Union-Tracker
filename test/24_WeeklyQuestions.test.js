@@ -277,6 +277,100 @@ describe('WeeklyQuestions.setStewardQuestion', () => {
 });
 
 // ============================================================================
+// v4.56.0 Targeted Polls: audience targeting + results visibility
+// ============================================================================
+
+describe('WeeklyQuestions v4.56.0 — Targeted Polls', () => {
+  function currentPeriodKey() {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    monday.setHours(0, 0, 0, 0);
+    return monday.toISOString().split('T')[0];
+  }
+
+  test('Q_COLS exposes TARGET_ROLE and RESULTS_PUBLIC indices', () => {
+    expect(WeeklyQuestions.Q_COLS.TARGET_ROLE).toBe(8);
+    expect(WeeklyQuestions.Q_COLS.RESULTS_PUBLIC).toBe(9);
+  });
+
+  test('setStewardQuestion rejects invalid targetRole', () => {
+    const result = WeeklyQuestions.setStewardQuestion(
+      'steward@test.com', 'Approve?', ['Yes','No'], 'managers', true
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/targetRole/i);
+  });
+
+  test('getActiveQuestions hides stewards-targeted polls from members', () => {
+    const p = currentPeriodKey();
+    const qData = [
+      ['ID','Text','Options','Source','SubmittedBy','WeekStart','Active','Created','TargetRole','ResultsPublic'],
+      ['PL_a','All-audience?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'all',      'TRUE'],
+      ['PL_b','Steward-only?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'stewards', 'TRUE'],
+    ];
+    setupSheets(qData, [['header']], null);
+    const result = WeeklyQuestions.getActiveQuestions('member@t.com', 'member');
+    expect(result.questions.map(q => q.id)).toEqual(['PL_a']);
+  });
+
+  test('getActiveQuestions exposes stewards-targeted polls to admins', () => {
+    const p = currentPeriodKey();
+    const qData = [
+      ['ID','Text','Options','Source','SubmittedBy','WeekStart','Active','Created','TargetRole','ResultsPublic'],
+      ['PL_a','All-audience?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'all',      'TRUE'],
+      ['PL_b','Steward-only?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'stewards', 'TRUE'],
+    ];
+    setupSheets(qData, [['header']], null);
+    const result = WeeklyQuestions.getActiveQuestions('admin@t.com', 'admin');
+    expect(result.questions.map(q => q.id).sort()).toEqual(['PL_a','PL_b']);
+  });
+
+  test('getActiveQuestions hides counts from non-voters when resultsPublic=FALSE', () => {
+    const p = currentPeriodKey();
+    const qData = [
+      ['ID','Text','Options','Source','SubmittedBy','WeekStart','Active','Created','TargetRole','ResultsPublic'],
+      ['PL_c','Sensitive?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'all', 'FALSE'],
+    ];
+    setupSheets(qData, [['header']], null);
+    const result = WeeklyQuestions.getActiveQuestions('member@t.com', 'member');
+    expect(result.questions[0].resultsPublic).toBe(false);
+    expect(result.questions[0].stats.counts).toBeNull();
+  });
+
+  test('getActiveQuestions exposes counts to non-voters when resultsPublic=TRUE', () => {
+    const p = currentPeriodKey();
+    const qData = [
+      ['ID','Text','Options','Source','SubmittedBy','WeekStart','Active','Created','TargetRole','ResultsPublic'],
+      ['PL_d','Transparent?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date(), 'all', 'TRUE'],
+    ];
+    setupSheets(qData, [['header']], null);
+    const result = WeeklyQuestions.getActiveQuestions('member@t.com', 'member');
+    expect(result.questions[0].resultsPublic).toBe(true);
+    expect(result.questions[0].stats.counts).not.toBeNull();
+    expect(result.questions[0].hasResponded).toBe(false);
+  });
+
+  test('getActiveQuestions back-compat: rows missing new cols default to all+TRUE', () => {
+    const p = currentPeriodKey();
+    const qData = [
+      ['ID','Text','Options','Source','SubmittedBy','WeekStart','Active','Created'],
+      ['PL_e','Legacy?','["Y","N"]','steward','s@t.com', p, 'TRUE', new Date()],
+    ];
+    setupSheets(qData, [['header']], null);
+    const result = WeeklyQuestions.getActiveQuestions('member@t.com', 'member');
+    expect(result.questions.length).toBe(1);
+    expect(result.questions[0].targetRole).toBe('all');
+    expect(result.questions[0].resultsPublic).toBe(true);
+  });
+
+  test('wqSetTargetedQuestion global wrapper is defined', () => {
+    expect(typeof wqSetTargetedQuestion).toBe('function');
+  });
+});
+
+// ============================================================================
 // closePoll
 // ============================================================================
 
