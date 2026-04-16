@@ -115,12 +115,31 @@ var e = _resolveCallerEmail(); if (!e) return <safe_empty>;   // any user
 var s = _requireStewardAuth(); if (!s) return <safe_empty>;   // steward-only
 ```
 
+**Column-Dynamic Claim Discipline:** Never claim the column system is "dynamic" or "safe" without verifying BOTH read AND write paths. Reads (`_buildColumnMap`) are header-name-based; writes like `syncGrievanceToMemberDirectory` and engagement sync have historically used static `MEMBER_COLS` constants that go stale when columns reorder. Trace all CRUD paths before asserting — if only some paths are dynamic, say so explicitly.
+
+**Build CRLF parity:** `build.js minifyHtml()` MUST normalize `\r\n` → `\n` before any text processing. Windows (local) and Linux (CI) produce divergent dist output otherwise — CRLF lines become `"\r"` instead of `""`, breaking the CI dist-parity check. After any `build.js` change, run `npm run build:prod` and confirm `git diff --stat dist/` is empty.
+
+**Pre-commit hook MUST use `--prod --minify`:** `.husky/pre-commit` runs `node build.js --prod --minify` and auto-stages dist/. Never revert to plain `node build.js` or `npm run build` — it restores DevTools files and un-minifies HTML, silently corrupting every deploy.
+
+**GAS HTML Size Limit (~820KB):** GAS `HtmlOutput` silently truncates pages over ~820KB — no error, just "undefined" at runtime when a trailing file gets cut. Dual-role users hit this first. Mitigations: `member_view.html` and `org_chart` are lazy-loaded server-side via `getMemberViewHtml()` + `_loadMemberViewThen(container, callback)`; `build:prod --minify` strips blank/comment lines (13–26% savings). **Before adding any new unconditional HTML include, verify the dual-role combined size stays under 800KB.**
+
 ## Code Review — STRICT
 
 Canonical: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are outdated.
 1. Never claim "FIXED" without proof — cite file, line, code.
 2. Search entire codebase for vulnerability patterns.
 3. No inflated scores.
+
+## Sync from DDS (DDS → UT)
+
+SolidBase mirrors DDS with org-specific content stripped. When pulling a new DDS version in:
+1. Copy DDS `src/`, `test/`, `docs/`, root configs here (overwrite)
+2. Delete: `25_WorkloadService.gs`, `poms_reference.html`, `agency_org_chart.html`, related tests, `scripts/sync-org-chart.js`
+3. Scrub: "Union Dashboard"→"SolidBase"; MassAbility/DDS/SEIU 509→generic; seiu509.org→example-union.org
+4. Remove Workload Tracker + POMS Reference (nav, routing, rendering, data service, SHEETS constants, tests)
+5. **CRITICAL PII CHECK** — `org_chart.html` must be the generic placeholder; DDS version has 100+ org-specific strings, personal emails, phones, salaries. Zero PII survives.
+6. Update configs: package.json (name/desc/repo), CLAUDE.md + AI_REFERENCE.md (DDS Script ID must be redacted here), SYNC-LOG.md
+7. `npm run build:prod` → `test:guards` + `test:unit` → commit
 
 ## Reference Documents
 

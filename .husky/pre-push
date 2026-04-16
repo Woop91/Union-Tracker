@@ -3,9 +3,14 @@
 # 1. OAuth scope change detection (all branches)
 # 2. Full test suite gate (Main and staging only)
 
-# Detect if pushing to a protected branch
+# Detect protected branches AND verify local is not behind origin
+# (both checks share stdin, so consolidated into one loop)
+echo "Fetching origin to verify local is up-to-date..."
+git fetch origin --quiet || { echo "Fetch failed — check network."; exit 1; }
+
 PROTECTED_PUSH=false
 PROTECTED_BRANCHES=""
+BEHIND_BLOCK=""
 while read local_ref local_sha remote_ref remote_sha; do
   REMOTE_BRANCH="${remote_ref#refs/heads/}"
   case "$REMOTE_BRANCH" in
@@ -14,7 +19,21 @@ while read local_ref local_sha remote_ref remote_sha; do
       PROTECTED_BRANCHES="${PROTECTED_BRANCHES:+$PROTECTED_BRANCHES, }$REMOTE_BRANCH"
       ;;
   esac
+  # Divergence check: origin ahead of local = non-fast-forward risk
+  BEHIND=$(git rev-list --count "$local_sha..origin/$REMOTE_BRANCH" 2>/dev/null || echo 0)
+  if [ "$BEHIND" -gt 0 ]; then
+    BEHIND_BLOCK="${BEHIND_BLOCK}  origin/$REMOTE_BRANCH is $BEHIND commit(s) ahead of local.\n"
+  fi
 done
+
+if [ -n "$BEHIND_BLOCK" ]; then
+  echo ""
+  echo "Push blocked — remote has commits you don't:"
+  printf "$BEHIND_BLOCK"
+  echo "Run: git pull --rebase origin <branch>"
+  echo "(User may have uploaded files via GitHub web UI.)"
+  exit 1
+fi
 
 echo "Running pre-push checks..."
 echo ""
