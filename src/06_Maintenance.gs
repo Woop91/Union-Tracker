@@ -1171,6 +1171,16 @@ function primeWebAppCaches() {
   catch (e) { log_('primeWebAppCaches', 'syncColumnMaps failed: ' + (e.message || e)); }
   try { ConfigReader.refreshConfig(); }
   catch (e) { log_('primeWebAppCaches', 'refreshConfig failed: ' + (e.message || e)); }
+  // Keep the /exec V8 instance itself warm. Apps Script evicts idle
+  // instances within minutes — priming ScriptCache alone doesn't prevent
+  // cold-start, which is ~5s here (119K lines across 63 files) and
+  // routinely exceeds the edge TTFB budget.
+  try {
+    UrlFetchApp.fetch(
+      'https://script.google.com/macros/s/AKfycbxQ5bRduNR_ZrIc2VTst6FzeiY9UyB8FF4u5Fthls_CIywVWhtdRow6bSUPxUfAtDVTjQ/exec',
+      { muteHttpExceptions: true, followRedirects: false }
+    );
+  } catch (e) { log_('primeWebAppCaches', 'exec ping failed: ' + (e.message || e)); }
 }
 
 /**
@@ -1184,15 +1194,18 @@ function installWebAppCacheWarmupTrigger() {
       ScriptApp.deleteTrigger(t);
     }
   });
-  ScriptApp.newTrigger('primeWebAppCaches').timeBased().everyHours(4).create();
+  ScriptApp.newTrigger('primeWebAppCaches').timeBased().everyMinutes(1).create();
   primeWebAppCaches();
-  SpreadsheetApp.getUi().alert(
-    'Web App Warmup Enabled',
-    'ScriptCache primed now and will refresh every 4 hours.\n\n' +
-    'Prevents the ~5s cold-start that caused ERR_CONNECTION_CLOSED on the ' +
-    'first web-app request after ScriptCache expiry.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  // UI alert only works when invoked from a bound-sheet menu context.
+  // Swallow to support direct invocation from the Apps Script editor.
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Web App Warmup Enabled',
+      'ScriptCache primed now; /exec pinged every 1 minute to keep the V8\n' +
+      'instance warm and eliminate cold-start ERR_CONNECTION_CLOSED failures.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  } catch (_uiErr) { /* non-UI context (editor / trigger) */ }
 }
 
 /**

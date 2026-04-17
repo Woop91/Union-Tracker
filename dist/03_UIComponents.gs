@@ -268,7 +268,7 @@ function createDashboardMenu() {
       .addItem('🔥 Warm Up Caches', 'warmUpCaches')
       .addItem('🗑️ Clear All Caches', 'invalidateAllCaches')
       .addSeparator()
-      .addItem('⏱️ Enable 4h Web App Auto-Warmup', 'installWebAppCacheWarmupTrigger')
+      .addItem('⏱️ Enable 1m Web App Keep-Warm', 'installWebAppCacheWarmupTrigger')
       .addItem('🚫 Disable Web App Auto-Warmup', 'removeWebAppCacheWarmupTrigger'))
 
     .addSubMenu(ui.createMenu('🛡️ Security & Backup')
