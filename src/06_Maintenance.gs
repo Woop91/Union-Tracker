@@ -1153,6 +1153,66 @@ function warmWebAppCaches_() {
     }
   }
 }
+/**
+ * v4.56.2 — Time-based trigger handler: pre-populates the ScriptCache entries
+ * that `doGetWebDashboard` (22_WebDashApp.gs) reads on every request. When
+ * `RESOLVED_COL_MAPS` is absent (6-hour ScriptCache TTL expired, or evicted
+ * by a push/restore), doGet falls into `syncColumnMaps()` + `refreshConfig()`
+ * which can exceed Apps Script's ~5s TTFB edge budget and cause the first
+ * request after expiry to fail with ERR_CONNECTION_CLOSED in the browser.
+ *
+ * Keeping this warm on a 4-hour cadence (well under the 6h TTL) eliminates
+ * that cold-start class of failure.
+ *
+ * Safe to run from a time-based trigger — uses no UI calls.
+ */
+function primeWebAppCaches() {
+  try { syncColumnMaps(); }
+  catch (e) { log_('primeWebAppCaches', 'syncColumnMaps failed: ' + (e.message || e)); }
+  try { ConfigReader.refreshConfig(); }
+  catch (e) { log_('primeWebAppCaches', 'refreshConfig failed: ' + (e.message || e)); }
+}
+
+/**
+ * Installs a time-based trigger that runs `primeWebAppCaches` every 4 hours.
+ * Idempotent — removes any existing primeWebAppCaches triggers first, then
+ * runs once immediately so the cache is hot the moment this returns.
+ */
+function installWebAppCacheWarmupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'primeWebAppCaches') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('primeWebAppCaches').timeBased().everyHours(4).create();
+  primeWebAppCaches();
+  SpreadsheetApp.getUi().alert(
+    'Web App Warmup Enabled',
+    'ScriptCache primed now and will refresh every 4 hours.\n\n' +
+    'Prevents the ~5s cold-start that caused ERR_CONNECTION_CLOSED on the ' +
+    'first web-app request after ScriptCache expiry.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Removes the time-based trigger installed by installWebAppCacheWarmupTrigger.
+ */
+function removeWebAppCacheWarmupTrigger() {
+  var removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'primeWebAppCaches') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+  SpreadsheetApp.getUi().alert(
+    'Web App Warmup Disabled',
+    'Removed ' + removed + ' trigger(s). Cold-start may return after the next 6h ScriptCache TTL.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
 // ============================================================================
 // CACHED DATA LOADERS
 // ============================================================================

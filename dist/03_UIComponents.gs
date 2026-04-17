@@ -266,7 +266,10 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('🗄️ Cache & Performance')
       .addItem('🗄️ Cache Status', 'showCacheStatusDashboard')
       .addItem('🔥 Warm Up Caches', 'warmUpCaches')
-      .addItem('🗑️ Clear All Caches', 'invalidateAllCaches'))
+      .addItem('🗑️ Clear All Caches', 'invalidateAllCaches')
+      .addSeparator()
+      .addItem('⏱️ Enable 4h Web App Auto-Warmup', 'installWebAppCacheWarmupTrigger')
+      .addItem('🚫 Disable Web App Auto-Warmup', 'removeWebAppCacheWarmupTrigger'))
 
     .addSubMenu(ui.createMenu('🛡️ Security & Backup')
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
