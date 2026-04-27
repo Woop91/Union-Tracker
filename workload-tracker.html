@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-mode="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes">
+  <title>Workload Tracker — DDS Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Manrope:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background 0.3s, color 0.3s; }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; border: none; background: none; font: inherit; }
+    input, select { font: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Dark Theme (default) ───────────────────────────────── */
+    :root, [data-theme-mode="dark"] {
+      --bg:          #0d0d14;
+      --surface:     #16161f;
+      --raised:      #1e1e2a;
+      --border:      rgba(255,255,255,0.07);
+      --text:        #e9e6f8;
+      --muted:       #7b7899;
+      --accent:      #8b5cf6;
+      --accentBg:    rgba(139,92,246,0.1);
+      --accentBorder:rgba(139,92,246,0.3);
+      --accentGlow:  rgba(139,92,246,0.4);
+      --danger:      #ef4444;
+      --warning:     #f59e0b;
+      --success:     #22c55e;
+      --radius:      10px;
+      --fontBody:    'DM Sans', 'Manrope', sans-serif;
+      --overlay-bg:  rgba(0,0,0,0.65);
+    }
+
+    /* ── Light Theme ────────────────────────────────────────── */
+    [data-theme-mode="light"] {
+      --bg:          #f4f3fa;
+      --surface:     #ffffff;
+      --raised:      #ebebf5;
+      --border:      rgba(0,0,0,0.09);
+      --text:        #1a1827;
+      --muted:       #6b6882;
+      --accent:      #7c3aed;
+      --accentBg:    rgba(124,58,237,0.07);
+      --accentBorder:rgba(124,58,237,0.25);
+      --accentGlow:  rgba(124,58,237,0.3);
+      --danger:      #dc2626;
+      --warning:     #d97706;
+      --success:     #16a34a;
+      --overlay-bg:  rgba(0,0,0,0.35);
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    body { background: var(--bg); color: var(--text); font-family: var(--fontBody); min-height: 100vh; }
+
+    .app-shell {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 0 80px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 50;
+    }
+    .app-header-left { display: flex; align-items: center; gap: 10px; }
+    .app-header-icon { font-size: 22px; }
+    .app-header-title { font-size: 1.0625rem; font-weight: 700; color: var(--text); }
+    .app-header-sub { font-size: 0.6875rem; color: var(--muted); margin-top: 1px; }
+    .theme-toggle {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--raised); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: background 0.2s;
+      cursor: pointer;
+    }
+    .theme-toggle:hover { background: var(--accentBg); }
+
+    /* ── Sub-tabs ───────────────────────────────────────────── */
+    .sub-tabs {
+      display: flex; gap: 4px;
+      padding: 14px 16px 0;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .sub-tabs::-webkit-scrollbar { display: none; }
+    .sub-tab {
+      flex-shrink: 0;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 0.8125rem; font-weight: 500;
+      color: var(--muted);
+      background: none;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+    .sub-tab:hover { color: var(--text); background: var(--raised); }
+    .sub-tab.active {
+      color: var(--accent);
+      background: var(--accentBg);
+      border-color: var(--accentBorder);
+      font-weight: 600;
+    }
+
+    /* ── Content ────────────────────────────────────────────── */
+    .content { padding: 16px; }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600;
+      transition: all 0.15s; cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff; border: none;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-secondary {
+      background: var(--raised); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Form controls ──────────────────────────────────────── */
+    .form-select, .form-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.875rem;
+      color: var(--text);
+      outline: none;
+    }
+    .form-select:focus, .form-input:focus { border-color: var(--accent); }
+    .form-select { appearance: none; -webkit-appearance: none; padding-right: 24px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237b7899' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+
+    /* ── Workload grid ──────────────────────────────────────── */
+    .wt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 480px) { .wt-grid { grid-template-columns: 1fr; } }
+
+    .wt-grid-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      transition: border-color 0.15s;
+    }
+    .wt-grid-item.warn { border-color: var(--warning); }
+    .wt-grid-head { display: flex; align-items: center; justify-content: space-between; }
+    .wt-grid-label { font-size: 0.8125rem; font-weight: 600; color: var(--text); }
+    .wt-grid-input {
+      width: 70px; text-align: center;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px;
+      font-size: 0.875rem; color: var(--text); outline: none;
+    }
+    .wt-grid-input:focus { border-color: var(--accent); }
+    .wt-warn-label { font-size: 0.6875rem; color: var(--warning); display: none; }
+    .wt-grid-item.warn .wt-warn-label { display: block; }
+    .wt-detail-btn {
+      font-size: 0.6875rem; color: var(--accent);
+      background: none; border: none; cursor: pointer;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .wt-detail-btn:hover { background: var(--accentBg); }
+
+    /* ── Section titles ─────────────────────────────────────── */
+    .wt-section-title {
+      font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--muted); margin-bottom: 10px; margin-top: 18px;
+    }
+
+    /* ── Privacy cards ──────────────────────────────────────── */
+    .wt-privacy-option {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 6px; cursor: pointer; transition: all 0.15s;
+    }
+    .wt-privacy-option:hover { background: var(--accentBg); }
+    .wt-privacy-option.selected { border-color: var(--accent); background: var(--accentBg); }
+    .wt-privacy-name { font-weight: 600; font-size: 0.8125rem; color: var(--text); }
+    .wt-privacy-desc { font-size: 0.6875rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Leave row ──────────────────────────────────────────── */
+    .wt-leave-section { margin-top: 10px; }
+    .wt-leave-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .wt-leave-row label { font-size: 0.75rem; color: var(--muted); min-width: 80px; }
+    .wt-leave-row select, .wt-leave-row input[type="date"] {
+      flex: 1; min-width: 120px;
+      padding: 6px 8px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.8125rem; color: var(--text); outline: none;
+    }
+    .wt-leave-row select:focus, .wt-leave-row input[type="date"]:focus { border-color: var(--accent); }
+
+    /* ── Clear button ───────────────────────────────────────── */
+    .wt-clear-btn {
+      font-size: 0.75rem; color: var(--muted);
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 14px; cursor: pointer; transition: all 0.15s;
+    }
+    .wt-clear-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+    /* ── Last submitted ─────────────────────────────────────── */
+    .wt-last-submitted {
+      font-size: 0.75rem; color: var(--muted);
+      margin-bottom: 12px; padding: 6px 10px;
+      background: var(--accentBg); border-radius: 6px;
+      border-left: 3px solid var(--accent);
+    }
+
+    /* ── Submit button row ──────────────────────────────────── */
+    .wt-btn-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+    .wt-status-msg { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Checkbox row ───────────────────────────────────────── */
+    .wt-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .wt-check-row label { font-size: 0.875rem; color: var(--text); cursor: pointer; }
+    .wt-check-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+    /* ── Modal ──────────────────────────────────────────────── */
+    .wt-modal-overlay {
+      position: fixed; inset: 0;
+      background: var(--overlay-bg);
+      z-index: 200; display: flex;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .wt-modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto;
+    }
+    .wt-modal-title {
+      font-size: 0.9375rem; font-weight: 700; color: var(--text); margin-bottom: 14px;
+    }
+    .wt-sub-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 0; border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem; color: var(--text);
+    }
+    .wt-sub-row input {
+      width: 60px; text-align: center; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px; font-size: 0.8125rem; color: var(--text); outline: none;
+    }
+    .wt-sub-row input:focus { border-color: var(--accent); }
+    .wt-modal-total {
+      display: flex; justify-content: space-between;
+      font-weight: 600; margin-top: 12px; padding-top: 12px;
+      border-top: 2px solid var(--accent);
+      color: var(--accent); font-size: 0.875rem;
+    }
+    .wt-modal-btns { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+
+    /* ── History cards ──────────────────────────────────────── */
+    .wt-history-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; margin-bottom: 8px;
+    }
+    .wt-history-date { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; }
+    .wt-history-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .wt-history-cell { text-align: center; }
+    .wt-history-cell-label { font-size: 0.5625rem; color: var(--muted); }
+    .wt-history-cell-val { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+    .wt-history-meta { font-size: 0.6875rem; color: var(--muted); margin-top: 8px; }
+    .wt-history-expand-btn {
+      font-size: 0.6875rem; color: var(--accent); background: none; border: none;
+      cursor: pointer; padding: 4px 0; margin-top: 4px; display: block;
+    }
+
+    /* ── Stats ──────────────────────────────────────────────── */
+    .wt-stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px; text-align: center;
+    }
+    .wt-stat-value { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+    .wt-stat-label { font-size: 0.6875rem; color: var(--muted); margin-top: 2px; }
+
+    .wt-bar-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .wt-bar-label { font-size: 0.75rem; color: var(--text); min-width: 130px; }
+    .wt-bar-track { flex: 1; height: 8px; background: var(--raised); border-radius: 4px; overflow: hidden; }
+    .wt-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.6s ease; }
+    .wt-bar-val { font-size: 0.75rem; color: var(--muted); min-width: 28px; text-align: right; }
+
+    .wt-breakdown-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
+    }
+    .wt-breakdown-title { font-size: 0.75rem; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .wt-breakdown-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;
+    }
+    .wt-breakdown-row:last-child { border-bottom: none; }
+    .wt-breakdown-key { color: var(--muted); }
+    .wt-breakdown-val { font-weight: 600; color: var(--text); }
+
+    /* ── Reminders ──────────────────────────────────────────── */
+    .wt-reminders-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+    }
+    .wt-reminders-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .wt-reminders-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .wt-save-msg { font-size: 0.75rem; color: var(--success); margin-top: 8px; display: none; }
+
+    /* ── KPI strip ──────────────────────────────────────────── */
+    .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+
+    /* ── Empty / info state ─────────────────────────────────── */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 0.875rem; }
+
+    /* ── Divider ────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+    /* ── Demo banner ────────────────────────────────────────── */
+    .demo-banner {
+      background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05));
+      border: 1px solid var(--accentBorder); border-radius: var(--radius);
+      padding: 10px 14px; margin: 14px 16px 0;
+      font-size: 0.75rem; color: var(--muted);
+      display: flex; gap: 8px; align-items: center;
+    }
+    .demo-banner strong { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- Header -->
+  <div class="app-header">
+    <div class="app-header-left">
+      <span class="app-header-icon">📊</span>
+      <div>
+        <div class="app-header-title">Workload Tracker</div>
+        <div class="app-header-sub">DDS Dashboard · Standalone View</div>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle light/dark theme">🌙</button>
+  </div>
+
+  <!-- Demo notice -->
+  <div class="demo-banner">
+    <span>🔍</span>
+    <span><strong>Preview mode</strong> — form interactions work locally; submit/history/stats use sample data.</span>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="sub-tabs" id="subTabs" role="tablist"></div>
+
+  <!-- Tab content -->
+  <div class="content" id="subContent"></div>
+
+</div>
+
+<!-- Sub-category modal (injected dynamically) -->
+
+<script>
+/* ── Data ─────────────────────────────────────────────────── */
+var WT_CATEGORIES = [
+  { id: 't1', label: 'Priority Cases',      key: 'priority',   warnAt: 50  },
+  { id: 't2', label: 'Pending Cases',       key: 'pending',    warnAt: 100 },
+  { id: 't3', label: 'Unread Documents',    key: 'unread',     warnAt: 50  },
+  { id: 't4', label: 'To-Do Items',         key: 'todo',       warnAt: 50  },
+  { id: 't5', label: 'Sent Referrals',      key: 'referrals',  warnAt: 0   },
+  { id: 't6', label: 'CE Activities',       key: 'ce',         warnAt: 0   },
+  { id: 't7', label: 'Assistance Requests', key: 'assistance', warnAt: 0   },
+  { id: 't8', label: 'Aged Cases',          key: 'aged',       warnAt: 30  }
+];
+
+var WT_SUB_CATS = {
+  priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
+               'Presumptive Disability','COBRA','Agency Aged','SOAR Involvement',
+               'MC/WW','100% P&T','Public Inquiry','Agency Important (High)','Agency Important (Medium)'],
+  pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
+               'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
+  unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],
+  todo:       ['Follow-Ups Due','Unread Case Notes','Delivery Failures','Updates'],
+  referrals:  ['MC/PC','General'],
+  ce:         ['All CE Activities','Scheduled','Not Kept','Under Review'],
+  assistance: ['Outbound'],
+  aged:       ['60-89 Days','90-119 Days','120-179 Days','180+ Days']
+};
+
+/* ── Sample history data ───────────────────────────────────── */
+var SAMPLE_HISTORY = [
+  { dateDisplay: 'Mon, Apr 14 2025', t1:12, t2:87, t3:34, t4:21, t5:3, t6:5, t7:2, t8:8,
+    weeklyCases:'15', employment:'Full-time', leaveType:'', overtime:'2', privacy:'Unit Anonymized', onPlan:'Yes',
+    subCategories: { priority: { 0:4, 1:3, 2:5 }, pending: { 0:40, 1:12, 4:6 } } },
+  { dateDisplay: 'Mon, Apr 7 2025',  t1:9,  t2:92, t3:28, t4:18, t5:5, t6:3, t7:1, t8:11,
+    weeklyCases:'15', employment:'Full-time', leaveType:'', overtime:'0', privacy:'Unit Anonymized', onPlan:'No',
+    subCategories: { aged: { 0:3, 1:4, 2:4 } } },
+  { dateDisplay: 'Mon, Mar 31 2025', t1:15, t2:101,t3:41, t4:27, t5:2, t6:7, t7:4, t8:14,
+    weeklyCases:'15', employment:'Full-time', leaveType:'Planned', overtime:'4', privacy:'Agency Anonymized', onPlan:'Yes',
+    subCategories: {} },
+  { dateDisplay: 'Mon, Mar 24 2025', t1:7,  t2:76, t3:22, t4:14, t5:1, t6:2, t7:0, t8:6,
+    weeklyCases:'12', employment:'Part-time', ptHours:'32', leaveType:'', overtime:'0', privacy:'Unit Anonymized', onPlan:'No',
+    subCategories: {} }
+];
+
+/* ── Sample stats data ─────────────────────────────────────── */
+var SAMPLE_STATS = {
+  totalSubmissions: 47,
+  members: 12,
+  overtimeTotal: 38,
+  overtimePct: 58,
+  overtimeAvg: 2.4,
+  categoryAverages: [
+    { label: 'Priority Cases',      avg: 11.2, max: 18  },
+    { label: 'Pending Cases',       avg: 86.4, max: 120 },
+    { label: 'Unread Documents',    avg: 29.1, max: 55  },
+    { label: 'To-Do Items',         avg: 19.8, max: 40  },
+    { label: 'Sent Referrals',      avg:  3.4, max: 10  },
+    { label: 'CE Activities',       avg:  4.7, max: 12  },
+    { label: 'Assistance Requests', avg:  1.9, max: 7   },
+    { label: 'Aged Cases',          avg:  9.3, max: 20  }
+  ],
+  employment: { fullTime: 38, partTime: 9 },
+  onPlan:     { yes: 24, no: 23 }
+};
+
+/* ── Tiny element builder ──────────────────────────────────── */
+function el(tag, props, children) {
+  var node = document.createElement(tag);
+  if (props) {
+    Object.keys(props).forEach(function(k) {
+      if (k === 'className')    node.className = props[k];
+      else if (k === 'onClick') node.addEventListener('click', props[k]);
+      else if (k === 'style' && typeof props[k] === 'object') Object.assign(node.style, props[k]);
+      else if (k in node)       node[k] = props[k];
+      else                       node.setAttribute(k, props[k]);
+    });
+  }
+  if (typeof children === 'string') node.textContent = children;
+  else if (children instanceof Node) node.appendChild(children);
+  return node;
+}
+
+/* ── Theme toggle ──────────────────────────────────────────── */
+var html = document.documentElement;
+document.getElementById('themeToggle').addEventListener('click', function() {
+  var isDark = html.getAttribute('data-theme-mode') === 'dark';
+  html.setAttribute('data-theme-mode', isDark ? 'light' : 'dark');
+  this.textContent = isDark ? '🌕' : '🌙';
+});
+
+/* ── Tab router ────────────────────────────────────────────── */
+var activeTab = 'submit';
+var subInputs = {};
+var subData   = {};
+
+var tabBar     = document.getElementById('subTabs');
+var subContent = document.getElementById('subContent');
+
+['submit','history','stats','reminders'].forEach(function(tab) {
+  var btn = el('button', {
+    className: 'sub-tab' + (tab === activeTab ? ' active' : ''),
+    role: 'tab',
+    'aria-selected': tab === activeTab ? 'true' : 'false',
+    onClick: function() {
+      activeTab = tab;
+      tabBar.querySelectorAll('.sub-tab').forEach(function(b) {
+        b.classList.toggle('active', b.textContent.toLowerCase() === tab);
+        b.setAttribute('aria-selected', b.textContent.toLowerCase() === tab ? 'true' : 'false');
+      });
+      renderSubContent();
+    }
+  }, tab.charAt(0).toUpperCase() + tab.slice(1));
+  tabBar.appendChild(btn);
+});
+
+function renderSubContent() {
+  subContent.innerHTML = '';
+  if      (activeTab === 'submit')    renderSubmit(subContent);
+  else if (activeTab === 'history')   renderHistory(subContent);
+  else if (activeTab === 'stats')     renderStats(subContent);
+  else if (activeTab === 'reminders') renderReminders(subContent);
+}
+
+/* ── Submit tab ────────────────────────────────────────────── */
+function renderSubmit(container) {
+  subInputs = {};
+  subData   = {};
+
+  // Last submitted indicator
+  container.appendChild(el('div', { className: 'wt-last-submitted' },
+    'Last submitted: Mon, Apr 21 2025 · 9:03 AM'));
+
+  // Category grid
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Caseload Categories'));
+  var grid = el('div', { className: 'wt-grid' });
+
+  WT_CATEGORIES.forEach(function(cat) {
+    var item = el('div', { className: 'wt-grid-item' });
+    var head = el('div', { className: 'wt-grid-head' });
+    head.appendChild(el('span', { className: 'wt-grid-label' }, cat.label));
+
+    var numInput = el('input', { type: 'number', className: 'wt-grid-input', min: '0', max: '999', value: '0' });
+    numInput.addEventListener('input', function() {
+      var v = parseInt(numInput.value) || 0;
+      if (cat.warnAt > 0 && v >= cat.warnAt) item.classList.add('warn');
+      else item.classList.remove('warn');
+    });
+    subInputs[cat.id] = numInput;
+    head.appendChild(numInput);
+    item.appendChild(head);
+
+    var subs = WT_SUB_CATS[cat.key];
+    if (subs && subs.length) {
+      item.appendChild(el('button', { className: 'wt-detail-btn',
+        onClick: function() { openSubModal(cat, numInput); }
+      }, '+ detail'));
+    }
+    item.appendChild(el('div', { className: 'wt-warn-label' }, '⚠ High caseload'));
+    grid.appendChild(item);
+  });
+  container.appendChild(grid);
+
+  // Weekly cases
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Weekly Cases Assigned'));
+  var weeklyRow = el('div', { style: { display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' } });
+  var weeklySelect = el('select', { className: 'form-select' });
+  [['15','15 Cases'],['12','12 Cases'],['18','18 Cases'],['manual','Manual Entry']].forEach(function(o) {
+    weeklySelect.appendChild(el('option', { value: o[0] }, o[1]));
+  });
+  var weeklyManual = el('input', { type:'number', className:'wt-grid-input', min:'1', max:'999',
+    placeholder:'#', style:{ display:'none', width:'80px' } });
+  weeklySelect.addEventListener('change', function() {
+    weeklyManual.style.display = weeklySelect.value === 'manual' ? '' : 'none';
+  });
+  weeklyRow.appendChild(weeklySelect);
+  weeklyRow.appendChild(weeklyManual);
+  container.appendChild(weeklyRow);
+
+  // Employment
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Employment & Status'));
+  var empRow = el('div', { style: { display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' } });
+  var empSelect = el('select', { className: 'form-select' });
+  ['Full-time','Part-time'].forEach(function(o) { empSelect.appendChild(el('option', { value:o }, o)); });
+  var ptInput = el('input', { type:'number', className:'form-input', min:'1', max:'40',
+    placeholder:'Hours/wk', style:{ display:'none', width:'110px' } });
+  empSelect.addEventListener('change', function() {
+    ptInput.style.display = empSelect.value === 'Part-time' ? '' : 'none';
+  });
+  empRow.appendChild(empSelect);
+  empRow.appendChild(ptInput);
+  container.appendChild(empRow);
+
+  // Workflow plan + overtime
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Plan & Overtime'));
+  var planRow = el('div', { className: 'wt-check-row' });
+  var planCheck = el('input', { type:'checkbox', id:'planCheck' });
+  planRow.appendChild(planCheck);
+  planRow.appendChild(el('label', { htmlFor:'planCheck' }, 'On workflow plan'));
+  container.appendChild(planRow);
+
+  var otRow = el('div', { className: 'wt-check-row' });
+  var otCheck = el('input', { type:'checkbox', id:'otCheck' });
+  var otInput = el('input', { type:'number', className:'form-input', min:'0', max:'999',
+    placeholder:'OT hours', style:{ display:'none', width:'110px', marginLeft:'8px' } });
+  otCheck.addEventListener('change', function() { otInput.style.display = otCheck.checked ? '' : 'none'; });
+  otRow.appendChild(otCheck);
+  otRow.appendChild(el('label', { htmlFor:'otCheck' }, 'Worked overtime'));
+  otRow.appendChild(otInput);
+  container.appendChild(otRow);
+
+  // Leave
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Leave'));
+  var leaveSection = el('div', { className: 'wt-leave-section' });
+  var leaveTypeRow = el('div', { className: 'wt-leave-row' });
+  leaveTypeRow.appendChild(el('label', {}, 'Leave type'));
+  var leaveType = el('select', {});
+  ['','Sick Leave','Annual Leave','LWOP','FMLA','Admin Leave','Comp Time'].forEach(function(o) {
+    leaveType.appendChild(el('option', { value:o }, o || '— None —'));
+  });
+  var leaveDetails = el('div', { className: 'wt-leave-section', style: { display:'none' } });
+
+  leaveType.addEventListener('change', function() {
+    leaveDetails.style.display = leaveType.value ? '' : 'none';
+  });
+  leaveTypeRow.appendChild(leaveType);
+  leaveSection.appendChild(leaveTypeRow);
+
+  var leavePlannedRow = el('div', { className: 'wt-leave-row' });
+  leavePlannedRow.appendChild(el('label', {}, 'Type'));
+  var leavePlanned = el('select', {});
+  ['','Planned','Unplanned'].forEach(function(o) { leavePlanned.appendChild(el('option', { value:o }, o || '— Select —')); });
+  leavePlannedRow.appendChild(leavePlanned);
+  leaveDetails.appendChild(leavePlannedRow);
+
+  var leaveStartRow = el('div', { className: 'wt-leave-row' });
+  leaveStartRow.appendChild(el('label', {}, 'Start'));
+  leaveStartRow.appendChild(el('input', { type:'date' }));
+  leaveDetails.appendChild(leaveStartRow);
+
+  var leaveEndRow = el('div', { className: 'wt-leave-row' });
+  leaveEndRow.appendChild(el('label', {}, 'End'));
+  leaveEndRow.appendChild(el('input', { type:'date' }));
+  leaveDetails.appendChild(leaveEndRow);
+
+  leaveSection.appendChild(leaveDetails);
+  container.appendChild(leaveSection);
+
+  // Privacy
+  container.appendChild(el('div', { className: 'wt-section-title' }, 'Privacy Setting'));
+  var selectedPrivacy = 'Unit';
+  var privacyOptions = [
+    { val: 'Unit',   name: '🏢 Unit Anonymized',   desc: 'Your data is visible to stewards in your unit only, without your name.' },
+    { val: 'Agency', name: '🌐 Agency Anonymized', desc: 'Your data contributes to agency-wide statistics without identifying your unit.' }
+  ];
+  var privacyCards = [];
+  privacyOptions.forEach(function(p) {
+    var card = el('div', { className: 'wt-privacy-option' + (p.val === selectedPrivacy ? ' selected' : '') });
+    var inner = el('div');
+    inner.appendChild(el('div', { className: 'wt-privacy-name' }, p.name));
+    inner.appendChild(el('div', { className: 'wt-privacy-desc' }, p.desc));
+    card.appendChild(inner);
+    card.addEventListener('click', function() {
+      selectedPrivacy = p.val;
+      privacyCards.forEach(function(c, i) { c.classList.toggle('selected', privacyOptions[i].val === selectedPrivacy); });
+    });
+    privacyCards.push(card);
+    container.appendChild(card);
+  });
+
+  // Button row
+  var btnRow = el('div', { className: 'wt-btn-row' });
+  var clearBtn = el('button', { className: 'wt-clear-btn',
+    onClick: function() {
+      WT_CATEGORIES.forEach(function(cat) { subInputs[cat.id].value = '0'; });
+      statusMsg.textContent = 'Form cleared.';
+      setTimeout(function() { statusMsg.textContent = ''; }, 2000);
+    }
+  }, 'Clear All');
+
+  var submitBtn = el('button', { className: 'btn btn-primary',
+    onClick: function() {
+      statusMsg.style.color = 'var(--muted)';
+      statusMsg.textContent = 'Submitting…';
+      setTimeout(function() {
+        statusMsg.style.color = 'var(--success)';
+        statusMsg.textContent = '✓ Submitted to secure ledger';
+        submitBtn.disabled = false;
+      }, 900);
+      submitBtn.disabled = true;
+    }
+  }, 'Submit to Secure Ledger');
+
+  var statusMsg = el('span', { className: 'wt-status-msg' }, '');
+  btnRow.appendChild(clearBtn);
+  btnRow.appendChild(submitBtn);
+  btnRow.appendChild(statusMsg);
+  container.appendChild(btnRow);
+}
+
+/* ── Sub-category modal ────────────────────────────────────── */
+function openSubModal(cat, mainInput) {
+  var subs = WT_SUB_CATS[cat.key];
+  if (!subData[cat.key]) subData[cat.key] = {};
+
+  var overlay = el('div', { className: 'wt-modal-overlay' });
+  var modal   = el('div', { className: 'wt-modal' });
+  modal.appendChild(el('div', { className: 'wt-modal-title' }, cat.label + ' — Breakdown'));
+
+  var subInputElems = [];
+  var totalEl = el('span', {}, '0');
+
+  function updateTotal() {
+    var sum = subInputElems.reduce(function(a, i) { return a + (parseInt(i.value) || 0); }, 0);
+    totalEl.textContent = String(sum);
+  }
+
+  subs.forEach(function(name, si) {
+    var row = el('div', { className: 'wt-sub-row' });
+    row.appendChild(el('span', {}, name));
+    var inp = el('input', { type:'number', min:'0', max:'999', value: String(subData[cat.key][si] || 0) });
+    inp.addEventListener('input', updateTotal);
+    subInputElems.push(inp);
+    row.appendChild(inp);
+    modal.appendChild(row);
+  });
+
+  var totalRow = el('div', { className: 'wt-modal-total' });
+  totalRow.appendChild(el('span', {}, 'Total'));
+  totalRow.appendChild(totalEl);
+  modal.appendChild(totalRow);
+  updateTotal();
+
+  var btns = el('div', { className: 'wt-modal-btns' });
+  btns.appendChild(el('button', { className: 'btn btn-secondary',
+    onClick: function() { overlay.remove(); }
+  }, 'Cancel'));
+  btns.appendChild(el('button', { className: 'btn btn-primary',
+    onClick: function() {
+      var sum = 0;
+      subInputElems.forEach(function(inp, si) {
+        var v = parseInt(inp.value) || 0;
+        subData[cat.key][si] = v;
+        sum += v;
+      });
+      mainInput.value = String(sum);
+      mainInput.dispatchEvent(new Event('input'));
+      overlay.remove();
+    }
+  }, 'Apply'));
+  modal.appendChild(btns);
+
+  overlay.appendChild(modal);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  setTimeout(function() { modal.querySelector('input') && modal.querySelector('input').focus(); }, 50);
+}
+
+/* ── History tab ───────────────────────────────────────────── */
+function renderHistory(container) {
+  // Export button
+  var exportBtn = el('button', { className: 'btn btn-secondary',
+    style: { marginBottom:'12px', fontSize:'12px' },
+    onClick: function() {
+      exportBtn.textContent = '✓ Downloaded';
+      setTimeout(function() { exportBtn.textContent = 'Export CSV'; }, 2000);
+    }
+  }, 'Export CSV');
+  container.appendChild(exportBtn);
+
+  // Summary card
+  var sc = el('div', { className: 'wt-history-card', style:{ marginBottom:'12px' } });
+  sc.appendChild(el('div', { style:{ fontWeight:'600', fontSize:'13px', marginBottom:'6px' } }, 'Summary'));
+  sc.appendChild(el('div', { className: 'wt-history-meta' },
+    '4 submissions · Mar 24 – Apr 14, 2025'));
+  sc.appendChild(el('div', { className: 'wt-history-meta' },
+    'Overtime: 6 hrs total · 1.5 avg/submission'));
+  container.appendChild(sc);
+
+  var labels = ['Pri','Pend','Doc','ToDo','Ref','CE','Asst','Aged'];
+
+  SAMPLE_HISTORY.forEach(function(entry) {
+    var card = el('div', { className: 'wt-history-card' });
+    card.appendChild(el('div', { className: 'wt-history-date' }, entry.dateDisplay));
+
+    var grid = el('div', { className: 'wt-history-grid' });
+    for (var i = 0; i < 8; i++) {
+      var cell = el('div', { className: 'wt-history-cell' });
+      cell.appendChild(el('div', { className: 'wt-history-cell-label' }, labels[i]));
+      cell.appendChild(el('div', { className: 'wt-history-cell-val' }, String(entry['t' + (i+1)] || 0)));
+      grid.appendChild(cell);
+    }
+    card.appendChild(grid);
+
+    var meta = [];
+    if (entry.weeklyCases) meta.push('Weekly: ' + entry.weeklyCases);
+    if (entry.employment && entry.employment !== 'Full-time') meta.push(entry.employment + (entry.ptHours ? ' (' + entry.ptHours + 'h)' : ''));
+    if (entry.leaveType) meta.push('Leave: ' + entry.leaveType);
+    if (entry.overtime && entry.overtime !== '0') meta.push('OT: ' + entry.overtime + 'h');
+    meta.push(entry.privacy);
+    if (entry.onPlan === 'Yes') meta.push('On Plan');
+    card.appendChild(el('div', { className: 'wt-history-meta' }, meta.join(' · ')));
+
+    // Expandable sub-cats
+    if (entry.subCategories && Object.keys(entry.subCategories).length) {
+      var subDiv = el('div', { style:{ display:'none', marginTop:'8px', fontSize:'12px', color:'var(--muted)' } });
+      var catLabels = { priority:'Priority Cases', pending:'Pending Cases', aged:'Aged Cases' };
+      Object.keys(entry.subCategories).forEach(function(ck) {
+        var catSubs = entry.subCategories[ck];
+        var catLabel = catLabels[ck] || ck;
+        var subs = WT_SUB_CATS[ck] || [];
+        Object.keys(catSubs).forEach(function(sk) {
+          if (Number(catSubs[sk]) > 0) {
+            subDiv.appendChild(el('div', {}, catLabel + ' › ' + (subs[sk] || sk) + ': ' + catSubs[sk]));
+          }
+        });
+      });
+      if (subDiv.children.length) {
+        var expBtn = el('button', { className: 'wt-history-expand-btn' }, '▼ Show details');
+        expBtn.addEventListener('click', function() {
+          var vis = subDiv.style.display === 'none';
+          subDiv.style.display = vis ? '' : 'none';
+          expBtn.textContent = vis ? '▲ Hide details' : '▼ Show details';
+        });
+        card.appendChild(expBtn);
+        card.appendChild(subDiv);
+      }
+    }
+
+    container.appendChild(card);
+  });
+}
+
+/* ── Stats tab ─────────────────────────────────────────────── */
+function renderStats(container) {
+  var d = SAMPLE_STATS;
+
+  // Header
+  container.appendChild(el('div', { style:{ fontSize:'13px', color:'var(--muted)', marginBottom:'10px' } },
+    d.totalSubmissions + ' shared submissions from ' + d.members + ' members'));
+
+  // KPI strip
+  var kpi = el('div', { className: 'kpi-strip' });
+  [
+    { val: d.overtimeTotal + 'h', label: 'Total OT hours' },
+    { val: d.overtimePct + '%',   label: '% reporting OT' },
+    { val: d.overtimeAvg + 'h',   label: 'Avg OT / submission' }
+  ].forEach(function(k) {
+    var card = el('div', { className: 'wt-stat-card' });
+    card.appendChild(el('div', { className: 'wt-stat-value' }, k.val));
+    card.appendChild(el('div', { className: 'wt-stat-label' }, k.label));
+    kpi.appendChild(card);
+  });
+  container.appendChild(kpi);
+
+  // Category averages bar chart
+  var avgSection = el('div', { className: 'wt-breakdown-section' });
+  avgSection.appendChild(el('div', { className: 'wt-breakdown-title' }, 'Average Caseload by Category'));
+  var maxAvg = Math.max.apply(null, d.categoryAverages.map(function(c) { return c.avg; }));
+  d.categoryAverages.forEach(function(cat) {
+    var row = el('div', { className: 'wt-bar-row' });
+    row.appendChild(el('span', { className: 'wt-bar-label' }, cat.label));
+    var track = el('div', { className: 'wt-bar-track' });
+    var fill  = el('div', { className: 'wt-bar-fill', style:{ width: Math.round((cat.avg / maxAvg) * 100) + '%' } });
+    track.appendChild(fill);
+    row.appendChild(track);
+    row.appendChild(el('span', { className: 'wt-bar-val' }, cat.avg));
+    avgSection.appendChild(row);
+  });
+  container.appendChild(avgSection);
+
+  // Employment + plan breakdowns
+  var empSection = el('div', { className: 'wt-breakdown-section' });
+  empSection.appendChild(el('div', { className: 'wt-breakdown-title' }, 'Employment'));
+  [['Full-time', d.employment.fullTime], ['Part-time', d.employment.partTime]].forEach(function(row) {
+    var r = el('div', { className: 'wt-breakdown-row' });
+    r.appendChild(el('span', { className: 'wt-breakdown-key' }, row[0]));
+    r.appendChild(el('span', { className: 'wt-breakdown-val' }, row[1] + ' members'));
+    empSection.appendChild(r);
+  });
+  container.appendChild(empSection);
+
+  var planSection = el('div', { className: 'wt-breakdown-section' });
+  planSection.appendChild(el('div', { className: 'wt-breakdown-title' }, 'Workflow Plan'));
+  [['On plan', d.onPlan.yes], ['Not on plan', d.onPlan.no]].forEach(function(row) {
+    var r = el('div', { className: 'wt-breakdown-row' });
+    r.appendChild(el('span', { className: 'wt-breakdown-key' }, row[0]));
+    r.appendChild(el('span', { className: 'wt-breakdown-val' }, row[1] + ' members'));
+    planSection.appendChild(r);
+  });
+  container.appendChild(planSection);
+}
+
+/* ── Reminders tab ─────────────────────────────────────────── */
+function renderReminders(container) {
+  var card = el('div', { className: 'wt-reminders-card' });
+
+  // Enabled toggle
+  var enabledRow = el('div', { className: 'wt-check-row', style:{ marginBottom:'18px' } });
+  var enabledCheck = el('input', { type:'checkbox', id:'remEnabled', checked: true });
+  enabledCheck.setAttribute('checked', '');
+  enabledRow.appendChild(enabledCheck);
+  enabledRow.appendChild(el('label', { htmlFor:'remEnabled' }, 'Email reminders enabled'));
+  card.appendChild(enabledRow);
+
+  // Frequency
+  var freqRow = el('div', { className: 'wt-reminders-row' });
+  freqRow.appendChild(el('div', { className: 'wt-reminders-label' }, 'Frequency'));
+  var freqSel = el('select', { className: 'form-select' });
+  ['daily','weekly','biweekly','monthly','quarterly'].forEach(function(o) {
+    freqSel.appendChild(el('option', { value:o }, o.charAt(0).toUpperCase() + o.slice(1)));
+  });
+  freqSel.value = 'weekly';
+  freqRow.appendChild(freqSel);
+  card.appendChild(freqRow);
+
+  // Day picker (weekly/biweekly)
+  var dayRow = el('div', { className: 'wt-reminders-row' });
+  dayRow.appendChild(el('div', { className: 'wt-reminders-label' }, 'Day'));
+  var daySel = el('select', { className: 'form-select' });
+  ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(function(d) {
+    daySel.appendChild(el('option', { value:d }, d));
+  });
+  daySel.value = 'Monday';
+  dayRow.appendChild(daySel);
+  card.appendChild(dayRow);
+
+  freqSel.addEventListener('change', function() {
+    dayRow.style.display = (freqSel.value === 'weekly' || freqSel.value === 'biweekly') ? '' : 'none';
+  });
+
+  // Time picker
+  var timeRow = el('div', { className: 'wt-reminders-row' });
+  timeRow.appendChild(el('div', { className: 'wt-reminders-label' }, 'Time'));
+  var timeSel = el('select', { className: 'form-select' });
+  [['8','8:00 AM'],['10','10:00 AM'],['12','12:00 PM'],['14','2:00 PM'],['16','4:00 PM'],['18','6:00 PM'],['20','8:00 PM']].forEach(function(t) {
+    timeSel.appendChild(el('option', { value: t[0] }, t[1]));
+  });
+  timeSel.value = '8';
+  timeRow.appendChild(timeSel);
+  card.appendChild(timeRow);
+
+  // Save button
+  var saveMsg = el('div', { className: 'wt-save-msg' }, '✓ Preferences saved');
+  var saveBtn = el('button', { className: 'btn btn-primary', style:{ marginTop:'4px' },
+    onClick: function() {
+      saveMsg.style.display = 'block';
+      setTimeout(function() { saveMsg.style.display = 'none'; }, 2500);
+    }
+  }, 'Save Preferences');
+  card.appendChild(saveBtn);
+  card.appendChild(saveMsg);
+
+  container.appendChild(card);
+}
+
+/* ── Boot ──────────────────────────────────────────────────── */
+renderSubContent();
+</script>
+</body>
+</html>

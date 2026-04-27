@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-mode="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DDS Dashboard — Local Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+/* ── Design Tokens ── */
+:root {
+  --accent:        #7C3AED;
+  --accent-light:  #9b6af5;
+  --accent-bg:     rgba(124,58,237,.12);
+  --accent-border: rgba(124,58,237,.35);
+  --accent-glow:   0 0 18px rgba(124,58,237,.45);
+
+  --success:  #4ade80;
+  --warning:  #facc15;
+  --danger:   #ef4444;
+  --info:     #60a5fa;
+
+  --surface:   #141414;
+  --surface-2: #1c1c1c;
+  --surface-3: #242424;
+  --border:    rgba(255,255,255,.08);
+  --text:      #e0e0e0;
+  --text-2:    #888;
+
+  --radius:    10px;
+  --sidebar-w: 240px;
+  --font-ui:   'Space Grotesk', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  position: relative;
+  z-index: 10;
+}
+.sidebar-brand {
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-title {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed, #c084fc, #818cf8);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: prism 6s ease infinite;
+  letter-spacing: .4px;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+}
+@keyframes prism {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+.sidebar-section {
+  padding: 10px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  font-family: var(--font-ui);
+  margin-top: 4px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-radius: 7px;
+  margin: 1px 6px;
+  font-size: 13.5px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--text-2);
+  transition: background .15s, color .15s, border-color .15s;
+  border-left: 3px solid transparent;
+}
+.sidebar-item:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.sidebar-item.active {
+  background: var(--accent-bg);
+  color: var(--accent-light);
+  border-left-color: var(--accent);
+}
+.sidebar-item .icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.sidebar-item .nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+}
+
+/* ── Main Content ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Top Bar ── */
+.topbar {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.topbar-title {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  cursor: pointer;
+  border: 2px solid var(--accent-border);
+}
+.topbar-btn {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.topbar-btn:hover { background: var(--accent-bg); color: var(--accent-light); border-color: var(--accent-border); }
+.live-pill {
+  background: rgba(74,222,128,.12);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  border: 1px solid rgba(74,222,128,.25);
+}
+
+/* ── Tab Content Area ── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Section Header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.section-title {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+.section-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+
+/* ── KPI Grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.kpi-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.kpi-card:hover { border-color: var(--accent-border); box-shadow: var(--accent-glow); }
+.kpi-label { font-size: 11px; color: var(--text-2); font-weight: 600; letter-spacing: .5px; text-transform: uppercase; font-family: var(--font-ui); }
+.kpi-value { font-size: 26px; font-weight: 700; font-family: var(--font-ui); color: var(--text); line-height: 1; }
+.kpi-delta { font-size: 11.5px; font-family: var(--font-mono); }
+.kpi-delta.up   { color: var(--success); }
+.kpi-delta.down { color: var(--danger); }
+.kpi-delta.flat { color: var(--text-2); }
+
+/* ── Card ── */
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Table ── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+}
+.data-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  color: var(--text);
+  font-family: var(--font-body);
+  vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface-3); }
+
+/* ── Status Badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.badge.open     { background: rgba(96,165,250,.15); color: var(--info); }
+.badge.active   { background: rgba(250,204,21,.15);  color: var(--warning); }
+.badge.resolved { background: rgba(74,222,128,.15);  color: var(--success); }
+.badge.overdue  { background: rgba(239,68,68,.15);   color: var(--danger); }
+.badge.pending  { background: rgba(139,92,246,.15);  color: #a78bfa; }
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot.open     { background: var(--info);    box-shadow: 0 0 6px var(--info); }
+.dot.active   { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.dot.resolved { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.dot.overdue  { background: var(--danger);  box-shadow: 0 0 6px var(--danger); }
+.dot.pending  { background: #a78bfa;        box-shadow: 0 0 6px #a78bfa; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  border: none;
+}
+.btn-primary   { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); box-shadow: var(--accent-glow); }
+.btn-secondary { background: var(--surface-3); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { border-color: var(--accent-border); color: var(--accent-light); }
+.btn-danger    { background: rgba(239,68,68,.15); color: var(--danger); border: 1px solid rgba(239,68,68,.3); }
+.btn-danger:hover { background: rgba(239,68,68,.25); }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
+
+/* ── Progress Bars ── */
+.progress-wrap { background: var(--surface-3); border-radius: 20px; height: 6px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 20px; transition: width .6s ease; }
+
+/* ── Member Row ── */
+.member-row { display: flex; align-items: center; gap: 10px; }
+.member-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.member-name { font-size: 13.5px; font-weight: 600; }
+.member-role { font-size: 11px; color: var(--text-2); }
+
+/* ── Grid Layouts ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+
+/* ── Event Items ── */
+.event-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.event-item:last-child { border-bottom: none; }
+.event-date-block {
+  text-align: center;
+  min-width: 44px;
+  background: var(--surface-3);
+  border-radius: 8px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+}
+.event-month { font-size: 9px; font-weight: 700; color: var(--accent-light); text-transform: uppercase; font-family: var(--font-ui); }
+.event-day   { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1; font-family: var(--font-ui); }
+.event-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.event-meta  { font-size: 11.5px; color: var(--text-2); margin-top: 3px; }
+
+/* ── Broadcasts ── */
+.broadcast-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.broadcast-item:last-child { border-bottom: none; }
+.broadcast-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.broadcast-title { font-size: 14px; font-weight: 700; font-family: var(--font-ui); }
+.broadcast-body  { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+.broadcast-ts    { font-size: 11px; color: var(--text-2); font-family: var(--font-mono); flex-shrink: 0; }
+
+/* ── Health Rows ── */
+.health-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.health-row:last-child { border-bottom: none; }
+.health-label { font-size: 13px; font-weight: 500; width: 170px; flex-shrink: 0; }
+.health-bar   { flex: 1; }
+.health-pct   { font-size: 12px; font-weight: 700; font-family: var(--font-mono); width: 40px; text-align: right; flex-shrink: 0; }
+
+/* ── Poll Options ── */
+.poll-option { padding: 10px 0; }
+.poll-option-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+.poll-option-label span:last-child { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
+
+/* ── Timeline ── */
+.timeline-item { display: flex; gap: 14px; padding-bottom: 20px; position: relative; }
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 17px; top: 36px;
+  width: 2px;
+  height: calc(100% - 16px);
+  background: var(--border);
+}
+.timeline-item:last-child::before { display: none; }
+.timeline-dot {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  background: var(--surface-3);
+  z-index: 1;
+}
+.timeline-content { flex: 1; }
+.timeline-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.timeline-desc  { font-size: 12.5px; color: var(--text-2); margin-top: 3px; line-height: 1.5; }
+.timeline-time  { font-size: 11px; color: var(--text-2); font-family: var(--font-mono); margin-top: 5px; }
+
+/* ── Nav Progress Bar ── */
+.nav-progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa, #7c3aed);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  z-index: 9999;
+  transition: opacity .15s, transform .35s ease;
+}
+.nav-progress.running { opacity: 1; transform: scaleX(.8); }
+.nav-progress.done    { opacity: 0; transform: scaleX(1); }
+
+/* ── Bottom Nav (mobile) ── */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  padding: 8px 0 env(safe-area-inset-bottom, 0);
+  z-index: 100;
+}
+.bottom-nav-inner { display: flex; justify-content: space-around; }
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 12px;
+  cursor: pointer;
+  opacity: .5;
+  transition: opacity .15s;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--text);
+}
+.bottom-nav-item.active { opacity: 1; color: var(--accent-light); }
+.bottom-nav-icon { font-size: 20px; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2,1fr); }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .bottom-nav { display: block; }
+  .content { padding: 16px; padding-bottom: 90px; }
+  .topbar { padding: 10px 16px; }
+  .topbar-btn span { display: none; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="nav-progress" id="navProgress"></div>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-title">DDS Dashboard</div>
+    <div class="brand-sub">Region 1 · Steward View</div>
+  </div>
+
+  <div class="sidebar-item active" data-tab="cases">
+    <span class="icon">📋</span> Cases
+    <span class="nav-badge">7</span>
+  </div>
+  <div class="sidebar-item" data-tab="newgrievance">
+    <span class="icon">📝</span> New Grievance
+  </div>
+  <div class="sidebar-item" data-tab="members">
+    <span class="icon">👥</span> Members
+  </div>
+  <div class="sidebar-item" data-tab="contactlog">
+    <span class="icon">📞</span> Contact Log
+  </div>
+
+  <div class="sidebar-section">Manage</div>
+  <div class="sidebar-item" data-tab="tasks">
+    <span class="icon">✅</span> Tasks
+  </div>
+  <div class="sidebar-item" data-tab="insights">
+    <span class="icon">📊</span> Insights
+  </div>
+  <div class="sidebar-item" data-tab="explorer">
+    <span class="icon">🔬</span> Explorer
+  </div>
+  <div class="sidebar-item" data-tab="accesslog">
+    <span class="icon">🔍</span> Access Log
+  </div>
+  <div class="sidebar-item" data-tab="engagement">
+    <span class="icon">🎯</span> Engagement
+  </div>
+  <div class="sidebar-item" data-tab="orghealth">
+    <span class="icon">🌳</span> Org Health
+  </div>
+
+  <div class="sidebar-section">Community</div>
+  <div class="sidebar-item" data-tab="qaforum">
+    <span class="icon">💬</span> Q&amp;A Forum
+    <span class="nav-badge">3</span>
+  </div>
+  <div class="sidebar-item" data-tab="polls">
+    <span class="icon">🗳</span> Polls
+  </div>
+  <div class="sidebar-item" data-tab="surveytrack">
+    <span class="icon">📈</span> Survey Tracking
+  </div>
+  <div class="sidebar-item" data-tab="mentorship">
+    <span class="icon">🤝</span> Mentorship
+  </div>
+
+  <div class="sidebar-section">Reference</div>
+  <div class="sidebar-item" data-tab="resources">
+    <span class="icon">📚</span> Resources
+  </div>
+  <div class="sidebar-item" data-tab="knowledge">
+    <span class="icon">🎓</span> Knowledge
+  </div>
+
+  <div class="sidebar-section">Comms</div>
+  <div class="sidebar-item" data-tab="broadcast">
+    <span class="icon">📢</span> Broadcast
+  </div>
+  <div class="sidebar-item" data-tab="minutes">
+    <span class="icon">📝</span> Minutes
+  </div>
+  <div class="sidebar-item" data-tab="notifications">
+    <span class="icon">🔔</span> Notifications
+  </div>
+  <div class="sidebar-item" data-tab="events">
+    <span class="icon">📅</span> Events
+  </div>
+  <div class="sidebar-item" data-tab="timeline">
+    <span class="icon">📅</span> Timeline
+  </div>
+
+  <div class="sidebar-section">Admin</div>
+  <div class="sidebar-item" data-tab="analytics">
+    <span class="icon">📈</span> Usage Analytics
+  </div>
+  <div class="sidebar-item" data-tab="failsafe">
+    <span class="icon">🛡</span> Data Failsafe
+  </div>
+  <div class="sidebar-item" data-tab="testrunner">
+    <span class="icon">🧪</span> Test Runner
+  </div>
+</aside>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="tabTitle">Home</div>
+    </div>
+    <div class="topbar-right">
+      <span class="live-pill">● Live</span>
+      <button class="topbar-btn" onclick="showToast('New grievance form opened')">
+        <span>⊕</span><span>New Grievance</span>
+      </button>
+      <button class="topbar-btn" onclick="showToast('Broadcast composer opened')">
+        <span>📣</span><span>Broadcast</span>
+      </button>
+      <div class="avatar" title="Wardis Vizcaino — Steward">WV</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ══════ HOME ══════ -->
+    <div class="tab-pane active" id="tab-home">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Good afternoon, Wardis 👋</div>
+          <div class="section-sub">Friday, April 25, 2026 · Region 1 · Boston District Office</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Report exported')">⬇ Export Report</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Open Cases</div>
+          <div class="kpi-value">23</div>
+          <div class="kpi-delta up">↑ 3 this week</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Active Members</div>
+          <div class="kpi-value">184</div>
+          <div class="kpi-delta up">↑ 2 new this month</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg. Resolution</div>
+          <div class="kpi-value">18d</div>
+          <div class="kpi-delta down">↑ 2d slower than target</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Engagement Rate</div>
+          <div class="kpi-value">71%</div>
+          <div class="kpi-delta up">↑ 4% vs last quarter</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📂 Recent Cases</div>
+          <table class="data-table">
+            <thead><tr><th>Case</th><th>Member</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0415</td>
+                <td><div class="member-row"><div class="member-avatar" style="background:#8b5cf6">JT</div><div class="member-name">James Tran</div></div></td>
+                <td><span class="badge open"><span class="dot open"></span>Open</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0412</td>
+                <td><div class="member-row"><div class="member-avatar" style="background:#3b82f6">RM</div><div class="member-name">Rosa Martinez</div></div></td>
+                <td><span class="badge active"><span class="dot active"></span>Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0408</td>
+                <td><div class="member-row"><div class="member-avatar" style="background:#f59e0b">DK</div><div class="member-name">David Kim</div></div></td>
+                <td><span class="badge overdue"><span class="dot overdue"></span>Overdue</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0399</td>
+                <td><div class="member-row"><div class="member-avatar" style="background:#10b981">SO</div><div class="member-name">Sandra O'Brien</div></div></td>
+                <td><span class="badge resolved"><span class="dot resolved"></span>Resolved</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:14px">
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('cases')">View All Cases →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🕐 Activity Timeline</div>
+          <div class="timeline-item">
+            <div class="timeline-dot">📝</div>
+            <div class="timeline-content">
+              <div class="timeline-title">Grievance #GRV-0415 filed</div>
+              <div class="timeline-desc">James Tran — Art. 17 overtime violation, 2.5 hrs unpaid</div>
+              <div class="timeline-time">Today 9:42 AM</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot">✅</div>
+            <div class="timeline-content">
+              <div class="timeline-title">GRV-0399 resolved — Step 2 withdrawn</div>
+              <div class="timeline-desc">Management agreed to retroactive pay correction</div>
+              <div class="timeline-time">Yesterday 3:15 PM</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot">📣</div>
+            <div class="timeline-content">
+              <div class="timeline-title">Broadcast sent — Q2 Contract Update</div>
+              <div class="timeline-desc">Delivered to 184 members · 91% open rate</div>
+              <div class="timeline-time">Apr 23, 11:00 AM</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot">🗓</div>
+            <div class="timeline-content">
+              <div class="timeline-title">General membership meeting scheduled</div>
+              <div class="timeline-desc">May 8 @ 6:00 PM — Zoom + Boston DO Conf. Rm B</div>
+              <div class="timeline-time">Apr 22, 8:30 AM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ CASES ══════ -->
+    <div class="tab-pane" id="tab-cases">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Cases</div>
+          <div class="section-sub">23 open · 7 overdue · 41 resolved YTD</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="showToast('Filters panel opened')">⚙ Filter</button>
+          <button class="btn btn-primary btn-sm" onclick="showToast('New grievance form opened')">⊕ New Grievance</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Open</div>
+          <div class="kpi-value" style="color:var(--info)">23</div>
+          <div class="kpi-delta flat">In progress</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Overdue</div>
+          <div class="kpi-value" style="color:var(--danger)">7</div>
+          <div class="kpi-delta down">↑ 2 vs last week</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Resolved YTD</div>
+          <div class="kpi-value" style="color:var(--success)">41</div>
+          <div class="kpi-delta up">↑ 12 vs Q1 last year</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Win Rate</div>
+          <div class="kpi-value">67%</div>
+          <div class="kpi-delta up">↑ 5% vs prior year</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📂 Grievance Log</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>ID</th><th>Member</th><th>Article</th><th>Issue</th><th>Step</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0415</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#8b5cf6;font-size:11px">JT</div><div class="member-name">James Tran</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 17</td>
+              <td>Unpaid overtime — 2.5 hrs</td><td>Step 1</td>
+              <td><span class="badge open"><span class="dot open"></span>Open</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0415 opened')">View</button></td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0412</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#3b82f6;font-size:11px">RM</div><div class="member-name">Rosa Martinez</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 12</td>
+              <td>Denied telework accommodation</td><td>Step 2</td>
+              <td><span class="badge active"><span class="dot active"></span>Active</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0412 opened')">View</button></td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0408</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#f59e0b;font-size:11px">DK</div><div class="member-name">David Kim</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 31</td>
+              <td>Performance appraisal dispute</td><td>Step 1</td>
+              <td><span class="badge overdue"><span class="dot overdue"></span>Overdue</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0408 opened')">View</button></td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0403</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#10b981;font-size:11px">LP</div><div class="member-name">Luz Pereira</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 25</td>
+              <td>Unsafe workspace — ergonomics</td><td>Step 3</td>
+              <td><span class="badge pending"><span class="dot pending"></span>Pending</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0403 opened')">View</button></td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0399</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#6366f1;font-size:11px">SO</div><div class="member-name">Sandra O'Brien</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 19</td>
+              <td>Retroactive pay correction</td><td>Closed</td>
+              <td><span class="badge resolved"><span class="dot resolved"></span>Resolved</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0399 opened')">View</button></td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12px;color:var(--text-2)">#GRV-0395</td>
+              <td><div class="member-row"><div class="member-avatar" style="background:#ec4899;font-size:11px">TW</div><div class="member-name">Terrence Wade</div></div></td>
+              <td style="font-family:var(--font-mono);font-size:12px">Art. 10</td>
+              <td>Disciplinary — written reprimand</td><td>Step 2</td>
+              <td><span class="badge overdue"><span class="dot overdue"></span>Overdue</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Case GRV-0395 opened')">View</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ MEMBERS ══════ -->
+    <div class="tab-pane" id="tab-members">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Members</div>
+          <div class="section-sub">184 active · 6 new this quarter</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Member onboarding form opened')">⊕ Add Member</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Members</div>
+          <div class="kpi-value">184</div>
+          <div class="kpi-delta up">↑ 6 this quarter</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Good Standing</div>
+          <div class="kpi-value">171</div>
+          <div class="kpi-delta up">93% rate</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Dues Current</div>
+          <div class="kpi-value">98%</div>
+          <div class="kpi-delta up">↑ 1% vs last month</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg. Tenure</div>
+          <div class="kpi-value">8.4y</div>
+          <div class="kpi-delta flat">Stable</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">👥 Member Roster</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>Member</th><th>Grade</th><th>Office</th><th>Unit</th><th>Status</th><th>Tenure</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#3b82f6">RM</div><div><div class="member-name">Rosa Martinez</div><div class="member-role">Claims Examiner</div></div></div></td>
+              <td>GS-12</td><td>Boston DO</td><td>Claims</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">11 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#f59e0b">DK</div><div><div class="member-name">David Kim</div><div class="member-role">Medical Analyst</div></div></div></td>
+              <td>GS-11</td><td>Boston DO</td><td>Medical</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">6 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#10b981">SO</div><div><div class="member-name">Sandra O'Brien</div><div class="member-role">Senior Examiner</div></div></div></td>
+              <td>GS-13</td><td>Boston DO</td><td>Claims</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">18 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#8b5cf6">JT</div><div><div class="member-name">James Tran</div><div class="member-role">Claims Examiner</div></div></div></td>
+              <td>GS-11</td><td>Boston DO</td><td>Claims</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">3 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#10b981">LP</div><div><div class="member-name">Luz Pereira</div><div class="member-role">Data Entry Specialist</div></div></div></td>
+              <td>GS-9</td><td>Boston DO</td><td>Admin</td>
+              <td><span class="badge active">Review Pending</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">2 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#ec4899">TW</div><div><div class="member-name">Terrence Wade</div><div class="member-role">Vocational Expert</div></div></div></td>
+              <td>GS-12</td><td>Boston DO</td><td>Vocational</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">9 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+            <tr>
+              <td><div class="member-row"><div class="member-avatar" style="background:#6366f1">MC</div><div><div class="member-name">Maria Chen</div><div class="member-role">Hearing Officer</div></div></div></td>
+              <td>GS-13</td><td>Springfield DO</td><td>Hearings</td>
+              <td><span class="badge resolved">Good Standing</span></td>
+              <td style="font-family:var(--font-mono);font-size:12px">14 yrs</td>
+              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Profile opened')">Profile</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ INSIGHTS ══════ -->
+    <div class="tab-pane" id="tab-insights">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Insights</div>
+          <div class="section-sub">Q2 2026 · Boston District Office</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Q2 analytics report downloaded')">⬇ Download Q2 Report</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Win Rate</div>
+          <div class="kpi-value" style="color:var(--success)">67%</div>
+          <div class="kpi-delta up">↑ 5% YoY</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg. Step 1 Days</div>
+          <div class="kpi-value">12</div>
+          <div class="kpi-delta up">↓ 3d faster than Q1</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Member Satisfaction</div>
+          <div class="kpi-value">4.2</div>
+          <div class="kpi-delta up">↑ 0.3 vs last quarter</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Broadcast Open Rate</div>
+          <div class="kpi-value">91%</div>
+          <div class="kpi-delta up">↑ 8% vs Q1</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📈 Grievance Outcomes (YTD)</div>
+          <div class="health-row">
+            <div class="health-label">Won — Full remedy</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:42%;background:var(--success)"></div></div></div>
+            <div class="health-pct" style="color:var(--success)">42%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Won — Partial remedy</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:25%;background:var(--info)"></div></div></div>
+            <div class="health-pct" style="color:var(--info)">25%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Withdrawn — Settled</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:18%;background:var(--warning)"></div></div></div>
+            <div class="health-pct" style="color:var(--warning)">18%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Denied</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:15%;background:var(--danger)"></div></div></div>
+            <div class="health-pct" style="color:var(--danger)">15%</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📋 Top Grievance Articles</div>
+          <div class="health-row">
+            <div class="health-label">Art. 17 — Overtime</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:34%;background:var(--accent)"></div></div></div>
+            <div class="health-pct" style="color:var(--accent-light)">34%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Art. 12 — Leave</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:22%;background:var(--accent)"></div></div></div>
+            <div class="health-pct" style="color:var(--accent-light)">22%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Art. 10 — Discipline</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:19%;background:var(--accent)"></div></div></div>
+            <div class="health-pct" style="color:var(--accent-light)">19%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Art. 25 — Safety</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:14%;background:var(--accent)"></div></div></div>
+            <div class="health-pct" style="color:var(--accent-light)">14%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Art. 31 — Performance</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:11%;background:var(--accent)"></div></div></div>
+            <div class="health-pct" style="color:var(--accent-light)">11%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Poll -->
+      <div class="card">
+        <div class="card-title">📊 Active Poll — Contract Priority Survey <span style="font-size:12px;color:var(--text-2);font-weight:400">· 142 responses</span></div>
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:14px">Which contract item should the negotiating team prioritize in 2026?</div>
+
+        <div class="poll-option">
+          <div class="poll-option-label"><span>💰 Wage increases above COLA</span><span>51% · 72 votes</span></div>
+          <div class="progress-wrap"><div class="progress-fill" style="width:51%;background:var(--accent)"></div></div>
+        </div>
+        <div class="poll-option">
+          <div class="poll-option-label"><span>🏠 Expanded telework rights</span><span>28% · 40 votes</span></div>
+          <div class="progress-wrap"><div class="progress-fill" style="width:28%;background:var(--info)"></div></div>
+        </div>
+        <div class="poll-option">
+          <div class="poll-option-label"><span>🛡 Stronger RIF protections</span><span>14% · 20 votes</span></div>
+          <div class="progress-wrap"><div class="progress-fill" style="width:14%;background:var(--success)"></div></div>
+        </div>
+        <div class="poll-option">
+          <div class="poll-option-label"><span>⏱ Overtime cap enforcement</span><span>7% · 10 votes</span></div>
+          <div class="progress-wrap"><div class="progress-fill" style="width:7%;background:var(--warning)"></div></div>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="showToast('Vote recorded — thank you!')">Cast Vote</button>
+          <button class="btn btn-secondary btn-sm" onclick="showToast('Poll results exported')">Export Results</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ ORG HEALTH ══════ -->
+    <div class="tab-pane" id="tab-orghealth">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Org Health</div>
+          <div class="section-sub">Overall score: 78 / 100 · Q2 2026</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Health report emailed to exec board')">📤 Share with Board</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Health Score</div>
+          <div class="kpi-value" style="color:var(--success)">78</div>
+          <div class="kpi-delta up">↑ 4 pts vs Q1</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Dues Collection</div>
+          <div class="kpi-value">98%</div>
+          <div class="kpi-delta up">↑ 1%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Meeting Attendance</div>
+          <div class="kpi-value">63%</div>
+          <div class="kpi-delta down">↓ 4% vs Q1</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Steward Capacity</div>
+          <div class="kpi-value">84%</div>
+          <div class="kpi-delta up">↑ 9%</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">💚 Health Indicators</div>
+          <div class="health-row">
+            <div class="health-label">Dues collection</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:98%;background:var(--success)"></div></div></div>
+            <div class="health-pct" style="color:var(--success)">98%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Steward responsiveness</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:88%;background:var(--success)"></div></div></div>
+            <div class="health-pct" style="color:var(--success)">88%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Member satisfaction</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:84%;background:var(--info)"></div></div></div>
+            <div class="health-pct" style="color:var(--info)">84%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Meeting attendance</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:63%;background:var(--warning)"></div></div></div>
+            <div class="health-pct" style="color:var(--warning)">63%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">New member onboarding</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:71%;background:var(--info)"></div></div></div>
+            <div class="health-pct" style="color:var(--info)">71%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Grievance resolution speed</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:55%;background:var(--danger)"></div></div></div>
+            <div class="health-pct" style="color:var(--danger)">55%</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📌 Action Items</div>
+          <table class="data-table">
+            <thead><tr><th>Issue</th><th>Priority</th><th>Owner</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Resolve 7 overdue grievances</td>
+                <td><span class="badge overdue">High</span></td>
+                <td>Wardis V.</td>
+              </tr>
+              <tr>
+                <td>Boost meeting attendance — Q3 goal 70%</td>
+                <td><span class="badge active">Medium</span></td>
+                <td>All Stewards</td>
+              </tr>
+              <tr>
+                <td>Complete 6 new member orientations</td>
+                <td><span class="badge active">Medium</span></td>
+                <td>Maria C.</td>
+              </tr>
+              <tr>
+                <td>Art. 25 safety walkthroughs follow-up</td>
+                <td><span class="badge open">Normal</span></td>
+                <td>Sandra O.</td>
+              </tr>
+              <tr>
+                <td>Update emergency contact log (13 gaps)</td>
+                <td><span class="badge open">Normal</span></td>
+                <td>Admin</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:14px">
+            <button class="btn btn-primary btn-sm" onclick="showToast('Action items synced to task board')">Sync to Tasks</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ BROADCASTS ══════ -->
+    <div class="tab-pane" id="tab-broadcasts">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Broadcasts</div>
+          <div class="section-sub">12 sent this quarter · 91% avg open rate</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Broadcast composer opened')">📣 New Broadcast</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Sent This Quarter</div>
+          <div class="kpi-value">12</div>
+          <div class="kpi-delta up">↑ 3 vs Q1</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg Open Rate</div>
+          <div class="kpi-value">91%</div>
+          <div class="kpi-delta up">↑ 8%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Recipients</div>
+          <div class="kpi-value">184</div>
+          <div class="kpi-delta flat">All members</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Click-Through</div>
+          <div class="kpi-value">44%</div>
+          <div class="kpi-delta up">↑ 12%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📬 Recent Broadcasts</div>
+
+        <div class="broadcast-item">
+          <div class="broadcast-header">
+            <div class="broadcast-title">⚖️ Q2 Contract Negotiation Update</div>
+            <div class="broadcast-ts">Apr 23 · 11:00 AM</div>
+          </div>
+          <div class="broadcast-body">The negotiating team met with agency management on April 21st. Article 17 overtime caps and Article 12 telework expansion are both on the table. Next session scheduled May 12. Members will be notified of any tentative agreements before ratification vote.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge resolved">Delivered · 184</span>
+            <span class="badge open">Open rate 94%</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showToast('Resent to unread members')">Resend to Unread</button>
+          </div>
+        </div>
+
+        <div class="broadcast-item">
+          <div class="broadcast-header">
+            <div class="broadcast-title">📋 April General Meeting — Agenda & Dial-In</div>
+            <div class="broadcast-ts">Apr 18 · 9:30 AM</div>
+          </div>
+          <div class="broadcast-body">Join us April 24th @ 6:00 PM via Zoom or at Boston DO Conference Room B. Agenda: grievance report, contract update, safety walkthroughs, open floor. Steward recognition awards will be presented.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge resolved">Delivered · 184</span>
+            <span class="badge open">Open rate 89%</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showToast('Resent to unread members')">Resend to Unread</button>
+          </div>
+        </div>
+
+        <div class="broadcast-item">
+          <div class="broadcast-header">
+            <div class="broadcast-title">🚨 RIF Alert — Response Deadline May 1</div>
+            <div class="broadcast-ts">Apr 14 · 8:00 AM</div>
+          </div>
+          <div class="broadcast-body">Management has issued a potential reduction-in-force notice affecting GS-9 and GS-11 positions. The union is filing a formal objection under Article 34. All affected members should submit their seniority verification by May 1st. Contact your steward immediately.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge resolved">Delivered · 184</span>
+            <span class="badge overdue">Open rate 97%</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showToast('Resent to unread members')">Resend to Unread</button>
+          </div>
+        </div>
+
+        <div class="broadcast-item">
+          <div class="broadcast-header">
+            <div class="broadcast-title">💡 Know Your Rights — Article 17 Overtime Guide</div>
+            <div class="broadcast-ts">Apr 7 · 2:00 PM</div>
+          </div>
+          <div class="broadcast-body">We've published a plain-language guide to your overtime rights under Article 17. Covers comp time elections, mandatory OT limits, and how to file a grievance if your rights are violated. Available in the Resources section of the dashboard.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge resolved">Delivered · 184</span>
+            <span class="badge open">Open rate 86%</span>
+            <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showToast('Resent to unread members')">Resend to Unread</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ EVENTS ══════ -->
+    <div class="tab-pane" id="tab-events">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Events</div>
+          <div class="section-sub">5 upcoming this month</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Event creation form opened')">⊕ Add Event</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Upcoming (30d)</div>
+          <div class="kpi-value">5</div>
+          <div class="kpi-delta flat">Including 1 critical</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Last Attendance</div>
+          <div class="kpi-value">116</div>
+          <div class="kpi-delta up">↑ 63% turnout</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">RSVPs Collected</div>
+          <div class="kpi-value">98</div>
+          <div class="kpi-delta up">↑ 53% rate</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Events This Year</div>
+          <div class="kpi-value">14</div>
+          <div class="kpi-delta up">↑ 2 vs prior year</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📅 Upcoming Events</div>
+
+          <div class="event-item">
+            <div class="event-date-block"><div class="event-month">MAY</div><div class="event-day">1</div></div>
+            <div>
+              <div class="event-title">🚨 RIF Seniority Verification Deadline</div>
+              <div class="event-meta">All affected members · Due by 5:00 PM EDT</div>
+              <div style="margin-top:8px"><button class="btn btn-danger btn-sm" onclick="showToast('Verification form opened')">Submit Verification</button></div>
+            </div>
+          </div>
+
+          <div class="event-item">
+            <div class="event-date-block"><div class="event-month">MAY</div><div class="event-day">8</div></div>
+            <div>
+              <div class="event-title">📋 General Membership Meeting</div>
+              <div class="event-meta">Zoom + Boston DO Conf. Rm B · 6:00 PM EDT</div>
+              <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="showToast('RSVP confirmed!')">RSVP</button></div>
+            </div>
+          </div>
+
+          <div class="event-item">
+            <div class="event-date-block"><div class="event-month">MAY</div><div class="event-day">12</div></div>
+            <div>
+              <div class="event-title">⚖️ Contract Negotiation Session #4</div>
+              <div class="event-meta">Management Conference Room · 9:00 AM EDT · Internal</div>
+              <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="showToast('Added to calendar')">Add to Calendar</button></div>
+            </div>
+          </div>
+
+          <div class="event-item">
+            <div class="event-date-block"><div class="event-month">MAY</div><div class="event-day">19</div></div>
+            <div>
+              <div class="event-title">🛡 Steward Training — Arbitration Prep</div>
+              <div class="event-meta">AFGE Regional Office, Worcester · 10:00 AM – 3:00 PM</div>
+              <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="showToast('Seat reserved!')">Reserve Seat</button></div>
+            </div>
+          </div>
+
+          <div class="event-item">
+            <div class="event-date-block"><div class="event-month">JUN</div><div class="event-day">3</div></div>
+            <div>
+              <div class="event-title">🤝 Member Appreciation Cookout</div>
+              <div class="event-meta">Columbus Park, Boston · Noon – 4:00 PM</div>
+              <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="showToast('RSVP confirmed — see you there!')">RSVP</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📊 Past Event Attendance</div>
+          <div class="health-row">
+            <div class="health-label">Apr 24 — General Meeting</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:63%;background:var(--success)"></div></div></div>
+            <div class="health-pct" style="color:var(--success)">63%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Mar 28 — Safety Walkthrough</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:41%;background:var(--warning)"></div></div></div>
+            <div class="health-pct" style="color:var(--warning)">41%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Mar 12 — Contract Info Session</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:78%;background:var(--success)"></div></div></div>
+            <div class="health-pct" style="color:var(--success)">78%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Feb 20 — Steward Training</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:55%;background:var(--info)"></div></div></div>
+            <div class="health-pct" style="color:var(--info)">55%</div>
+          </div>
+          <div class="health-row">
+            <div class="health-label">Feb 6 — General Meeting</div>
+            <div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:59%;background:var(--info)"></div></div></div>
+            <div class="health-pct" style="color:var(--info)">59%</div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-secondary btn-sm" onclick="showToast('Full attendance report opened')">📋 Full Attendance Report</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ NEW GRIEVANCE ══════ -->
+    <div class="tab-pane" id="tab-newgrievance">
+      <div class="section-header">
+        <div>
+          <div class="section-title">New Grievance</div>
+          <div class="section-sub">File a new grievance on behalf of a member</div>
+        </div>
+      </div>
+      <div class="card" style="max-width:680px">
+        <div class="card-title">📝 Grievance Form</div>
+        <div style="display:grid;gap:14px;margin-top:4px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Member Name</div>
+              <select style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px">
+                <option>Select member...</option>
+                <option>James Tran</option><option>Rosa Martinez</option><option>David Kim</option><option>Sandra O'Brien</option><option>Luz Pereira</option><option>Terrence Wade</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Contract Article</div>
+              <select style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px">
+                <option>Select article...</option>
+                <option>Art. 10 — Discipline</option><option>Art. 12 — Leave</option><option>Art. 17 — Overtime</option><option>Art. 19 — Pay</option><option>Art. 25 — Safety</option><option>Art. 31 — Performance</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Incident Date</div>
+              <input type="date" style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px" value="2026-04-27"/>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Grievance Step</div>
+              <select style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px">
+                <option>Step 1</option><option>Step 2</option><option>Step 3</option><option>Arbitration</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Issue Summary</div>
+            <input type="text" placeholder="Brief description of the violation..." style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px"/>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Detailed Description</div>
+            <textarea rows="5" placeholder="Describe the management action, the contract provision violated, and the remedy requested..." style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;resize:vertical"></textarea>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Remedy Requested</div>
+            <input type="text" placeholder="e.g., Retroactive overtime pay, removal of written reprimand..." style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px"/>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-primary btn-sm" onclick="showToast('Grievance filed — Case ID assigned: GRV-0416')">Submit Grievance</button>
+            <button class="btn btn-secondary btn-sm" onclick="showToast('Draft saved')">Save Draft</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ CONTACT LOG ══════ -->
+    <div class="tab-pane" id="tab-contactlog">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Contact Log</div>
+          <div class="section-sub">48 interactions logged this quarter</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New contact log entry opened')">⊕ Log Contact</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">This Quarter</div><div class="kpi-value">48</div><div class="kpi-delta up">↑ 11 vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Members Contacted</div><div class="kpi-value">62</div><div class="kpi-delta up">34% of unit</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Response Time</div><div class="kpi-value">4.2h</div><div class="kpi-delta up">↓ 1.1h faster</div></div>
+        <div class="kpi-card"><div class="kpi-label">Follow-ups Pending</div><div class="kpi-value">6</div><div class="kpi-delta down">Due this week</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📞 Recent Contacts</div>
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Member</th><th>Type</th><th>Topic</th><th>Follow-up</th></tr></thead>
+          <tbody>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 26</td><td><div class="member-row"><div class="member-avatar" style="background:#8b5cf6">JT</div><div class="member-name">James Tran</div></div></td><td>Phone</td><td>GRV-0415 intake — overtime details</td><td><span class="badge open">Pending</span></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 25</td><td><div class="member-row"><div class="member-avatar" style="background:#3b82f6">RM</div><div class="member-name">Rosa Martinez</div></div></td><td>In person</td><td>Step 2 prep — telework denial docs</td><td><span class="badge resolved">Done</span></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 24</td><td><div class="member-row"><div class="member-avatar" style="background:#10b981">SO</div><div class="member-name">Sandra O'Brien</div></div></td><td>Email</td><td>Confirmed GRV-0399 settlement terms</td><td><span class="badge resolved">Done</span></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 23</td><td><div class="member-row"><div class="member-avatar" style="background:#f59e0b">DK</div><div class="member-name">David Kim</div></div></td><td>Phone</td><td>Art. 31 appraisal — gathering evidence</td><td><span class="badge active">In progress</span></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 21</td><td><div class="member-row"><div class="member-avatar" style="background:#10b981">LP</div><div class="member-name">Luz Pereira</div></div></td><td>In person</td><td>Ergonomics complaint — initial intake</td><td><span class="badge open">Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ TASKS ══════ -->
+    <div class="tab-pane" id="tab-tasks">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Tasks</div>
+          <div class="section-sub">14 open · 3 due today</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New task created')">⊕ New Task</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Open</div><div class="kpi-value">14</div><div class="kpi-delta down">3 overdue</div></div>
+        <div class="kpi-card"><div class="kpi-label">Due Today</div><div class="kpi-value" style="color:var(--warning)">3</div><div class="kpi-delta flat">Needs attention</div></div>
+        <div class="kpi-card"><div class="kpi-label">Completed This Week</div><div class="kpi-value" style="color:var(--success)">8</div><div class="kpi-delta up">↑ 3 vs last week</div></div>
+        <div class="kpi-card"><div class="kpi-label">Assigned to Others</div><div class="kpi-value">5</div><div class="kpi-delta flat">2 stewards</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">✅ Task Board</div>
+        <table class="data-table">
+          <thead><tr><th>Task</th><th>Priority</th><th>Assigned</th><th>Due</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>File Step 2 response — GRV-0412</td><td><span class="badge overdue">High</span></td><td>Wardis V.</td><td style="font-family:var(--font-mono);font-size:12px;color:var(--danger)">Apr 27</td><td><span class="badge open">Open</span></td></tr>
+            <tr><td>Contact David Kim re: Art. 31 evidence</td><td><span class="badge overdue">High</span></td><td>Wardis V.</td><td style="font-family:var(--font-mono);font-size:12px;color:var(--danger)">Apr 27</td><td><span class="badge active">In Progress</span></td></tr>
+            <tr><td>Schedule May general membership meeting</td><td><span class="badge active">Medium</span></td><td>Wardis V.</td><td style="font-family:var(--font-mono);font-size:12px">Apr 28</td><td><span class="badge open">Open</span></td></tr>
+            <tr><td>Complete 6 new member orientations</td><td><span class="badge active">Medium</span></td><td>Maria C.</td><td style="font-family:var(--font-mono);font-size:12px">May 2</td><td><span class="badge active">In Progress</span></td></tr>
+            <tr><td>Art. 25 safety walkthroughs follow-up</td><td><span class="badge open">Normal</span></td><td>Sandra O.</td><td style="font-family:var(--font-mono);font-size:12px">May 5</td><td><span class="badge open">Open</span></td></tr>
+            <tr><td>Update emergency contact log (13 gaps)</td><td><span class="badge open">Normal</span></td><td>Admin</td><td style="font-family:var(--font-mono);font-size:12px">May 9</td><td><span class="badge open">Open</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ EXPLORER ══════ -->
+    <div class="tab-pane" id="tab-explorer">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Explorer</div>
+          <div class="section-sub">Search and analyze all unit data</div>
+        </div>
+      </div>
+      <div class="card" style="max-width:600px;margin-bottom:16px">
+        <div class="card-title">🔬 Data Explorer</div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input type="text" placeholder="Search members, cases, events..." style="flex:1;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px"/>
+          <select style="background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px">
+            <option>All types</option><option>Members</option><option>Cases</option><option>Events</option><option>Broadcasts</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="showToast('Search executed')">Search</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-2)">Try: "overtime Art. 17", "Boston DO GS-12", "overdue Q1"</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📊 Quick Stats</div>
+          <div class="health-row"><div class="health-label">Members by office</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:72%;background:var(--accent)"></div></div></div><div class="health-pct">Boston DO · 133</div></div>
+          <div class="health-row"><div class="health-label">Springfield DO</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:28%;background:var(--info)"></div></div></div><div class="health-pct">51</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🗂 Recent Queries</div>
+          <div class="timeline-item"><div class="timeline-dot">🔍</div><div class="timeline-content"><div class="timeline-title">Art. 17 cases — Q1 2026</div><div class="timeline-time">Apr 24</div></div></div>
+          <div class="timeline-item"><div class="timeline-dot">🔍</div><div class="timeline-content"><div class="timeline-title">Members — GS-11 + GS-12</div><div class="timeline-time">Apr 22</div></div></div>
+          <div class="timeline-item"><div class="timeline-dot">🔍</div><div class="timeline-content"><div class="timeline-title">Broadcasts — open rate &gt; 80%</div><div class="timeline-time">Apr 19</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ ACCESS LOG ══════ -->
+    <div class="tab-pane" id="tab-accesslog">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Access Log</div>
+          <div class="section-sub">Audit trail — last 30 days</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Access log exported')">⬇ Export Log</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🔍 Recent Access Events</div>
+        <table class="data-table">
+          <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Record</th></tr></thead>
+          <tbody>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 27 9:42 AM</td><td>Wardis V.</td><td>Viewed</td><td>Member — James Tran</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 27 9:38 AM</td><td>Wardis V.</td><td>Created</td><td>Case GRV-0415</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 26 4:12 PM</td><td>Maria C.</td><td>Viewed</td><td>Member — Luz Pereira</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 26 2:05 PM</td><td>Wardis V.</td><td>Updated</td><td>Case GRV-0412 — Step 2 notes</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 25 11:30 AM</td><td>Sandra O.</td><td>Exported</td><td>Q1 Grievance Report</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 24 3:20 PM</td><td>Wardis V.</td><td>Sent</td><td>Broadcast — Q2 Contract Update</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ ENGAGEMENT ══════ -->
+    <div class="tab-pane" id="tab-engagement">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Engagement</div>
+          <div class="section-sub">Member participation tracking · Q2 2026</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Engagement report exported')">⬇ Export Report</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Engagement Score</div><div class="kpi-value" style="color:var(--success)">71%</div><div class="kpi-delta up">↑ 4% vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Meeting Attendance</div><div class="kpi-value">63%</div><div class="kpi-delta down">↓ 4% vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Broadcast Opens</div><div class="kpi-value">91%</div><div class="kpi-delta up">↑ 8%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Poll Participation</div><div class="kpi-value">77%</div><div class="kpi-delta up">↑ 6%</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🎯 Engagement by Category</div>
+          <div class="health-row"><div class="health-label">Broadcast opens</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:91%;background:var(--success)"></div></div></div><div class="health-pct" style="color:var(--success)">91%</div></div>
+          <div class="health-row"><div class="health-label">Poll responses</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:77%;background:var(--info)"></div></div></div><div class="health-pct" style="color:var(--info)">77%</div></div>
+          <div class="health-row"><div class="health-label">Meeting attendance</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:63%;background:var(--warning)"></div></div></div><div class="health-pct" style="color:var(--warning)">63%</div></div>
+          <div class="health-row"><div class="health-label">Event RSVPs</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:55%;background:var(--warning)"></div></div></div><div class="health-pct" style="color:var(--warning)">55%</div></div>
+          <div class="health-row"><div class="health-label">Q&amp;A participation</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:44%;background:var(--danger)"></div></div></div><div class="health-pct" style="color:var(--danger)">44%</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📉 Low Engagement Members</div>
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Score</th><th>Last Activity</th></tr></thead>
+            <tbody>
+              <tr><td><div class="member-row"><div class="member-avatar" style="background:#6366f1;font-size:11px">AH</div><div class="member-name">Andre Harris</div></div></td><td style="color:var(--danger)">22%</td><td style="font-family:var(--font-mono);font-size:12px">Feb 2026</td></tr>
+              <tr><td><div class="member-row"><div class="member-avatar" style="background:#f59e0b;font-size:11px">KL</div><div class="member-name">Karen Liu</div></div></td><td style="color:var(--danger)">28%</td><td style="font-family:var(--font-mono);font-size:12px">Mar 2026</td></tr>
+              <tr><td><div class="member-row"><div class="member-avatar" style="background:#ec4899;font-size:11px">BN</div><div class="member-name">Brian Nguyen</div></div></td><td style="color:var(--warning)">33%</td><td style="font-family:var(--font-mono);font-size:12px">Mar 2026</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ Q&A FORUM ══════ -->
+    <div class="tab-pane" id="tab-qaforum">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Q&amp;A Forum</div>
+          <div class="section-sub">3 unanswered · 28 answered this month</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New post composer opened')">✏ New Post</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Unanswered</div><div class="kpi-value" style="color:var(--warning)">3</div><div class="kpi-delta down">Needs response</div></div>
+        <div class="kpi-card"><div class="kpi-label">Answered This Month</div><div class="kpi-value" style="color:var(--success)">28</div><div class="kpi-delta up">↑ 7 vs March</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Response Time</div><div class="kpi-value">6.2h</div><div class="kpi-delta up">↓ 1.8h faster</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Posts</div><div class="kpi-value">142</div><div class="kpi-delta flat">All time</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💬 Recent Questions</div>
+        <div style="display:grid;gap:12px">
+          <div style="padding:14px;background:var(--surface-3);border-radius:8px;border-left:3px solid var(--warning)">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Can management require me to stay late without advance notice?</div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:8px">Asked by J. Tran · Apr 26 · <span style="color:var(--warning)">Unanswered</span></div>
+            <button class="btn btn-primary btn-sm" onclick="showToast('Reply composer opened')">Answer</button>
+          </div>
+          <div style="padding:14px;background:var(--surface-3);border-radius:8px;border-left:3px solid var(--warning)">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">What is the timeline for filing a Step 2 grievance?</div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:8px">Asked by L. Pereira · Apr 25 · <span style="color:var(--warning)">Unanswered</span></div>
+            <button class="btn btn-primary btn-sm" onclick="showToast('Reply composer opened')">Answer</button>
+          </div>
+          <div style="padding:14px;background:var(--surface-3);border-radius:8px;border-left:3px solid var(--success)">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Does telework count toward my performance rating?</div>
+            <div style="font-size:12px;color:var(--text-2)">Asked by R. Martinez · Apr 23 · <span style="color:var(--success)">Answered by Wardis V.</span></div>
+          </div>
+          <div style="padding:14px;background:var(--surface-3);border-radius:8px;border-left:3px solid var(--success)">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Can I request a union rep for an investigatory interview?</div>
+            <div style="font-size:12px;color:var(--text-2)">Asked by T. Wade · Apr 20 · <span style="color:var(--success)">Answered by Wardis V.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ POLLS ══════ -->
+    <div class="tab-pane" id="tab-polls">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Polls</div>
+          <div class="section-sub">2 active · 9 completed this quarter</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Poll builder opened')">⊕ Create Poll</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Active Polls</div><div class="kpi-value">2</div><div class="kpi-delta flat">Closes May 2</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Participation</div><div class="kpi-value">77%</div><div class="kpi-delta up">↑ 6%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Completed This Quarter</div><div class="kpi-value">9</div><div class="kpi-delta up">↑ 3 vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Votes Cast</div><div class="kpi-value">1,284</div><div class="kpi-delta up">↑ 18%</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🗳 Contract Priority Survey <span style="font-size:12px;color:var(--text-2);font-weight:400">· 142 responses · Closes May 2</span></div>
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:14px">Which contract item should the negotiating team prioritize in 2026?</div>
+        <div class="poll-option"><div class="poll-option-label"><span>💰 Wage increases above COLA</span><span>51% · 72 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:51%;background:var(--accent)"></div></div></div>
+        <div class="poll-option"><div class="poll-option-label"><span>🏠 Expanded telework rights</span><span>28% · 40 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:28%;background:var(--info)"></div></div></div>
+        <div class="poll-option"><div class="poll-option-label"><span>🛡 Stronger RIF protections</span><span>14% · 20 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:14%;background:var(--success)"></div></div></div>
+        <div class="poll-option"><div class="poll-option-label"><span>⏱ Overtime cap enforcement</span><span>7% · 10 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:7%;background:var(--warning)"></div></div></div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="showToast('Poll closed and results exported')">Close Poll</button>
+          <button class="btn btn-secondary btn-sm" onclick="showToast('Reminder sent to non-voters')">Send Reminder</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🗳 May Meeting Date Poll <span style="font-size:12px;color:var(--text-2);font-weight:400">· 88 responses · Closes Apr 30</span></div>
+        <div class="poll-option"><div class="poll-option-label"><span>📅 May 8 — Thursday 6:00 PM</span><span>58% · 51 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:58%;background:var(--accent)"></div></div></div>
+        <div class="poll-option"><div class="poll-option-label"><span>📅 May 13 — Tuesday 5:30 PM</span><span>27% · 24 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:27%;background:var(--info)"></div></div></div>
+        <div class="poll-option"><div class="poll-option-label"><span>📅 May 15 — Thursday 6:00 PM</span><span>15% · 13 votes</span></div><div class="progress-wrap"><div class="progress-fill" style="width:15%;background:var(--warning)"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ══════ SURVEY TRACKING ══════ -->
+    <div class="tab-pane" id="tab-surveytrack">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Survey Tracking</div>
+          <div class="section-sub">Member satisfaction · Q2 2026</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Survey report exported')">⬇ Export Report</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Surveys Sent</div><div class="kpi-value">3</div><div class="kpi-delta flat">This quarter</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Response Rate</div><div class="kpi-value">68%</div><div class="kpi-delta up">↑ 9% vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Satisfaction Score</div><div class="kpi-value" style="color:var(--success)">4.2/5</div><div class="kpi-delta up">↑ 0.3</div></div>
+        <div class="kpi-card"><div class="kpi-label">NPS Score</div><div class="kpi-value">+41</div><div class="kpi-delta up">↑ 8 pts</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📈 Q2 Member Satisfaction Survey</div>
+          <div class="health-row"><div class="health-label">Steward responsiveness</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:88%;background:var(--success)"></div></div></div><div class="health-pct" style="color:var(--success)">4.4/5</div></div>
+          <div class="health-row"><div class="health-label">Communication quality</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:84%;background:var(--success)"></div></div></div><div class="health-pct" style="color:var(--success)">4.2/5</div></div>
+          <div class="health-row"><div class="health-label">Grievance handling</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:80%;background:var(--info)"></div></div></div><div class="health-pct" style="color:var(--info)">4.0/5</div></div>
+          <div class="health-row"><div class="health-label">Contract knowledge</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:74%;background:var(--warning)"></div></div></div><div class="health-pct" style="color:var(--warning)">3.7/5</div></div>
+          <div class="health-row"><div class="health-label">Meeting usefulness</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:66%;background:var(--warning)"></div></div></div><div class="health-pct" style="color:var(--warning)">3.3/5</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Survey History</div>
+          <table class="data-table">
+            <thead><tr><th>Survey</th><th>Sent</th><th>Responses</th><th>Score</th></tr></thead>
+            <tbody>
+              <tr><td>Q2 Satisfaction</td><td style="font-family:var(--font-mono);font-size:12px">Apr 15</td><td>125 / 184</td><td style="color:var(--success)">4.2</td></tr>
+              <tr><td>Contract Priorities</td><td style="font-family:var(--font-mono);font-size:12px">Mar 10</td><td>142 / 184</td><td style="color:var(--success)">—</td></tr>
+              <tr><td>Q1 Satisfaction</td><td style="font-family:var(--font-mono);font-size:12px">Jan 20</td><td>108 / 184</td><td style="color:var(--info)">3.9</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ MENTORSHIP ══════ -->
+    <div class="tab-pane" id="tab-mentorship">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Mentorship</div>
+          <div class="section-sub">6 active pairs · 3 pending matches</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New mentorship match form opened')">⊕ Create Match</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Active Pairs</div><div class="kpi-value">6</div><div class="kpi-delta up">↑ 2 vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pending Matches</div><div class="kpi-value" style="color:var(--warning)">3</div><div class="kpi-delta flat">Needs pairing</div></div>
+        <div class="kpi-card"><div class="kpi-label">Completed Programs</div><div class="kpi-value">11</div><div class="kpi-delta up">All time</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Program Length</div><div class="kpi-value">4.5mo</div><div class="kpi-delta flat">Stable</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🤝 Active Mentorship Pairs</div>
+        <table class="data-table">
+          <thead><tr><th>Mentor</th><th>Mentee</th><th>Focus Area</th><th>Started</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Sandra O'Brien</td><td>Luz Pereira</td><td>Grievance filing</td><td style="font-family:var(--font-mono);font-size:12px">Feb 2026</td><td><span class="badge active">Active</span></td></tr>
+            <tr><td>Maria Chen</td><td>James Tran</td><td>Contract knowledge</td><td style="font-family:var(--font-mono);font-size:12px">Mar 2026</td><td><span class="badge active">Active</span></td></tr>
+            <tr><td>Wardis V.</td><td>Rosa Martinez</td><td>Step 2 procedures</td><td style="font-family:var(--font-mono);font-size:12px">Jan 2026</td><td><span class="badge active">Active</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ RESOURCES ══════ -->
+    <div class="tab-pane" id="tab-resources">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Resources</div>
+          <div class="section-sub">Contract documents, guides, and reference materials</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Upload form opened')">⊕ Upload Resource</button>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📚 Contract &amp; Agreement Documents</div>
+          <div style="display:grid;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">AFGE Master Agreement 2023–2027</div><div style="font-size:12px;color:var(--text-2)">PDF · 248 pages · Updated Jan 2026</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">Local Supplemental Agreement</div><div style="font-size:12px;color:var(--text-2)">PDF · 42 pages · Region 1</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">Telework Agreement — Boston DO</div><div style="font-size:12px;color:var(--text-2)">PDF · 12 pages · Mar 2025</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Steward Guides &amp; Templates</div>
+          <div style="display:grid;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">Grievance Filing Guide</div><div style="font-size:12px;color:var(--text-2)">PDF · Step-by-step procedures</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">Weingarten Rights Card</div><div style="font-size:12px;color:var(--text-2)">PDF · Printable pocket reference</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-3);border-radius:6px">
+              <div><div style="font-size:13px;font-weight:600">Grievance Form Template</div><div style="font-size:12px;color:var(--text-2)">DOCX · Official AFGE form</div></div>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Downloading...')">⬇</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ KNOWLEDGE ══════ -->
+    <div class="tab-pane" id="tab-knowledge">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Knowledge Base</div>
+          <div class="section-sub">Articles, FAQs, and training materials</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New article editor opened')">✏ New Article</button>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <input type="text" placeholder="Search knowledge base..." style="width:100%;background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:6px;font-size:13px"/>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🎓 Top Articles</div>
+          <div style="display:grid;gap:10px">
+            <div style="padding:12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Article opened')"><div style="font-size:13px;font-weight:600">How to File a Step 1 Grievance</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">Viewed 84 times this month</div></div>
+            <div style="padding:12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Article opened')"><div style="font-size:13px;font-weight:600">Weingarten Rights Explained</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">Viewed 61 times this month</div></div>
+            <div style="padding:12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Article opened')"><div style="font-size:13px;font-weight:600">Art. 17 — Overtime Rules &amp; Caps</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">Viewed 47 times this month</div></div>
+            <div style="padding:12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Article opened')"><div style="font-size:13px;font-weight:600">RIF Protections &amp; Seniority Rights</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">Viewed 39 times this month</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📂 Categories</div>
+          <div style="display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Category opened')"><span>Contract Articles</span><span style="font-size:12px;color:var(--text-2)">18 articles</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Category opened')"><span>Grievance Procedures</span><span style="font-size:12px;color:var(--text-2)">11 articles</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Category opened')"><span>Member Rights</span><span style="font-size:12px;color:var(--text-2)">9 articles</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface-3);border-radius:6px;cursor:pointer" onclick="showToast('Category opened')"><span>Benefits &amp; Leave</span><span style="font-size:12px;color:var(--text-2)">14 articles</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ BROADCAST ══════ -->
+    <div class="tab-pane" id="tab-broadcast">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Broadcast</div>
+          <div class="section-sub">12 sent this quarter · 91% avg open rate</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Broadcast composer opened')">📣 New Broadcast</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Sent This Quarter</div><div class="kpi-value">12</div><div class="kpi-delta up">↑ 3 vs Q1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Open Rate</div><div class="kpi-value">91%</div><div class="kpi-delta up">↑ 8%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Recipients</div><div class="kpi-value">184</div><div class="kpi-delta flat">All members</div></div>
+        <div class="kpi-card"><div class="kpi-label">Click-Through</div><div class="kpi-value">44%</div><div class="kpi-delta up">↑ 12%</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📬 Recent Broadcasts</div>
+        <div class="broadcast-item">
+          <div class="broadcast-header"><div class="broadcast-title">⚖️ Q2 Contract Negotiation Update</div><div class="broadcast-ts">Apr 23 · 11:00 AM</div></div>
+          <div class="broadcast-body">The negotiating team met with agency management on April 21st. Article 17 overtime caps and Article 12 telework expansion are both on the table. Next session scheduled May 12.</div>
+        </div>
+        <div class="broadcast-item">
+          <div class="broadcast-header"><div class="broadcast-title">🛡 Know Your Rights — Investigatory Interviews</div><div class="broadcast-ts">Apr 10 · 9:00 AM</div></div>
+          <div class="broadcast-body">Reminder: You have the right to union representation at any investigatory interview that could lead to discipline. This is your Weingarten right — always request your steward.</div>
+        </div>
+        <div class="broadcast-item">
+          <div class="broadcast-header"><div class="broadcast-title">📅 May General Meeting — Save the Date</div><div class="broadcast-ts">Apr 5 · 2:00 PM</div></div>
+          <div class="broadcast-body">Tentatively scheduled for May 8 @ 6:00 PM. Zoom link + Boston DO Conference Room B. Full agenda will be sent 1 week prior. Poll open now to confirm the date.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ MINUTES ══════ -->
+    <div class="tab-pane" id="tab-minutes">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Meeting Minutes</div>
+          <div class="section-sub">8 meetings recorded this year</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('New minutes editor opened')">⊕ New Minutes</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📝 Meeting Minutes Archive</div>
+        <table class="data-table">
+          <thead><tr><th>Meeting</th><th>Date</th><th>Attendees</th><th>Action Items</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>General Membership Meeting</td><td style="font-family:var(--font-mono);font-size:12px">Apr 24</td><td>116 / 184</td><td><span class="badge active">3 open</span></td><td><button class="btn btn-secondary btn-sm" onclick="showToast('Minutes opened')">View</button></td></tr>
+            <tr><td>Steward Team Meeting</td><td style="font-family:var(--font-mono);font-size:12px">Apr 10</td><td>8 / 8</td><td><span class="badge resolved">Done</span></td><td><button class="btn btn-secondary btn-sm" onclick="showToast('Minutes opened')">View</button></td></tr>
+            <tr><td>Safety Committee</td><td style="font-family:var(--font-mono);font-size:12px">Mar 28</td><td>22 / 184</td><td><span class="badge active">2 open</span></td><td><button class="btn btn-secondary btn-sm" onclick="showToast('Minutes opened')">View</button></td></tr>
+            <tr><td>General Membership Meeting</td><td style="font-family:var(--font-mono);font-size:12px">Mar 12</td><td>143 / 184</td><td><span class="badge resolved">Done</span></td><td><button class="btn btn-secondary btn-sm" onclick="showToast('Minutes opened')">View</button></td></tr>
+            <tr><td>Contract Info Session</td><td style="font-family:var(--font-mono);font-size:12px">Feb 20</td><td>109 / 184</td><td><span class="badge resolved">Done</span></td><td><button class="btn btn-secondary btn-sm" onclick="showToast('Minutes opened')">View</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════ NOTIFICATIONS ══════ -->
+    <div class="tab-pane" id="tab-notifications">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Notifications</div>
+          <div class="section-sub">4 unread</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('All notifications marked read')">Mark All Read</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🔔 Recent Notifications</div>
+        <div style="display:grid;gap:8px">
+          <div style="display:flex;gap:12px;padding:12px 14px;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px">
+            <div style="font-size:18px">⚠️</div>
+            <div><div style="font-size:13px;font-weight:600">GRV-0408 is overdue — Step 1 deadline passed</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Today 8:00 AM</div></div>
+          </div>
+          <div style="display:flex;gap:12px;padding:12px 14px;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px">
+            <div style="font-size:18px">💬</div>
+            <div><div style="font-size:13px;font-weight:600">New Q&amp;A question from James Tran — unanswered</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Apr 26 · 3:15 PM</div></div>
+          </div>
+          <div style="display:flex;gap:12px;padding:12px 14px;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px">
+            <div style="font-size:18px">📊</div>
+            <div><div style="font-size:13px;font-weight:600">Contract Priority Poll closes in 5 days</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Apr 26 · 9:00 AM</div></div>
+          </div>
+          <div style="display:flex;gap:12px;padding:12px 14px;background:var(--surface-3);border-radius:8px">
+            <div style="font-size:18px">✅</div>
+            <div><div style="font-size:13px;font-weight:600">GRV-0399 resolved — settlement confirmed</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Apr 25 · 3:15 PM</div></div>
+          </div>
+          <div style="display:flex;gap:12px;padding:12px 14px;background:var(--surface-3);border-radius:8px">
+            <div style="font-size:18px">📣</div>
+            <div><div style="font-size:13px;font-weight:600">Broadcast sent — 168/184 members opened</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">Apr 23 · 11:00 AM</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ TIMELINE ══════ -->
+    <div class="tab-pane" id="tab-timeline">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Timeline</div>
+          <div class="section-sub">Unit activity history · All events</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Timeline exported')">⬇ Export</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📅 Activity Timeline</div>
+        <div class="timeline-item"><div class="timeline-dot">📝</div><div class="timeline-content"><div class="timeline-title">GRV-0415 filed — James Tran (Art. 17 overtime)</div><div class="timeline-time">Apr 27 · 9:42 AM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">✅</div><div class="timeline-content"><div class="timeline-title">GRV-0399 resolved — settlement agreed</div><div class="timeline-time">Apr 25 · 3:15 PM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">📣</div><div class="timeline-content"><div class="timeline-title">Broadcast sent — Q2 Contract Negotiation Update</div><div class="timeline-time">Apr 23 · 11:00 AM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">🗓</div><div class="timeline-content"><div class="timeline-title">General membership meeting — 116 attended</div><div class="timeline-time">Apr 24 · 6:00 PM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">📊</div><div class="timeline-content"><div class="timeline-title">Contract Priority Poll launched — 142 responses</div><div class="timeline-time">Apr 15 · 9:00 AM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">📝</div><div class="timeline-content"><div class="timeline-title">GRV-0412 escalated to Step 2 — Rosa Martinez</div><div class="timeline-time">Apr 12 · 2:30 PM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">🛡</div><div class="timeline-content"><div class="timeline-title">Broadcast — Weingarten Rights reminder</div><div class="timeline-time">Apr 10 · 9:00 AM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">🤝</div><div class="timeline-content"><div class="timeline-title">Mentorship pair created — Maria Chen + James Tran</div><div class="timeline-time">Mar 15 · 11:00 AM</div></div></div>
+        <div class="timeline-item"><div class="timeline-dot">🗓</div><div class="timeline-content"><div class="timeline-title">Safety Committee meeting — 22 attended</div><div class="timeline-time">Mar 28 · 10:00 AM</div></div></div>
+      </div>
+    </div>
+
+    <!-- ══════ USAGE ANALYTICS ══════ -->
+    <div class="tab-pane" id="tab-analytics">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Usage Analytics</div>
+          <div class="section-sub">Admin only · Dashboard engagement · Q2 2026</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Analytics report exported')">⬇ Export Report</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Daily Active Users</div><div class="kpi-value">47</div><div class="kpi-delta up">↑ 8 vs Q1 avg</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Session Length</div><div class="kpi-value">8.3m</div><div class="kpi-delta up">↑ 1.4m</div></div>
+        <div class="kpi-card"><div class="kpi-label">Most Used Tab</div><div class="kpi-value" style="font-size:16px">Cases</div><div class="kpi-delta flat">34% of sessions</div></div>
+        <div class="kpi-card"><div class="kpi-label">Mobile Users</div><div class="kpi-value">62%</div><div class="kpi-delta up">↑ 9%</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📈 Tab Usage Frequency</div>
+          <div class="health-row"><div class="health-label">Cases</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:34%;background:var(--accent)"></div></div></div><div class="health-pct">34%</div></div>
+          <div class="health-row"><div class="health-label">Members</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:22%;background:var(--info)"></div></div></div><div class="health-pct">22%</div></div>
+          <div class="health-row"><div class="health-label">Broadcast</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:18%;background:var(--success)"></div></div></div><div class="health-pct">18%</div></div>
+          <div class="health-row"><div class="health-label">Insights</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:14%;background:var(--warning)"></div></div></div><div class="health-pct">14%</div></div>
+          <div class="health-row"><div class="health-label">Other</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:12%;background:var(--text-2)"></div></div></div><div class="health-pct">12%</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🗓 Weekly Active Users (last 6 weeks)</div>
+          <div class="health-row"><div class="health-label">Week of Apr 21</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:91%;background:var(--success)"></div></div></div><div class="health-pct">91</div></div>
+          <div class="health-row"><div class="health-label">Week of Apr 14</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:84%;background:var(--success)"></div></div></div><div class="health-pct">84</div></div>
+          <div class="health-row"><div class="health-label">Week of Apr 7</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:79%;background:var(--info)"></div></div></div><div class="health-pct">79</div></div>
+          <div class="health-row"><div class="health-label">Week of Mar 31</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:72%;background:var(--info)"></div></div></div><div class="health-pct">72</div></div>
+          <div class="health-row"><div class="health-label">Week of Mar 24</div><div class="health-bar"><div class="progress-wrap"><div class="progress-fill" style="width:68%;background:var(--warning)"></div></div></div><div class="health-pct">68</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ DATA FAILSAFE ══════ -->
+    <div class="tab-pane" id="tab-failsafe">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Data Failsafe</div>
+          <div class="section-sub">Admin only · Backup and data integrity</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Manual backup triggered')">▶ Run Backup Now</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Last Backup</div><div class="kpi-value" style="font-size:18px;color:var(--success)">2h ago</div><div class="kpi-delta up">Auto · Apr 27</div></div>
+        <div class="kpi-card"><div class="kpi-label">Backup Status</div><div class="kpi-value" style="font-size:18px;color:var(--success)">✓ OK</div><div class="kpi-delta up">All systems nominal</div></div>
+        <div class="kpi-card"><div class="kpi-label">Records Protected</div><div class="kpi-value">4,812</div><div class="kpi-delta flat">Across all sheets</div></div>
+        <div class="kpi-card"><div class="kpi-label">Integrity Checks</div><div class="kpi-value" style="color:var(--success)">Passed</div><div class="kpi-delta up">Last run: 7:00 AM</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🛡 Backup History</div>
+          <table class="data-table">
+            <thead><tr><th>Timestamp</th><th>Type</th><th>Records</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 27 7:00 AM</td><td>Auto</td><td>4,812</td><td><span class="badge resolved">✓ OK</span></td></tr>
+              <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 26 7:00 AM</td><td>Auto</td><td>4,801</td><td><span class="badge resolved">✓ OK</span></td></tr>
+              <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 25 7:00 AM</td><td>Auto</td><td>4,798</td><td><span class="badge resolved">✓ OK</span></td></tr>
+              <tr><td style="font-family:var(--font-mono);font-size:12px">Apr 24 2:30 PM</td><td>Manual</td><td>4,791</td><td><span class="badge resolved">✓ OK</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠️ Integrity Warnings</div>
+          <div style="padding:14px;background:var(--surface-3);border-radius:8px;font-size:13px;color:var(--success)">✓ No integrity issues detected.<br><br>All sheet checksums match. No orphaned records found. Row counts consistent across backup snapshots.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ TEST RUNNER ══════ -->
+    <div class="tab-pane" id="tab-testrunner">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Test Runner</div>
+          <div class="section-sub">Admin only · QA suite · Last run: Apr 27 6:58 AM</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToast('Test suite started — this may take 2–3 minutes')">▶ Run All Tests</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Tests Passed</div><div class="kpi-value" style="color:var(--success)">142</div><div class="kpi-delta up">↑ 4 new tests</div></div>
+        <div class="kpi-card"><div class="kpi-label">Tests Failed</div><div class="kpi-value" style="color:var(--danger)">0</div><div class="kpi-delta up">Clean run</div></div>
+        <div class="kpi-card"><div class="kpi-label">Test Coverage</div><div class="kpi-value">88%</div><div class="kpi-delta up">↑ 3%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Run Duration</div><div class="kpi-value">2m 14s</div><div class="kpi-delta flat">Within budget</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🧪 Test Suite Results</div>
+        <table class="data-table">
+          <thead><tr><th>Suite</th><th>Tests</th><th>Passed</th><th>Failed</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Core — Data Access</td><td>28</td><td>28</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>Grievance Service</td><td>22</td><td>22</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>Member Manager</td><td>19</td><td>19</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>UI Components</td><td>31</td><td>31</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>Broadcast Service</td><td>14</td><td>14</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>Security &amp; Access</td><td>16</td><td>16</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+            <tr><td>Failsafe &amp; Backup</td><td>12</td><td>12</td><td>0</td><td><span class="badge resolved">✓ Pass</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ═══════════════ BOTTOM NAV (mobile) ═══════════════ -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <div class="bottom-nav-item active" data-tab="home"><div class="bottom-nav-icon">🏠</div>Home</div>
+    <div class="bottom-nav-item" data-tab="cases"><div class="bottom-nav-icon">📂</div>Cases</div>
+    <div class="bottom-nav-item" data-tab="members"><div class="bottom-nav-icon">👥</div>Members</div>
+    <div class="bottom-nav-item" data-tab="insights"><div class="bottom-nav-icon">📊</div>Insights</div>
+    <div class="bottom-nav-item" data-tab="events"><div class="bottom-nav-icon">📅</div>Events</div>
+  </div>
+</nav>
+
+<!-- ═══════════════ TOAST ═══════════════ -->
+<div id="toast" style="
+  position:fixed;bottom:24px;right:24px;
+  background:#1e1e1e;border:1px solid rgba(124,58,237,.4);
+  color:#e0e0e0;padding:12px 18px;border-radius:9px;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
+  transform:translateY(20px);opacity:0;
+  transition:all .22s ease;
+  pointer-events:none;z-index:9998;
+  max-width:280px;
+"></div>
+
+<script>
+const TAB_LABELS = {
+  cases: 'Cases', newgrievance: 'New Grievance', members: 'Members', contactlog: 'Contact Log',
+  tasks: 'Tasks', insights: 'Insights', explorer: 'Explorer', accesslog: 'Access Log',
+  engagement: 'Engagement', orghealth: 'Org Health',
+  qaforum: 'Q&A Forum', polls: 'Polls', surveytrack: 'Survey Tracking', mentorship: 'Mentorship',
+  resources: 'Resources', knowledge: 'Knowledge',
+  broadcast: 'Broadcast', minutes: 'Minutes', notifications: 'Notifications',
+  events: 'Events', timeline: 'Timeline',
+  analytics: 'Usage Analytics', failsafe: 'Data Failsafe', testrunner: 'Test Runner',
+};
+
+function switchTab(id) {
+  const bar = document.getElementById('navProgress');
+  bar.classList.remove('done');
+  bar.classList.add('running');
+  setTimeout(() => { bar.classList.add('done'); bar.classList.remove('running'); }, 380);
+
+  document.querySelectorAll('.sidebar-item, .bottom-nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === id);
+  });
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.toggle('active', pane.id === 'tab-' + id);
+  });
+  document.getElementById('tabTitle').textContent = TAB_LABELS[id] || id;
+}
+
+document.querySelectorAll('[data-tab]').forEach(el => {
+  el.addEventListener('click', () => switchTab(el.dataset.tab));
+});
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = '✓ ' + msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateY(20px)';
+  }, 2800);
+}
+
+window.switchTab = switchTab;
+window.showToast = showToast;
+</script>
+</body>
+</html>

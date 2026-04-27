@@ -1,8 +1,29 @@
-# Strategic Command Center
+# DDS Dashboard
 
-**Version 4.50.7** | Union Steward Dashboard for Google Sheets
+**Union Steward Operations Platform for Google Sheets**
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 43-file modular architecture, 8 HTML templates, and a full SPA web dashboard. 2,900+ automated tests across 58 suites.
+> Built for AFGE Disability Determination Services (DDS) stewards — manage grievances, track members, run communications, and monitor your unit's health, all inside a Google Sheet with no external servers required.
+
+**Current version: 4.55.7** | Google Apps Script · SPA Web Dashboard · 43-file modular architecture · 2,900+ automated tests
+
+---
+
+### Who this is for
+
+This dashboard is built for **AFGE union stewards and local leadership** at Social Security Administration Disability Determination Services offices. If you represent DDS claims examiners, medical analysts, vocational experts, or other SSA/DDS employees, this tool is designed for your workflow.
+
+It gives stewards a centralized place to file and track grievances, maintain a full member roster, send broadcasts, run polls, and monitor the health of their unit — all accessible from a Google Sheet that anyone on your team can open.
+
+### What's inside
+
+| Layer | What you get |
+|---|---|
+| **Google Sheet backend** | Grievance Log, Member Directory, 30+ hidden calculation sheets |
+| **SPA web dashboard** | Role-based views for stewards and members, Google SSO + magic link auth |
+| **Automation** | Deadline tracking, overdue alerts, calendar sync, Google Drive folders per grievance |
+| **Analytics** | Org health scores, engagement tracking, win rates, Looker Studio integration |
+| **Communications** | Broadcasts, polls, Q&A Forum, meeting minutes, notifications |
+| **Security** | PII masking, zero-knowledge survey vault, SHA-256 hashed responses, audit log |
 
 ---
 
@@ -42,6 +63,21 @@ The Dashboard gives union stewards and leadership a centralized place to:
 - **Protect privacy** with PII masking on all public-facing dashboards
 
 The system runs entirely inside Google Sheets with no external servers required.
+
+---
+
+## Live Preview (No Setup Required)
+
+Want to see what the dashboard looks like before deploying anything? Open these standalone HTML files directly in your browser — no Google account, no Apps Script, no server needed.
+
+| File | What it shows |
+|------|--------------|
+| [`dashboard-standalone.html`](dashboard-standalone.html) | Full steward dashboard — all sidebar tabs (Cases, Members, Tasks, Q&A Forum, Polls, Broadcast, Admin, etc.) with realistic sample data |
+| [`workload-tracker.html`](workload-tracker.html) | Member-facing Workload Tracker portal — mobile-optimized, dark/light theme toggle |
+
+**Live:** [woop91.github.io/SolidBase](https://woop91.github.io/SolidBase)
+
+**To open locally:** double-click either file, or right-click → Open with → your browser.
 
 ---
 

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DDS Dashboard — Live Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#0f0f0f;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}
+.logo{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(135deg,#a78bfa,#7c3aed,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,5vw,48px);font-weight:700;text-align:center;margin-bottom:12px;line-height:1.15}
+.sub{font-size:16px;color:#888;text-align:center;max-width:520px;line-height:1.6;margin-bottom:48px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;width:100%;max-width:720px;margin-bottom:48px}
+.card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:28px;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
+.card:hover{border-color:rgba(124,58,237,.5);transform:translateY(-3px)}
+.card-icon{font-size:32px;margin-bottom:14px}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px}
+.card-desc{font-size:14px;color:#888;line-height:1.6;margin-bottom:18px}
+.card-cta{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#a78bfa}
+.badge{display:inline-block;font-size:11px;font-weight:600;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#c084fc;padding:3px 8px;border-radius:20px;margin-bottom:12px}
+.footer{font-size:13px;color:#555;text-align:center}
+.footer a{color:#7c3aed;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="logo">AFGE · DDS Dashboard</div>
+<h1>Union Steward Operations Platform</h1>
+<p class="sub">Live previews of the DDS Dashboard — open in your browser, no login or setup required.</p>
+
+<div class="cards">
+  <a class="card" href="../dashboard-standalone.html">
+    <div class="card-icon">📋</div>
+    <div class="badge">Steward View</div>
+    <div class="card-title">Full Dashboard</div>
+    <div class="card-desc">All sidebar tabs — Cases, Members, Tasks, Q&A Forum, Polls, Broadcast, Org Health, Analytics, Admin, and more. Realistic sample data throughout.</div>
+    <div class="card-cta">Open preview →</div>
+  </a>
+  <a class="card" href="../workload-tracker.html">
+    <div class="card-icon">📊</div>
+    <div class="badge">Member View</div>
+    <div class="card-title">Workload Tracker</div>
+    <div class="card-desc">Member-facing workload submission portal. Mobile-optimized with dark and light theme toggle.</div>
+    <div class="card-cta">Open preview →</div>
+  </a>
+</div>
+
+<p class="footer">
+  Built for AFGE Disability Determination Services · <a href="https://github.com/Woop91/SolidBase">GitHub Repository</a>
+</p>
+</body>
+</html>
