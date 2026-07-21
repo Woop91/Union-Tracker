@@ -414,7 +414,15 @@ describe('G6: dist/ files are in sync with src/', () => {
       }
 
       const srcContent = fs.readFileSync(srcPath, 'utf8');
-      const distContent = fs.readFileSync(distPath, 'utf8');
+      let distContent = fs.readFileSync(distPath, 'utf8');
+      // Release builds intentionally replace the sole SHA placeholder. Normalize
+      // only an exact 40-character SHA so every other source/dist drift still fails.
+      if (f === '01_Core.gs') {
+        distContent = distContent.replace(
+          /var BUILD_GIT_SHA = '[0-9a-f]{40}';/i,
+          "var BUILD_GIT_SHA = '__SOLIDBASE_GIT_SHA__';"
+        );
+      }
       if (srcContent !== distContent) {
         stale.push(`${f}: dist/ differs from src/ — run "node build.js"`);
       }

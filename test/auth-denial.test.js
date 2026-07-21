@@ -156,6 +156,7 @@ describe('Auth denial: DataService wrappers return safe empty values', () => {
     { name: 'dataGetAllStewardPerformance', args: [INVALID_TOKEN] },
     { name: 'dataGetSurveyResults', args: [INVALID_TOKEN] },
     { name: 'dataGetStewardContactLog', args: [INVALID_TOKEN] },
+    { name: 'dataGetAllStewardContactLogs', args: [INVALID_TOKEN] },
     { name: 'dataGetStewardAssignedMemberTasks', args: [INVALID_TOKEN] },
     { name: 'dataGetTasks', args: [INVALID_TOKEN, null] },
     { name: 'dataGetBroadcastFilterOptions', args: [INVALID_TOKEN] },

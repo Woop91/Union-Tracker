@@ -1957,3 +1957,54 @@ describe('DataService.getOrgHealthScores', () => {
     expect(result.orgScore).toBe(0);
   });
 });
+
+describe('Chief-steward cross-steward contact log', () => {
+  function useContactLogSheet() {
+    const contactData = [
+      ['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created', 'Member Name'],
+      ['CL_1', 'first@test.com', 'member1@test.com', 'Phone', new Date('2026-07-19'), 'First note', '10', new Date('2026-07-19'), 'Member One'],
+      ['CL_2', 'second@test.com', 'member2@test.com', 'Email', new Date('2026-07-21'), 'Second note', '5', new Date('2026-07-21'), 'Member Two'],
+    ];
+    const contactSheet = createMockSheet(SHEETS.CONTACT_LOG, contactData);
+    const ss = createMockSpreadsheet([mockMemberSheet, mockGrievanceSheet, contactSheet]);
+    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => ss);
+    DataService._resetSSCache();
+  }
+
+  test('returns all stewards newest first with steward identity', () => {
+    useContactLogSheet();
+    const result = DataService.getAllStewardContactLogs();
+    expect(result).toHaveLength(2);
+    expect(result[0].stewardEmail).toBe('second@test.com');
+    expect(result[0].memberName).toBe('Member Two');
+    expect(result[1].stewardEmail).toBe('first@test.com');
+  });
+
+  test('wrapper denies an authenticated non-chief steward', () => {
+    const originalIsChief = DataService.isChiefSteward;
+    const originalGetAll = DataService.getAllStewardContactLogs;
+    DataService.isChiefSteward = jest.fn(() => false);
+    DataService.getAllStewardContactLogs = jest.fn(() => [{ id: 'must-not-leak' }]);
+    try {
+      const result = dataGetAllStewardContactLogs('valid-token');
+      expect(result).toMatchObject({ success: false, authError: true });
+      expect(DataService.getAllStewardContactLogs).not.toHaveBeenCalled();
+    } finally {
+      DataService.isChiefSteward = originalIsChief;
+      DataService.getAllStewardContactLogs = originalGetAll;
+    }
+  });
+
+  test('wrapper returns records for a chief steward', () => {
+    const originalIsChief = DataService.isChiefSteward;
+    const originalGetAll = DataService.getAllStewardContactLogs;
+    DataService.isChiefSteward = jest.fn(() => true);
+    DataService.getAllStewardContactLogs = jest.fn(() => [{ id: 'CL_1' }]);
+    try {
+      expect(dataGetAllStewardContactLogs('valid-token')).toEqual([{ id: 'CL_1' }]);
+    } finally {
+      DataService.isChiefSteward = originalIsChief;
+      DataService.getAllStewardContactLogs = originalGetAll;
+    }
+  });
+});

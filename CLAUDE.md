@@ -12,11 +12,11 @@
 
 ## Tech Stack
 
-- **Version:** 4.43.1 (`package.json` + `src/01_Core.gs:VERSION_INFO`)
+- **Version:** 4.56.2 (`package.json` + `src/01_Core.gs:VERSION_INFO`)
 - **Runtime:** Google Apps Script V8 (ES2020), `America/New_York`
-- **Build:** Node >=18, ESLint v9, Jest 29, Husky 9
+- **Build:** Node >=20, ESLint v9, Jest 29, Husky 9
 - **Deploy:** CLASP, GitHub Actions CI
-- **Source:** 38 `.gs` + 15 `.html` (~113K lines) | **Tests:** 56 Jest suites + GAS TestRunner
+- **Source:** 45 `.gs` + 17 `.html` | **Tests:** 79 Jest suites + GAS TestRunner
 - **Scopes:** 10 (spreadsheets, drive, docs, gmail, calendar, external requests, userinfo, scriptapp, container.ui, send_mail)
 
 ## Permissions

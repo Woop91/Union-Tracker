@@ -118,6 +118,7 @@ module.exports = [
         VERSION: 'readonly',
         VERSION_HISTORY: 'readonly',
         VERSION_INFO: 'readonly',
+        BUILD_GIT_SHA: 'readonly',
         SECURITY_SEVERITY: 'readonly',
         SCALE_THRESHOLDS: 'readonly',
         IS_DEV_ENVIRONMENT: 'readonly',

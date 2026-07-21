@@ -86,6 +86,31 @@ describe('_serveFatalError', () => {
 // ============================================================================
 
 describe('doGet', () => {
+  test('health route returns public release identity without loading app dependencies', () => {
+    const originalConfigReader = ConfigReader.getConfig;
+    ConfigReader.getConfig = jest.fn(() => { throw new Error('health route must bypass config'); });
+
+    const output = doGet({ parameter: { healthz: '1' } });
+    const payload = JSON.parse(output.getContent());
+
+    expect(payload.ok).toBe(true);
+    expect(payload.version).toBe(COMMAND_CONFIG.VERSION);
+    expect(payload.sourceSha).toBe(BUILD_GIT_SHA);
+    expect(payload.releaseVerified).toBe(false);
+    expect(output.mimeType).toBe(ContentService.MimeType.JSON);
+
+    ConfigReader.getConfig = originalConfigReader;
+  });
+
+  test('_serveHealthCheck recognizes an exact embedded Git SHA', () => {
+    const originalSha = BUILD_GIT_SHA;
+    BUILD_GIT_SHA = '0123456789abcdef0123456789abcdef01234567';
+    const payload = JSON.parse(_serveHealthCheck().getContent());
+    expect(payload.releaseVerified).toBe(true);
+    expect(payload.sourceSha).toBe(BUILD_GIT_SHA);
+    BUILD_GIT_SHA = originalSha;
+  });
+
   test('does not throw for empty event', () => {
     expect(() => doGet({})).not.toThrow();
   });

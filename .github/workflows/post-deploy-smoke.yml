@@ -9,6 +9,10 @@ on:
         description: 'Deploy target description (for logging only)'
         required: false
         default: 'prod'
+      expected_sha:
+        description: 'Expected deployed Git SHA (defaults to selected workflow ref)'
+        required: false
+        default: ''
 
 jobs:
   smoke:
@@ -20,9 +24,17 @@ jobs:
         id: health
         run: |
           if [ -z "${{ secrets.WEBAPP_URL }}" ]; then
-            echo "::warning::WEBAPP_URL secret not configured. Set it in repo Settings > Secrets."
-            echo "skipped=true" >> $GITHUB_OUTPUT
-            exit 0
+            echo "::error::WEBAPP_URL secret not configured. Set it in repo Settings > Secrets."
+            exit 1
+          fi
+
+          EXPECTED_SHA="${{ inputs.expected_sha }}"
+          if [ -z "$EXPECTED_SHA" ]; then
+            EXPECTED_SHA="${{ github.sha }}"
+          fi
+          if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::expected_sha must be an exact 40-character Git SHA."
+            exit 1
           fi
 
           HEALTH_URL="${{ secrets.WEBAPP_URL }}?healthz=1"
@@ -54,7 +66,20 @@ jobs:
           fi
 
           VERSION=$(python3 -c "import json; data=json.load(open('/tmp/health_response.json')); print(data.get('version', 'unknown'))" 2>/dev/null || echo "unknown")
+          SOURCE_SHA=$(python3 -c "import json; data=json.load(open('/tmp/health_response.json')); print(data.get('sourceSha', 'unknown'))" 2>/dev/null || echo "unknown")
+          RELEASE_VERIFIED=$(python3 -c "import json; data=json.load(open('/tmp/health_response.json')); print(data.get('releaseVerified', False))" 2>/dev/null || echo "parse_error")
+
+          if [ "$SOURCE_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::Deployed SHA mismatch: $SOURCE_SHA != $EXPECTED_SHA"
+            exit 1
+          fi
+          if [ "$RELEASE_VERIFIED" != "True" ]; then
+            echo "::error::Health endpoint returned releaseVerified=false"
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "source_sha=$SOURCE_SHA" >> $GITHUB_OUTPUT
 
       - name: Report result
         if: always()
@@ -62,11 +87,10 @@ jobs:
           echo "## Post-Deploy Smoke Test" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Target**: ${{ inputs.target }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.health.outputs.skipped }}" = "true" ]; then
-            echo "- **Status**: Skipped (WEBAPP_URL secret not configured)" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ steps.health.outcome }}" = "success" ]; then
+          if [ "${{ steps.health.outcome }}" = "success" ]; then
             echo "- **Status**: Healthy" >> $GITHUB_STEP_SUMMARY
             echo "- **Version**: ${{ steps.health.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source SHA**: ${{ steps.health.outputs.source_sha }}" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: FAILED" >> $GITHUB_STEP_SUMMARY
           fi

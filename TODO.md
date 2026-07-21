@@ -27,13 +27,29 @@ Re-run the visual comparison if needed — the widget was built and can be regen
 
 **Files affected:** `src/styles.html` — `.glow-bar` + `@keyframes glowSweep`
 
+**2026-07-21 verification:** Blocked by the production web deployment returning
+HTTP 403 before application HTML loads. Re-run this visual review after public
+deployment access is repaired; do not close from the standalone preview because
+it does not render the production grievance-card glow states.
+
 ---
 
 ## 🔧 Technical Debt
 
+### [ ] Raise real Google Apps Script coverage baseline
+**Added:** 2026-07-21
+**Current enforced baseline:** 32% statements, 25% branches, 39% functions, 33% lines
+
+The old 70%/60% thresholds silently measured `0/0` because Jest did not
+instrument `.gs` files loaded through `eval`. Version 4.56.2 added explicit
+Istanbul instrumentation and set honest regression floors from the first real
+full-suite measurement. Raise each floor as new tests land; never restore an
+unmeasured aspirational threshold.
+
 ### [ ] Husky v10 Migration
 **Added:** 2026-03-17
 **Current version:** 9.1.7 (deprecation warning is forward-looking, no action needed now)
+**Checked:** 2026-07-21 — npm still reports 9.1.7 as latest; migration remains future-only.
 
 When Husky v10 is released:
 - [ ] Remove `#!/bin/sh` shebang from `.husky/pre-commit`, `.husky/pre-push`, `.husky/commit-msg`

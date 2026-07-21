@@ -333,7 +333,7 @@ function sendCriticalErrorNotification_(errorInfo) {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.55.7",
+  VERSION: "4.56.2",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -505,19 +505,27 @@ var VERSION_INFO = (function() {
   // Fallback should never fire — COMMAND_CONFIG is defined in this same file
   // a few lines earlier. Kept updated so any rare fallback firing reports
   // the current version rather than a stale one.
-  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.55.7';
+  var ver = (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : '4.56.2';
   var parts = ver.split('.');
   return {
     version: ver,
     MAJOR: parts.length > 0 ? parseInt(parts[0], 10) : 4,
-    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 55,
+    MINOR: parts.length > 1 ? parseInt(parts[1], 10) : 56,
     PATCH: parts.length > 2 ? parseInt(parts[2], 10) : 2,
     BUILD: 'v' + ver,
     CURRENT: ver,
-    BUILD_DATE: '2026-04-09',
-    codename: 'Org Health Tree'
+    BUILD_DATE: '2026-07-21',
+    codename: 'Release Truth'
   };
 })();
+
+/**
+ * Exact Git commit embedded into release builds by build.js --source-sha.
+ * Source and ordinary parity builds retain the placeholder. Production must
+ * expose a 40-character SHA through the health endpoint before verification.
+ * @const {string}
+ */
+var BUILD_GIT_SHA = '__SOLIDBASE_GIT_SHA__';
 
 /**
  * Lazy-loaded version history — only materialized on first access.
@@ -536,6 +544,7 @@ var _versionHistoryCache = null;
 function getVersionHistory_() {
   if (_versionHistoryCache) return _versionHistoryCache;
   _versionHistoryCache = [
+  { version: '4.56.2', date: '2026-07-21', codename: 'Release Truth', changes: 'Adds a real health endpoint with exact deployed Git SHA, enforces version alignment, hardens the deployment smoke gate, and completes the chief-steward all-contacts view.' },
   { version: '4.51.1', date: '2026-04-05', codename: 'Agent Audit', changes: '56 bug fixes from 14-agent functional testing + 3 auditors. E-signature schema (4 cols + DESCRIPTION). Data integrity: defaultView_ key fix, Admin Settings HTML-entity corruption, escapeForFormula quote doubling, ALERT_DAYS wired to notifications, satisfaction chart fix, survey vault dedup. Security: PIN weak validation, auth guard on getMemberViewHtml, DM rate limit, idemKey TTL 600s, 5 PII log leaks masked. Concurrency: 4 missing script locks. Mobile: 10 touch target + iOS zoom fixes. Keyboard: autocomplete navigation, Ctrl+Enter fix, resource card activation. Features: Q&A Reopen UI, meeting data enrichment, Leader Hub Mentorships tab, CSV export for cases, poll participation badges, resources caching, mobile default view, ICS calendar download. Infrastructure: syncColumnMaps case-insensitive matching, column reorder utility, CSP-safe rebinder hardening.' },
   { version: '4.51.0', date: '2026-04-03', codename: 'Release Audit', changes: 'Directory Explorer slicer-style filter + SVG Sankey chart + inline editing. Director field in member records. dataUpdateMemberBySteward endpoint. Config hardening (Directors rename). Release audit: fixed dataGetAllMembers/dataGetMemberGrievances/dataGetAvailableStewards returning authError objects instead of arrays, fixed cases sub-tab agency-wide fallback unreachable, wired broadcast recipient count, added mentorship steward/member selector dropdowns, added role+duesPaying fields to getAllMembers(), fixed appsscript.json not copied by build.js.' },
   { version: '4.50.7', date: '2026-04-02', codename: 'Trigger Persistence', changes: 'Fixed onOpenDeferred_ deleting its own installable trigger — leftover code from old one-shot approach caused deferred init to run only once after install (no column sync, tab colors, or modals on subsequent opens). Tab modals now auto-open on spreadsheet open via installable trigger (full authorization). Session invalidation hardened with deletion verification. TrendAlertService.runDetection() wrapped in LockService to prevent duplicate alerts from concurrent triggers.' },
