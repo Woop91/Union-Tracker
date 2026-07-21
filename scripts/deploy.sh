@@ -24,6 +24,15 @@ else
   exit 1
 fi
 
+# WSL Git applies Linux line-ending rules to a Windows checkout and can report
+# every CRLF file as dirty. Use Windows Git there so cleanliness matches the
+# checkout's actual index/config. Native Linux and Git Bash keep regular git.
+if grep -qi microsoft /proc/version 2>/dev/null && command -v git.exe >/dev/null 2>&1; then
+  GIT_BIN='git.exe'
+else
+  GIT_BIN='git'
+fi
+
 DRY_RUN=false
 if [ "${1:-}" == "--dry" ]; then
   DRY_RUN=true
@@ -33,11 +42,11 @@ elif [ -n "${1:-}" ]; then
   exit 1
 fi
 
-SOURCE_SHA="$(git rev-parse HEAD)"
-CURRENT_BRANCH="$(git branch --show-current)"
+SOURCE_SHA="$($GIT_BIN rev-parse HEAD)"
+CURRENT_BRANCH="$($GIT_BIN branch --show-current)"
 APP_VERSION="$($NODE_BIN -p "require('./package.json').version")"
 
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+if [ -n "$($GIT_BIN status --porcelain --untracked-files=no)" ]; then
   echo -e "${RED}FAIL: tracked working tree is dirty. Commit first.${NC}"
   exit 1
 fi
