@@ -4,7 +4,7 @@
 
 > Built for AFGE Disability Determination Services (DDS) stewards — manage grievances, track members, run communications, and monitor your unit's health, all inside a Google Sheet with no external servers required.
 
-**Current version: 4.55.7** | Google Apps Script · SPA Web Dashboard · 43-file modular architecture · 2,900+ automated tests
+**Current version: 4.56.2** | Google Apps Script · SPA Web Dashboard · 45-file modular architecture · 3,700+ automated tests
 
 ---
 
@@ -99,7 +99,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 ### Prerequisites
 
 - Google account with Google Sheets access
-- Node.js 18+ and npm (for building and testing locally)
+- Node.js 20+ and npm (for building, testing, and the current clasp toolchain)
 - [clasp](https://github.com/google/clasp) CLI (optional, for automated deployment)
 
 ### Option A: Manual Deployment
@@ -738,6 +738,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.56.2** | 2026-07-21 | Exact-SHA deployment proof, real health endpoint, completed chief-steward contact scope |
+| **4.56.0** | 2026-04-17 | Targeted polls, deployment hardening, response-size reduction |
+| **4.55.7** | 2026-04-11 | Six-wave reliability, security, mobile, charts, and admin catch-up sync |
 | **4.30.0** | 2026-03-16 | 41-item code review implementation, console.error migration, structured error codes |
 | **4.29.2** | 2026-03-14 | Bug fixes: missing wrappers, inFlight leak, mobile nav picker |
 | **4.29.0** | 2026-03-14 | Timeline 7 bug fixes, notification 6 fixes, auto-expire badge, archive pill safety |

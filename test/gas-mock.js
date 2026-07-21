@@ -364,6 +364,23 @@ global.DriveApp = {
 // --- MimeType ---
 global.MimeType = { CSV: 'text/csv', PDF: 'application/pdf' };
 
+// --- ContentService ---
+global.ContentService = {
+  MimeType: { JSON: 'application/json', TEXT: 'text/plain' },
+  createTextOutput: jest.fn((content) => {
+    const output = {
+      content,
+      mimeType: null,
+      setMimeType: jest.fn((mimeType) => {
+        output.mimeType = mimeType;
+        return output;
+      }),
+      getContent: jest.fn(() => content),
+    };
+    return output;
+  }),
+};
+
 // --- DocumentApp ---
 global.DocumentApp = {
   create: jest.fn(() => ({

@@ -21,7 +21,7 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 ### Prerequisites
 
-- Node.js 18 or higher
+- Node.js 20 or higher
 - npm (comes with Node.js)
 - Git
 - Google Account with access to Google Apps Script

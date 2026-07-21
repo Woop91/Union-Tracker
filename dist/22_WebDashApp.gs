@@ -44,6 +44,12 @@
 function doGet(e) {
   e = e || { parameter: {} };
 
+  // Public, dependency-light release probe. Returns no tenant or user data.
+  // The post-deploy workflow requires the exact merged Git SHA from this JSON.
+  if (e.parameter && e.parameter.healthz === '1') {
+    return _serveHealthCheck();
+  }
+
   // v4.33.0 — E-Signature page (token-authenticated, no login required)
   // Security: esign.html serves a static shell. No sensitive data is embedded in the HTML.
   // The client calls google.script.run.dataGetGrievanceForSigning(sigToken) which validates
@@ -98,6 +104,26 @@ function doGet(e) {
     } catch (_e) { log_('doGet', 'Error logging fatal context: ' + (_e.message || _e)); }
     return _serveFatalError(fatalErr.message);
   }
+}
+
+/**
+ * Returns public release identity for uptime and exact-SHA verification.
+ * @returns {TextOutput} JSON health response
+ * @private
+ */
+function _serveHealthCheck() {
+  var version = (typeof VERSION_INFO !== 'undefined' && VERSION_INFO.version)
+    ? VERSION_INFO.version
+    : ((typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.VERSION) ? COMMAND_CONFIG.VERSION : 'unknown');
+  var sourceSha = (typeof BUILD_GIT_SHA !== 'undefined') ? String(BUILD_GIT_SHA) : 'unavailable';
+  var payload = {
+    ok: true,
+    version: version,
+    sourceSha: sourceSha,
+    releaseVerified: /^[0-9a-f]{40}$/i.test(sourceSha)
+  };
+  return ContentService.createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**

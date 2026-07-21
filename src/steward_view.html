@@ -4735,21 +4735,16 @@ function _renderContactForm(container) {
 }
 
 function _renderRecentContacts(container) {
-  // Cross-steward visibility toggle for chief stewards
-  // TODO: requires server endpoint for cross-steward visibility
-  // When a server endpoint like DataService.getAllStewardContactLogs() is added,
-  // the toggle below should call it instead of dataGetStewardContactLog.
   var toggleRow = el('div', { style: { display: 'none', marginBottom: '10px' } });
   var _showAllStewards = false;
   var toggleBtn = el('button', {
     className: 'filter-tab',
     style: { fontSize: '11px' },
     onClick: function() {
-      // TODO: requires server endpoint for cross-steward visibility
-      // _showAllStewards = !_showAllStewards;
-      // toggleBtn.className = 'filter-tab' + (_showAllStewards ? ' active' : '');
-      // toggleBtn.textContent = _showAllStewards ? 'All Stewards' : 'My Contacts Only';
-      // _loadRecentContacts(listArea, _showAllStewards);
+      _showAllStewards = !_showAllStewards;
+      toggleBtn.className = 'filter-tab' + (_showAllStewards ? ' active' : '');
+      toggleBtn.textContent = _showAllStewards ? 'My Contacts Only' : 'All Stewards';
+      _loadRecentContacts(listArea, _showAllStewards);
     }
   }, 'All Stewards');
   toggleRow.appendChild(toggleBtn);
@@ -4763,9 +4758,17 @@ function _renderRecentContacts(container) {
   var listArea = el('div');
   container.appendChild(listArea);
 
+  _loadRecentContacts(listArea, false);
+}
+
+function _loadRecentContacts(listArea, showAllStewards) {
   showLoading(listArea, 'list');
-  serverCall().withSuccessHandler(function(log) {
+  var request = serverCall().withSuccessHandler(function(log) {
     listArea.textContent = '';
+    if (log && log.authError) {
+      listArea.appendChild(el('div', { className: 'empty-state-sm' }, log.message || 'Contact log access denied.'));
+      return;
+    }
     if (!log || log.length === 0) {
       listArea.appendChild(el('div', { className: 'empty-state-sm' }, 'No contacts logged yet.'));
       return;
@@ -4777,10 +4780,18 @@ function _renderRecentContacts(container) {
       top.appendChild(el('span', { className: 'text-xs-muted' }, entry.date));
       card.appendChild(top);
       card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
+      if (showAllStewards && entry.stewardEmail) {
+        card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, 'Steward: ' + entry.stewardEmail));
+      }
       if (entry.notes) card.appendChild(el('div', { className: 'text-xs-muted-mt-4' }, entry.notes));
       listArea.appendChild(card);
     });
-  }).dataGetStewardContactLog(SESSION_TOKEN);
+  }).withFailureHandler(function() {
+    listArea.textContent = '';
+    listArea.appendChild(el('div', { className: 'empty-state-sm' }, 'Failed to load contact log.'));
+  });
+  if (showAllStewards) request.dataGetAllStewardContactLogs(SESSION_TOKEN);
+  else request.dataGetStewardContactLog(SESSION_TOKEN);
 }
 
 function _renderContactByMember(container) {

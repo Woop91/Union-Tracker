@@ -56,7 +56,7 @@ If you see `command not found` or an error, install Node.js:
 4. **Restart your terminal** after installation (close it and open a new one)
 5. Verify it worked by running `node --version` again
 
-> **Note:** This project requires Node.js 18 or later.
+> **Note:** This project requires Node.js 20 or later.
 
 ---
 

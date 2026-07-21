@@ -211,6 +211,8 @@ function dataLogMemberContact(sessionToken, memberEmail, type, notes, duration, 
 function dataGetMemberContactHistory(sessionToken, memberEmail) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getMemberContactHistory(s, memberEmail); }
 /** @param {string} sessionToken @returns {Object[]} Full contact log for a steward. Requires steward auth. */
 function dataGetStewardContactLog(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; return DataService.getStewardContactLog(s); }
+/** @param {string} sessionToken @returns {Object[]} Cross-steward contact log. Requires chief steward auth. */
+function dataGetAllStewardContactLogs(sessionToken) { var s = _requireStewardAuth(sessionToken); if (!s) return { success: false, authError: true, message: 'Steward access required.' }; if (!DataService.isChiefSteward(s)) return { success: false, authError: true, message: 'Chief steward access required.' }; return DataService.getAllStewardContactLogs(); }
 
 // S2: Batch badge counts — replaces 3 serial client calls with 1 round-trip
 /**

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.56.2] - 2026-07-21
+
+### Added
+- Public `?healthz=1` JSON endpoint reporting version, exact release Git SHA, and release-verification state without exposing tenant or user data.
+- Chief-steward-only cross-steward contact log endpoint and working “All Stewards” toggle.
+
+### Changed
+- Production deploy now requires a clean checked-out `Main`, embeds the exact 40-character Git SHA, creates an immutable Apps Script version, updates the configured deployment, verifies public health, then restores deterministic `dist/` output.
+- Post-deploy smoke now fails closed when `WEBAPP_URL` is missing or when the deployed SHA differs from the expected commit.
+- Jest now instruments eval-loaded `.gs` production sources; coverage changed from a false `0/0` pass to real regression floors measured by the full suite.
+- Aligned package, source, and user-facing documentation versions at `4.56.2`.
+
 ## [4.55.7] - 2026-04-11
 
 ### SolidBase: Wholesale catchup sync from DDS v4.55.1 → v4.55.7

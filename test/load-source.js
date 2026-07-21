@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createInstrumenter } = require('istanbul-lib-instrument');
 
 /**
  * Loads a .gs source file into the global scope.
@@ -97,6 +98,24 @@ function loadSource(filename) {
 
   // Rewrite const/let at top level (ES6 in V8 runtime)
   code = code.replace(/^(const|let)\s+(\w+)\s*=/gm, 'global.$2 =');
+
+  // Jest cannot transform GAS .gs files because they are loaded through eval.
+  // Instrument the rewritten source explicitly so --coverage measures executed
+  // production code instead of silently reporting 0/0 and passing thresholds.
+  const coverageExcluded = new Set([
+    '07_DevTools.gs',
+    'DevMenu.gs',
+    '30_TestRunner.gs',
+    '31_WebAppTests.gs',
+  ]);
+  if (process.env.SOLIDBASE_COVERAGE === '1' && !coverageExcluded.has(filename)) {
+    const instrumenter = createInstrumenter({
+      coverageVariable: '__coverage__',
+      compact: false,
+      preserveComments: true,
+    });
+    code = instrumenter.instrumentSync(code, filePath);
+  }
 
   // Use indirect eval to run in global scope
   // eslint-disable-next-line no-eval

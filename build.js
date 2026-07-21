@@ -11,6 +11,8 @@
  *   node build.js --clean   - Clean dist directory
  *   node build.js --minify  - Build with HTML/CSS/JS minification
  *   node build.js --prod --minify - Production build with minification
+ *   node build.js --prod --minify --source-sha <40-char-git-sha>
+ *                            - Release build with exact source SHA embedded
  *
  * Production builds (--prod or --production):
  *   Excludes development/test files that should not be deployed:
@@ -26,6 +28,7 @@ const vm = require('vm');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
+const BUILD_SHA_TOKEN = '__SOLIDBASE_GIT_SHA__';
 
 // Build order: matches GAS V8 load order for most files (alphabetical by name).
 // Intentional deviations:
@@ -228,7 +231,7 @@ function minifyHtml(content) {
   return content;
 }
 
-function build(fileList, shouldMinify) {
+function build(fileList, shouldMinify, sourceSha) {
   const startTime = Date.now();
   console.log('Building dashboard (multi-file mode)...\n');
 
@@ -253,6 +256,9 @@ function build(fileList, shouldMinify) {
     }
 
     var content = fs.readFileSync(src, 'utf8').replace(/\r\n/g, '\n');
+    if (file === '01_Core.gs' && sourceSha) {
+      content = content.replace(BUILD_SHA_TOKEN, sourceSha);
+    }
     fs.writeFileSync(dest, content, 'utf8');
     const lineCount = content.split('\n').length;
     totalLines += lineCount;
@@ -312,6 +318,7 @@ function build(fileList, shouldMinify) {
   if (shouldMinify) {
     console.log(`  Minification: enabled (--minify)`);
   }
+  console.log(`  Source SHA:   ${sourceSha || 'placeholder (non-release build)'}`);
 }
 
 function clean() {
@@ -336,6 +343,16 @@ const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 const shouldMinify = args.includes('--minify');
 const validateOnly = args.includes('--validate-only');
+const sourceShaIndex = args.indexOf('--source-sha');
+var sourceSha = null;
+if (sourceShaIndex !== -1) {
+  sourceSha = args[sourceShaIndex + 1] || '';
+  if (!/^[0-9a-f]{40}$/i.test(sourceSha)) {
+    console.error('ERROR: --source-sha requires an exact 40-character Git SHA.');
+    process.exit(1);
+  }
+  sourceSha = sourceSha.toLowerCase();
+}
 
 // Files to exclude in production builds.
 // SolidBase excludes 4 files (vs DDS's 2): test runner files are also excluded here.
@@ -388,5 +405,5 @@ if (validateOnly) {
   // Auto-clean before build to prevent orphaned files from persisting
   validate(fileList, HTML_FILES);
   clean();
-  build(fileList, shouldMinify);
+  build(fileList, shouldMinify, sourceSha);
 }

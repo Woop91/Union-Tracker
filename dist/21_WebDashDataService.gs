@@ -2569,6 +2569,35 @@ var DataService = (function () {
     return results.slice(0, 100);
   }
 
+  /**
+   * Returns recent contact entries across every steward (max 250).
+   * Authorization is enforced by the chief-steward-only public wrapper.
+   * @returns {Object[]} Array of contact records
+   */
+  function getAllStewardContactLogs() {
+    var sheet = _ensureContactLog();
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    for (var i = 1; i < data.length; i++) {
+      var rawDate = data[i][4];
+      results.push({
+        id: data[i][0],
+        stewardEmail: String(data[i][1] || '').toLowerCase().trim(),
+        memberEmail: String(data[i][2] || '').toLowerCase().trim(),
+        memberName: data[i][8] || '',
+        type: data[i][3],
+        date: rawDate instanceof Date ? _formatDate(rawDate) : String(rawDate || ''),
+        _ts: rawDate instanceof Date ? rawDate.getTime() : 0,
+        notes: data[i][5],
+        duration: data[i][6]
+      });
+    }
+    results.sort(function(a, b) { return (b._ts || 0) - (a._ts || 0); });
+    results.forEach(function(r) { delete r._ts; });
+    return results.slice(0, 250);
+  }
+
   // ═══════════════════════════════════════
   // PUBLIC: Steward Tasks (v4.12.0)
   // ═══════════════════════════════════════
@@ -5549,6 +5578,7 @@ var DataService = (function () {
     logMemberContact: logMemberContact,
     getMemberContactHistory: getMemberContactHistory,
     getStewardContactLog: getStewardContactLog,
+    getAllStewardContactLogs: getAllStewardContactLogs,
     createTask: createTask,
     getTasks: getTasks,
     updateTask: updateTask,

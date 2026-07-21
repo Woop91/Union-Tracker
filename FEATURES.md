@@ -1,9 +1,9 @@
 # Strategic Command Center - Complete Features Reference
 
-**Version:** 4.30.0 | **Codename:** Review Findings Complete
-**Last Updated:** March 2026
+**Version:** 4.56.2 | **Codename:** Release Truth
+**Last Updated:** July 2026
 
-> **New in v4.30.0:** 41-item code review implementation, unified theme engine (6 visual styles), performance/scale hardening (8K+ members), resilience hardening (circuit breaker, retry, error boundaries), 2,900+ tests across 58 suites
+> **New in v4.56.2:** exact-SHA deployment proof, public health verification, targeted polls, and completed chief-steward cross-steward contact history.
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -952,6 +952,9 @@ Organization chart visualization.
 
 | Version | Features Added |
 |---------|----------------|
+| **4.56.2** | Exact deployed-SHA health proof, fail-closed release smoke, working chief-steward all-contacts view |
+| **4.56.0** | Targeted polls and response-size/cold-path reliability work |
+| **4.55.7** | Reliability, security, mobile, chart, org-health, and admin catch-up sync |
 | **4.30.0** | 41-item code review implementation, console.error migration, structured error codes, 2,900+ tests |
 | **4.29.0** | Timeline 7 bug fixes, notification 6 fixes, resilience hardening (3 tiers), error boundaries |
 | **4.28.0** | Speed optimizations (10 items), batch init, DataCache, pagination, unified color themes, OLED dark mode |
@@ -1018,4 +1021,4 @@ Organization chart visualization.
 
 ---
 
-*Strategic Command Center v4.30.0 - A personal project providing comprehensive tools for representatives*
+*Strategic Command Center v4.56.2 - A personal project providing comprehensive tools for representatives*
