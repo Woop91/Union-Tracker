@@ -13,6 +13,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# npm can launch this script through WSL on Windows. WSL resolves the Windows
+# runtime as node.exe (not node), so select the executable explicitly.
+if command -v node >/dev/null 2>&1; then
+  NODE_BIN='node'
+elif command -v node.exe >/dev/null 2>&1; then
+  NODE_BIN='node.exe'
+else
+  echo -e "${RED}FAIL: Node.js is not available in this shell.${NC}"
+  exit 1
+fi
+
 DRY_RUN=false
 if [ "${1:-}" == "--dry" ]; then
   DRY_RUN=true
@@ -24,7 +35,7 @@ fi
 
 SOURCE_SHA="$(git rev-parse HEAD)"
 CURRENT_BRANCH="$(git branch --show-current)"
-APP_VERSION="$(node -p "require('./package.json').version")"
+APP_VERSION="$($NODE_BIN -p "require('./package.json').version")"
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo -e "${RED}FAIL: tracked working tree is dirty. Commit first.${NC}"
@@ -45,7 +56,7 @@ fi
 # Release builds replace a source placeholder in dist/. Always restore the
 # deterministic tracked build so deploy verification cannot leave a dirty tree.
 restore_dist() {
-  node build.js --prod --minify >/dev/null 2>&1 || true
+  "$NODE_BIN" build.js --prod --minify >/dev/null 2>&1 || true
 }
 trap restore_dist EXIT
 
@@ -64,7 +75,7 @@ echo ""
 
 # Step 2: Build prod with minification
 echo "[2/8] Building release artifact with exact source SHA..."
-node build.js --prod --minify --source-sha "$SOURCE_SHA"
+"$NODE_BIN" build.js --prod --minify --source-sha "$SOURCE_SHA"
 if ! grep -q "$SOURCE_SHA" dist/01_Core.gs; then
   echo -e "${RED}FAIL: release artifact does not contain $SOURCE_SHA.${NC}"
   exit 1
@@ -133,7 +144,7 @@ else
   echo "[8/8] Verifying public health, version, and exact SHA..."
   WEBAPP_URL="${SOLIDBASE_WEBAPP_URL:-https://script.google.com/macros/s/${SOLIDBASE_DEPLOYMENT_ID}/exec}"
   HEALTH_JSON="$(curl --fail --silent --show-error --location --max-time 60 "${WEBAPP_URL}?healthz=1")"
-  node -e '
+  "$NODE_BIN" -e '
     const data = JSON.parse(process.argv[1]);
     const expectedSha = process.argv[2];
     const expectedVersion = process.argv[3];
