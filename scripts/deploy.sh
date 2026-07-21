@@ -93,7 +93,7 @@ echo ""
 
 # Step 3: Run deploy guards
 echo "[3/8] Running deploy guards..."
-npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail 2>&1 | tail -5
+npx jest test/deploy-guards.test.js test/spa-integrity.test.js --no-coverage --bail
 echo ""
 
 # Step 4: Run unit tests
