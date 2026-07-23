@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%234a3aa7'/><circle cx='16' cy='16' r='5' fill='%23eda100'/></svg>">
+<title>Common Ground — Union Atlas + USUnions data</title>
+<style>
+  :root{
+    --background:#f9f9f7; --foreground:#0b0b0b; --card:#fcfcfb; --card-foreground:#0b0b0b;
+    --popover:#fcfcfb; --popover-foreground:#0b0b0b; --primary:#4a3aa7; --primary-foreground:#ffffff;
+    --secondary:#eeecf8; --secondary-foreground:#312578; --muted-surface:#f0efec; --muted-foreground:#686660;
+    --accent:#fdf3dd; --accent-foreground:#6a4700; --destructive:#b42318; --destructive-foreground:#ffffff;
+    --border:#85837c; --input:#77756f; --focus-ring:#4a3aa7;
+    --page:var(--background); --surface:var(--card); --ink:var(--foreground); --ink2:#52514e; --muted:var(--muted-foreground);
+    --grid:#e1e0d9; --baseline:#c3c2b7; --ring:rgba(11,11,11,.10);
+    --brand:var(--primary); --brand-deep:var(--secondary-foreground); --brand-wash:var(--secondary);
+    --gold:#eda100; --gold-wash:#fdf3dd; --good:#006300; --danger:#d03b3b;
+    --r:12px; --shadow:0 1px 2px rgba(11,11,11,.05),0 4px 14px rgba(11,11,11,.05);
+  }
+  *{box-sizing:border-box; margin:0}
+  html,body{background:var(--page); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;}
+  button{font:inherit; cursor:pointer}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 20px 72px}
+
+  /* ---------- header ---------- */
+  header.top{background:var(--brand-deep); color:#fff; padding:18px 0 0}
+  header.top .wrap{padding-bottom:0}
+  .brandrow{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .brandrow h1{font-size:19px; font-weight:700; letter-spacing:.2px}
+  .brandrow .proto{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px;
+    background:rgba(255,255,255,.14); padding:2px 8px; border-radius:99px}
+  .brandrow .sub{color:rgba(255,255,255,.75); font-size:13px}
+  .mecard{margin-top:12px; font-size:13px; color:rgba(255,255,255,.9); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .mecard .lin{background:rgba(255,255,255,.12); border-radius:8px; padding:3px 10px}
+  nav.tabs{display:flex; gap:2px; margin-top:14px; overflow-x:auto}
+  nav.tabs button{background:transparent; border:0; color:rgba(255,255,255,.72); padding:10px 14px 12px;
+    font-weight:600; font-size:13.5px; border-radius:10px 10px 0 0; white-space:nowrap}
+  nav.tabs button:hover{color:#fff}
+  nav.tabs button[aria-selected="true"]{background:var(--page); color:var(--brand-deep)}
+
+  main{padding-top:22px}
+  .view{display:none} .view.on{display:block}
+  .viewhead{margin-bottom:16px}
+  .viewhead h2{font-size:20px; font-weight:700}
+  .viewhead p{color:var(--ink2); max-width:64ch; margin-top:3px}
+
+  /* ---------- shared bits ---------- */
+  .card{background:var(--surface); border:1px solid var(--ring); border-radius:var(--r);
+    box-shadow:var(--shadow); padding:16px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+  .chip{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    padding:2px 9px; border-radius:99px; background:var(--brand-wash); color:var(--brand-deep)}
+  .chip.gold{background:var(--gold-wash); color:#7a5200}
+  .chip.gray{background:#f0efec; color:var(--ink2)}
+  .chip.ok{background:#e7f3e7; color:var(--good)}
+  .lineage{font-size:12px; color:var(--ink2)}
+  .lineage b{color:var(--brand-deep)}
+  .tagrow{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
+  .btn{border:1px solid var(--input); background:var(--surface); border-radius:9px; padding:7px 13px;
+    font-weight:600; font-size:13px; color:var(--ink)}
+  .btn:hover{border-color:var(--brand); color:var(--brand-deep)}
+  .btn.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+  .btn.primary:hover{background:var(--brand-deep); color:#fff}
+  .btn.small{padding:4px 10px; font-size:12px; border-radius:8px}
+  .btn.done{background:var(--brand-wash); border-color:transparent; color:var(--brand-deep); cursor:default}
+  .note{font-size:12.5px; color:var(--muted)}
+  .filters{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px}
+  .filters select,.filters input[type=search]{font:inherit; font-size:13px; padding:7px 10px;
+    border:1px solid var(--input); border-radius:9px; background:var(--surface); color:var(--ink)}
+  .filters input[type=search]{min-width:200px}
+  .fchip{border:1px solid var(--input); background:var(--surface); border-radius:99px; padding:5px 12px;
+    font-size:12.5px; font-weight:600; color:var(--ink2)}
+  .fchip[aria-pressed="true"]{background:var(--brand); border-color:var(--brand); color:#fff}
+
+  /* ---------- branch picker ---------- */
+  .steps{display:flex; gap:6px; margin-bottom:14px; font-size:12.5px; font-weight:600; color:var(--muted)}
+  .steps span{padding:3px 10px; border-radius:99px; background:#f0efec}
+  .steps span.on{background:var(--brand); color:#fff}
+  .pickcols{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:820px){.pickcols{grid-template-columns:1fr}}
+  .treecol{max-height:430px; overflow:auto}
+  .tnode{padding:7px 9px; border-radius:9px; display:flex; align-items:center; gap:8px; cursor:pointer; border:1px solid transparent}
+  .tnode:hover{background:var(--brand-wash)}
+  .tnode.sel{border-color:var(--brand); background:var(--brand-wash)}
+  .tnode .car{width:14px; color:var(--muted); font-size:11px; flex:none; text-align:center}
+  .tnode .nm{font-weight:600; font-size:13.5px}
+  .tnode .ty{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px}
+  .tnode .band{margin-left:auto; font-size:11px; color:var(--ink2); background:#f0efec; padding:1px 7px; border-radius:99px; flex:none}
+  .indent{margin-left:18px; border-left:1px solid var(--grid); padding-left:6px}
+  .relopt{display:flex; gap:10px; padding:12px; border:1.5px solid var(--ring); border-radius:10px; cursor:pointer; margin-top:8px}
+  .relopt:hover{border-color:var(--brand)}
+  .relopt.sel{border-color:var(--brand); background:var(--brand-wash)}
+  .relopt b{display:block; font-size:14px}
+  .relopt .note{margin-top:2px}
+  .relopt input{accent-color:var(--brand); margin-top:3px}
+  .placedone{border-left:4px solid var(--brand); padding-left:14px; margin-top:14px}
+
+  /* ---------- directory cards ---------- */
+  .dirgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:820px){.dirgrid{grid-template-columns:1fr}}
+  .gcard{display:flex; flex-direction:column; gap:4px}
+  .gcard .toprow{display:flex; align-items:flex-start; gap:8px}
+  .gcard h3{font-size:15px; font-weight:700; cursor:pointer}
+  .gcard h3:hover{color:var(--brand-deep); text-decoration:underline}
+  .gcard .dist{margin-left:auto; font-size:12px; color:var(--muted); flex:none}
+  .gcard .actions{display:flex; gap:7px; margin-top:9px}
+
+  /* ---------- radar ---------- */
+  .radarwrap{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:14px}
+  @media(max-width:900px){.radarwrap{grid-template-columns:1fr}}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--ink2); margin-bottom:8px}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:99px; margin-right:6px; vertical-align:-1px}
+  .legend .fchip[aria-pressed="true"] i{box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
+  svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .dot{cursor:pointer}
+  .dot:focus{outline:none}
+  .dot:focus .core{stroke:var(--ink); stroke-width:2}
+  .listrow{display:flex; align-items:center; gap:10px; padding:9px 6px; border-bottom:1px solid var(--grid); font-size:13.5px}
+  .listrow:last-child{border-bottom:0}
+  .listrow .nm{font-weight:600; cursor:pointer}
+  .listrow .nm:hover{color:var(--brand-deep)}
+  .listrow .mi{margin-left:auto; color:var(--ink2); font-variant-numeric:tabular-nums; flex:none}
+
+  /* ---------- tree view ---------- */
+  .bigtree .tnode{cursor:default}
+  .bigtree .tnode.haskids{cursor:pointer}
+
+  /* ---------- network ---------- */
+  .sug{display:flex; gap:10px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--grid)}
+  .sug:last-child{border-bottom:0}
+  .sug .why{font-size:12px; color:var(--brand-deep); background:var(--brand-wash); border-radius:99px; padding:1px 8px; font-weight:600}
+  .sug .bd{flex:1}
+  .netlist .listrow{border-bottom:1px solid var(--grid)}
+  .aid{border:1px solid var(--ring); border-radius:10px; padding:12px; margin-top:10px}
+  .aid .kind{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#7a5200}
+
+  /* ---------- admin ---------- */
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px}
+  @media(max-width:820px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile .lbl{font-size:12.5px; color:var(--ink2)}
+  .tile .val{font-size:30px; font-weight:600; letter-spacing:-.3px; margin-top:2px}
+  .tile .delta{font-size:12.5px; font-weight:600; margin-top:1px}
+  .tile .delta.up{color:var(--good)}
+  .charthead{display:flex; align-items:baseline; gap:10px; margin-bottom:10px}
+  .charthead h3{font-size:14.5px; font-weight:700}
+  .charthead .tbl{margin-left:auto}
+  table.tv{width:100%; border-collapse:collapse; font-size:13px}
+  table.tv th{text-align:left; color:var(--ink2); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--baseline)}
+  table.tv td{padding:6px 8px; border-bottom:1px solid var(--grid); font-variant-numeric:tabular-nums}
+  .bar{cursor:default}
+  .bar:focus{outline:none}
+  .bar:focus rect.fill{stroke:var(--ink); stroke-width:1.5}
+
+  /* ---------- USUnions data ledger ---------- */
+  .source-banner{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center;
+    border-left:5px solid var(--primary); background:var(--card); padding:16px 18px}
+  .source-banner h3{font-size:17px}
+  .source-banner .stamp{border:2px solid var(--accent-foreground); color:var(--accent-foreground);
+    border-radius:8px; padding:7px 10px; text-transform:uppercase; letter-spacing:.8px;
+    font-size:11px; font-weight:800; transform:rotate(-1deg); text-align:center}
+  .source-meta{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:5px; color:var(--ink2); font-size:12.5px}
+  .metricrail{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:14px 0;
+    background:var(--border); border:1px solid var(--border); border-radius:var(--r); overflow:hidden}
+  .metricrail article{background:var(--card); padding:14px}
+  .metricrail .k{color:var(--muted-foreground); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.55px}
+  .metricrail .v{font-size:27px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px}
+  .metricrail .d{font-size:12px; color:var(--ink2)}
+  .ledger-grid{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(250px,.65fr); gap:14px}
+  .trend-chart{width:100%; min-height:220px}
+  .trend-chart .axis{stroke:var(--border); stroke-width:1}
+  .trend-chart .trend{fill:none; stroke:var(--primary); stroke-width:3}
+  .trend-chart .point{fill:var(--card); stroke:var(--primary); stroke-width:3}
+  .trend-chart text{fill:var(--muted-foreground); font-size:11px}
+  .trend-chart .value{fill:var(--foreground); font-weight:700}
+  .data-list{list-style:none; padding:0; margin-top:8px}
+  .data-list li{display:flex; gap:9px; padding:7px 0; border-bottom:1px solid var(--grid); font-size:13px}
+  .data-list li:last-child{border-bottom:0}
+  .data-list .mark{font-weight:800; color:var(--good)}
+  .data-list.blocked .mark{color:var(--destructive)}
+  .contract{margin-top:14px; border-top:3px solid var(--foreground)}
+  .contract-row{display:grid; grid-template-columns:190px 1fr; gap:14px; padding:10px 2px;
+    border-bottom:1px solid var(--grid); font-size:13px}
+  .contract-row code{font-size:12px; color:var(--secondary-foreground); overflow-wrap:anywhere}
+  .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0}
+  :focus-visible{outline:3px solid var(--focus-ring); outline-offset:3px}
+  @media(max-width:820px){
+    .metricrail{grid-template-columns:repeat(2,1fr)}
+    .ledger-grid{grid-template-columns:1fr}
+    .contract-row{grid-template-columns:1fr; gap:2px}
+  }
+  @media(max-width:520px){
+    .source-banner{grid-template-columns:1fr}
+    .source-banner .stamp{justify-self:start}
+    .metricrail{grid-template-columns:1fr 1fr}
+  }
+
+  /* ---------- modal ---------- */
+  .overlay{position:fixed; inset:0; background:rgba(11,11,11,.35); display:none; align-items:flex-start; justify-content:center; padding:6vh 16px; z-index:50}
+  .overlay.on{display:flex}
+  .modal{background:var(--surface); border-radius:14px; max-width:560px; width:100%; padding:20px; box-shadow:0 12px 48px rgba(11,11,11,.25); max-height:86vh; overflow:auto}
+  .modal h3{font-size:18px}
+  .tierseg{display:inline-flex; border:1px solid var(--ring); border-radius:9px; overflow:hidden; margin:12px 0 4px}
+  .tierseg button{border:0; background:var(--surface); padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--ink2)}
+  .tierseg button[aria-pressed="true"]{background:var(--brand); color:#fff}
+  .field{padding:10px 0; border-bottom:1px solid var(--grid)}
+  .field:last-child{border-bottom:0}
+  .field .k{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted)}
+  .field .locked{color:var(--muted); font-size:13px; font-style:italic}
+  .closex{float:right; border:0; background:transparent; font-size:18px; color:var(--muted); padding:2px 8px}
+
+  /* ---------- tooltip ---------- */
+  #tip{position:fixed; z-index:80; background:var(--ink); color:#fff; font-size:12.5px; padding:7px 10px;
+    border-radius:8px; pointer-events:none; display:none; max-width:250px; box-shadow:0 4px 14px rgba(11,11,11,.3)}
+  #tip .t1{font-weight:700}
+  #tip .t2{color:rgba(255,255,255,.75)}
+
+  footer{margin-top:36px; font-size:12px; color:var(--muted); border-top:1px solid var(--grid); padding-top:12px}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <div class="brandrow">
+    <h1>Common Ground</h1>
+    <span class="sub">the 509DDS Union Atlas</span>
+    <span class="proto">Clickable prototype · USUnions demo snapshot</span>
+  </div>
+  <div class="mecard" id="mecard"></div>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button role="tab" data-v="picker"    aria-selected="true">1 · Place your group</button>
+    <button role="tab" data-v="nearby"    aria-selected="false">2 · Near you</button>
+    <button role="tab" data-v="directory" aria-selected="false">3 · Directory</button>
+    <button role="tab" data-v="tree"      aria-selected="false">4 · The tree</button>
+    <button role="tab" data-v="network"   aria-selected="false">5 · My network</button>
+    <button role="tab" data-v="admin"     aria-selected="false">6 · Admin view</button>
+    <button role="tab" data-v="usunions"  aria-selected="false">7 · USUnions data</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+
+  <!-- 1 · BRANCH PICKER -->
+  <section class="view on" id="view-picker">
+    <div class="viewhead">
+      <h2>Place your group in the labor movement</h2>
+      <p>Step 2 of group creation. Pick your branch of the union family tree — or register as
+         not-yet-affiliated. Placement is what switches on nearby locals, discovery, and linking.</p>
+    </div>
+    <div class="steps" id="steps"><span class="on">1 · Find your branch</span><span>2 · Your relationship</span><span>3 · Profile &amp; confirm</span></div>
+    <div id="pickbody"></div>
+  </section>
+
+  <!-- 2 · NEAR YOU -->
+  <section class="view" id="view-nearby">
+    <div class="viewhead">
+      <h2>Near you</h2>
+      <p>Groups, active locals, and connective bodies around your home base — the cross-union
+         strength next door. Hover or tap any dot; the list is the same data in table form.</p>
+    </div>
+    <div class="filters" id="nearfilters"></div>
+    <div class="radarwrap">
+      <div class="card"><div class="legend" id="radarlegend"></div><div id="radar"></div></div>
+      <div class="card"><div class="charthead"><h3 id="nearlisthead"></h3></div><div id="nearlist"></div></div>
+    </div>
+  </section>
+
+  <!-- 3 · DIRECTORY -->
+  <section class="view" id="view-directory">
+    <div class="viewhead">
+      <h2>Directory</h2>
+      <p>Browse and search every discoverable group and body — by sector, issue, union family, and
+         distance. What each card shows is governed by that group's visibility tier.</p>
+    </div>
+    <div class="filters" id="dirfilters"></div>
+    <div class="dirgrid" id="dirgrid"></div>
+    <p class="note" style="margin-top:12px" id="dirnote"></p>
+  </section>
+
+  <!-- 4 · TREE -->
+  <section class="view" id="view-tree">
+    <div class="viewhead">
+      <h2>The reference tree</h2>
+      <p>The Atlas spine: federations, internationals, intermediate bodies, locals, chapters —
+         plus state federations and central labor councils. Counts are presence bands, never exact
+         rosters. Expand a branch to walk it.</p>
+    </div>
+    <div class="card bigtree" id="bigtree"></div>
+  </section>
+
+  <!-- 5 · NETWORK -->
+  <section class="view" id="view-network">
+    <div class="viewhead">
+      <h2>My network</h2>
+      <p>Suggestions explain <em>why</em> they were made. Links unlock contact; campaigns and
+         alliances are where linked groups act together.</p>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="charthead"><h3>Suggested for your group</h3></div><div id="sugs"></div></div>
+      <div>
+        <div class="card"><div class="charthead"><h3>Links &amp; follows</h3></div><div class="netlist" id="netlinks"></div></div>
+        <div class="card" style="margin-top:14px"><div class="charthead"><h3>Campaigns &amp; mutual aid</h3></div><div id="netaid"></div></div>
+        <div class="card" style="margin-top:14px"><div class="charthead"><h3>Alliances</h3></div><div id="netalli"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · ADMIN -->
+  <section class="view" id="view-admin">
+    <div class="viewhead">
+      <h2>Distribution &amp; coverage <span class="chip gray" style="vertical-align:2px">platform staff view</span></h2>
+      <p>What placement buys the back office: where members sit by sector, region, and family —
+         and the whitespace where the spine shows organized labor but the platform has no presence
+         yet. Aggregates only; small counts render as bands.</p>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid2">
+      <div class="card"><div class="charthead"><h3>Members mapped, by sector</h3><button class="btn small tbl" data-t="sector">Table</button></div><div id="chart-sector"></div></div>
+      <div class="card"><div class="charthead"><h3>Members mapped, by region</h3><button class="btn small tbl" data-t="region">Table</button></div><div id="chart-region"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="charthead"><h3>Coverage gaps — spine locals with no platform presence</h3></div>
+      <div id="whitespace"></div>
+    </div>
+  </section>
+
+  <!-- 7 · USUNIONS DATA -->
+  <section class="view" id="view-usunions">
+    <div class="viewhead">
+      <h2>USUnions data bridge</h2>
+      <p>Safe, aggregate operational data from the copied SolidBase / USUnions repository.
+         This view keeps local operations separate from Atlas-wide organization and proximity counts.</p>
+    </div>
+    <div class="source-banner card">
+      <div>
+        <h3>SolidBase local-union snapshot</h3>
+        <div class="source-meta">
+          <span><b>Repository:</b> Woop91/SolidBase</span>
+          <span><b>Source:</b> <code>src/07_DevTools.gs</code></span>
+          <span><b>Scope:</b> aggregate demo data</span>
+        </div>
+      </div>
+      <div class="stamp" aria-label="Demo aggregate; not production data">Demo aggregate<br>not production</div>
+    </div>
+    <div class="metricrail" id="us-metrics" aria-label="USUnions demo metrics"></div>
+    <div class="ledger-grid">
+      <div class="card">
+        <div class="charthead"><h3>Demo membership trend</h3><span class="chip gray">Sep–Feb</span></div>
+        <div id="us-trend"></div>
+      </div>
+      <div class="card">
+        <div class="charthead"><h3>Workload snapshot</h3></div>
+        <div id="us-workload"></div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:14px">
+      <div class="card">
+        <div class="charthead"><h3>Allowed into the Atlas</h3><span class="chip ok">safe fields</span></div>
+        <ul class="data-list" id="us-allowed"></ul>
+      </div>
+      <div class="card">
+        <div class="charthead"><h3>Kept out of the Atlas</h3><span class="chip gray">privacy boundary</span></div>
+        <ul class="data-list blocked" id="us-blocked"></ul>
+      </div>
+    </div>
+    <div class="card contract">
+      <div class="charthead"><h3>Live adapter contract</h3><span class="note">available in USUnions; not executed by this static prototype</span></div>
+      <div id="us-contract"></div>
+    </div>
+  </section>
+
+  <footer>
+    Prototype for 509dds.com · Atlas organizations are public bodies; platform groups, counts and
+    campaigns are invented. USUnions metrics are a separate repository demo snapshot, not live
+    production data. No member, grievance, contact, phone, email, or street-address records were copied.
+  </footer>
+</main>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true"><div class="modal" id="modal"></div></div>
+<div id="tip"></div>
+
+<script>
+"use strict";
+/* ============ Common Ground — Union Atlas prototype (demo data, in-memory only) ============ */
+
+/* ---------- taxonomies ---------- */
+const SECTORS = { hs:"Human services", hc:"Healthcare", ed:"Education", ps:"Public sector",
+  bt:"Building trades", ho:"Hospitality", lg:"Transit & logistics", rg:"Retail & grocery",
+  mu:"Manufacturing & utilities", pr:"Property services" };
+const ISSUES = { und:"Understaffing", wag:"Wages", saf:"Health & safety", prv:"Privatization",
+  con:"Contract fight", cas:"Caseloads", sch:"Scheduling", hou:"Housing" };
+const TYPE_LABEL = { federation:"Federation", international:"International", intermediate:"Council / district",
+  local:"Local", chapter_unit:"Chapter", state_fed:"State federation", clc:"Central labor council",
+  worker_center:"Worker center", independent_root:"Independent" };
+
+/* ---------- the reference tree (spine) ---------- */
+const NODES = [
+ {id:"aflcio", parent:null, type:"federation", name:"AFL-CIO", city:"Washington", st:"DC"},
+ {id:"soc",    parent:null, type:"federation", name:"Strategic Organizing Center", city:"Washington", st:"DC"},
+ {id:"indep",  parent:null, type:"independent_root", name:"Independent & pre-affiliation"},
+
+ /* SEIU family — re-affiliated with the AFL-CIO in January 2025 */
+ {id:"seiu",   parent:"aflcio", type:"international", name:"SEIU", full:"Service Employees International Union", est:2000000},
+ {id:"seiuma", parent:"seiu", type:"intermediate", name:"SEIU Massachusetts State Council", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589},
+ {id:"l509",   parent:"seiuma", type:"local", name:"SEIU Local 509", city:"Marlborough", st:"MA", lat:42.3459,lng:-71.5523, est:20000, sectors:["hs","ed"]},
+ {id:"ch_dds", parent:"l509", type:"chapter_unit", name:"DDS Chapter", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:7500, sectors:["hs"]},
+ {id:"ch_dmh", parent:"l509", type:"chapter_unit", name:"DMH Chapter", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:3000, sectors:["hs"]},
+ {id:"ch_dcf", parent:"l509", type:"chapter_unit", name:"DCF Chapter", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:3500, sectors:["hs"]},
+ {id:"ch_cp",  parent:"l509", type:"chapter_unit", name:"Community Providers Chapter", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:6000, sectors:["hs"]},
+ {id:"l1199",  parent:"seiuma", type:"local", name:"1199SEIU — Massachusetts", city:"Dorchester", st:"MA", lat:42.297,lng:-71.075, est:23000, sectors:["hc"]},
+ {id:"l888",   parent:"seiuma", type:"local", name:"SEIU Local 888", city:"Charlestown", st:"MA", lat:42.3782,lng:-71.0602, est:8500, sectors:["ps"]},
+ {id:"d615",   parent:"seiuma", type:"local", name:"32BJ SEIU — District 615", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:18000, sectors:["pr"]},
+
+ /* Teamsters */
+ {id:"ibt",  parent:"soc", type:"international", name:"Teamsters (IBT)", est:1300000},
+ {id:"jc10", parent:"ibt", type:"intermediate", name:"Teamsters Joint Council 10", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589},
+ {id:"l25",  parent:"jc10", type:"local", name:"Teamsters Local 25", city:"Charlestown", st:"MA", lat:42.3782,lng:-71.0602, est:12000, sectors:["lg"]},
+
+ /* AFL-CIO family */
+ {id:"afscme", parent:"aflcio", type:"international", name:"AFSCME", est:1400000},
+ {id:"c93",    parent:"afscme", type:"intermediate", name:"AFSCME Council 93", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:45000, sectors:["ps","hs"]},
+ {id:"l402",   parent:"c93", type:"local", name:"AFSCME Local 402", city:"Worcester", st:"MA", lat:42.2626,lng:-71.8023, est:900, sectors:["hs","ps"]},
+ {id:"aft",    parent:"aflcio", type:"international", name:"AFT", est:1700000},
+ {id:"aftma",  parent:"aft", type:"intermediate", name:"AFT Massachusetts", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:23000, sectors:["ed"]},
+ {id:"btu",    parent:"aftma", type:"local", name:"Boston Teachers Union — Local 66", city:"Dorchester", st:"MA", lat:42.297,lng:-71.075, est:10000, sectors:["ed"]},
+ {id:"ibew",   parent:"aflcio", type:"international", name:"IBEW", est:750000},
+ {id:"l103",   parent:"ibew", type:"local", name:"IBEW Local 103", city:"Dorchester", st:"MA", lat:42.297,lng:-71.075, est:7000, sectors:["bt"]},
+ {id:"l7",     parent:"ibew", type:"local", name:"IBEW Local 7", city:"Springfield", st:"MA", lat:42.1015,lng:-72.5898, est:1900, sectors:["bt"]},
+ {id:"ufcw",   parent:"aflcio", type:"international", name:"UFCW", est:1200000},
+ {id:"l1445",  parent:"ufcw", type:"local", name:"UFCW Local 1445", city:"Dedham", st:"MA", lat:42.2436,lng:-71.166, est:5600, sectors:["rg"]},
+ {id:"uh",     parent:"aflcio", type:"international", name:"UNITE HERE", est:300000},
+ {id:"l26",    parent:"uh", type:"local", name:"UNITE HERE Local 26", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:12000, sectors:["ho"]},
+ {id:"usw",    parent:"aflcio", type:"international", name:"USW", est:850000},
+ {id:"l12003", parent:"usw", type:"local", name:"USW Local 12003", city:"Dorchester", st:"MA", lat:42.297,lng:-71.075, est:1100, sectors:["mu"]},
+ {id:"iaff",   parent:"aflcio", type:"international", name:"IAFF", est:330000},
+ {id:"l718",   parent:"iaff", type:"local", name:"IAFF Local 718 — Boston Fire", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589, est:1500, sectors:["ps"]},
+
+ /* State fed + CLCs (connective tissue) */
+ {id:"massfed", parent:"aflcio", type:"state_fed", name:"Massachusetts AFL-CIO", city:"Malden", st:"MA", lat:42.4251,lng:-71.0662},
+ {id:"gblc",  parent:"massfed", type:"clc", name:"Greater Boston Labor Council", city:"Boston", st:"MA", lat:42.3601,lng:-71.0589},
+ {id:"wmalf", parent:"massfed", type:"clc", name:"Western Mass Area Labor Federation", city:"Springfield", st:"MA", lat:42.1015,lng:-72.5898},
+ {id:"cmclc", parent:"massfed", type:"clc", name:"Central Massachusetts AFL-CIO", city:"Worcester", st:"MA", lat:42.2626,lng:-71.8023},
+ {id:"mvclc", parent:"massfed", type:"clc", name:"Merrimack Valley Central Labor Council", city:"Lowell", st:"MA", lat:42.6334,lng:-71.3162},
+ {id:"nsclc", parent:"massfed", type:"clc", name:"North Shore Central Labor Council", city:"Lynn", st:"MA", lat:42.4668,lng:-70.9495},
+ {id:"nclc",  parent:"massfed", type:"clc", name:"Norfolk County Labor Council", city:"Quincy", st:"MA", lat:42.2529,lng:-71.0023},
+ {id:"gsmlc", parent:"massfed", type:"clc", name:"Greater Southeastern Mass. Labor Council", city:"New Bedford", st:"MA", lat:41.6362,lng:-70.9342},
+ {id:"pbclc", parent:"massfed", type:"clc", name:"Plymouth/Bristol Central Labor Council", city:"Brockton", st:"MA", lat:42.0834,lng:-71.0184},
+
+ /* Independents */
+ {id:"mna",  parent:"indep", type:"local", name:"Massachusetts Nurses Association", city:"Canton", st:"MA", lat:42.1584,lng:-71.1448, est:25000, sectors:["hc"]},
+ {id:"bwc",  parent:"indep", type:"worker_center", name:"Brazilian Worker Center", city:"Allston", st:"MA", lat:42.3539,lng:-71.1337, sectors:["hs","bt"]},
+ {id:"pvwc", parent:"indep", type:"worker_center", name:"Pioneer Valley Workers Center", city:"Northampton", st:"MA", lat:42.3251,lng:-72.6412, sectors:["hs"]},
+];
+const N = Object.fromEntries(NODES.map(n=>[n.id,n]));
+const kids = id => NODES.filter(n=>n.parent===id);
+function lineage(id){ const out=[]; let c=N[id]; while(c){ out.unshift(c); c=N[c.parent]; } return out; }
+function linLabel(id){ return lineage(id).map(n=>n.name.replace("Service Employees International Union","SEIU")).join(" › "); }
+function famRoot(id){ const l=lineage(id); return l.find(n=>n.type==="international") || l[0]; }
+
+/* ---------- platform groups ---------- */
+const GROUPS = [
+ {id:"g_ghjc", name:"Group-Home Justice Crew", node:"ch_dds", rel:"within", city:"Springfield", lat:42.1015,lng:-72.5898,
+  sectors:["hs"], issues:["und","saf","wag"], members:34, liaison:"R. Alvarez (steward)",
+  about:"Members across western-Mass DDS group homes organizing on chronic understaffing and unsafe overnight ratios."},
+ {id:"g_dds", name:"DDS Chapter — official", node:"ch_dds", rel:"claims", verified:true, city:"Boston", lat:42.3601,lng:-71.0589,
+  sectors:["hs"], issues:["und","cas","con"], members:480, liaison:"Chapter VP office",
+  about:"Official chapter body for SEIU 509 members at the Department of Developmental Services."},
+ {id:"g_dmhw", name:"DMH Western Mass Members", node:"ch_dmh", rel:"within", city:"Northampton", lat:42.3251,lng:-72.6412,
+  sectors:["hs"], issues:["cas","saf"], members:41, liaison:"K. Osei",
+  about:"DMH members west of Worcester coordinating on caseloads and site safety."},
+ {id:"g_dcfw", name:"DCF Worcester Unit", node:"ch_dcf", rel:"within", city:"Worcester", lat:42.2626,lng:-71.8023,
+  sectors:["hs"], issues:["cas"], members:58, liaison:"M. Nguyen",
+  about:"DCF Worcester-area unit; caseload caps campaign."},
+ {id:"g_cpc", name:"Community Providers Collective", node:"ch_cp", rel:"within", city:"Brockton", lat:42.0834,lng:-71.0184,
+  sectors:["hs"], issues:["wag","und"], members:120, liaison:"D. Jean-Baptiste",
+  about:"Provider-agency members organizing for rate-tied raises."},
+ {id:"g_1199", name:"1199 Nursing Home Workers United", node:"l1199", rel:"within", city:"Dorchester", lat:42.297,lng:-71.075,
+  sectors:["hc"], issues:["wag","und"], members:210, liaison:"Organizing desk",
+  about:"Nursing-home members coordinating across chains."},
+ {id:"g_afs", name:"AFSCME 402 Stewards Circle", node:"l402", rel:"within", city:"Worcester", lat:42.2626,lng:-71.8023,
+  sectors:["hs","ps"], issues:["con","wag"], members:26, liaison:"Chief steward",
+  about:"Stewards at state facilities — same buildings, different local."},
+ {id:"g_btu", name:"BTU Paraprofessionals Caucus", node:"btu", rel:"within", city:"Dorchester", lat:42.297,lng:-71.075,
+  sectors:["ed"], issues:["wag"], members:95, liaison:"Caucus co-chairs",
+  about:"Paraprofessional caucus inside Boston Teachers Union."},
+ {id:"g_mna", name:"MNA Baystate RNs", node:"mna", rel:"within", city:"Springfield", lat:42.1015,lng:-72.5898,
+  sectors:["hc"], issues:["und","saf"], members:150, liaison:"Unit chair",
+  about:"RN bargaining unit at Baystate; staffing-ratio fight."},
+ {id:"g_888", name:"Local 888 Library Workers", node:"l888", rel:"within", city:"Boston", lat:42.3601,lng:-71.0589,
+  sectors:["ps"], issues:["wag","sch"], members:33, liaison:"Unit rep",
+  about:"Municipal library workers across greater Boston."},
+ {id:"g_uh26", name:"Hotel Housekeepers Committee (L26)", node:"l26", rel:"within", city:"Boston", lat:42.3601,lng:-71.0589,
+  sectors:["ho"], issues:["sch","saf"], members:76, liaison:"Committee line",
+  about:"Housekeeping committee inside UNITE HERE Local 26."},
+ {id:"g_pvwc", name:"PVWC Comité de Trabajadores", node:"pvwc", rel:"claims", verified:true, city:"Northampton", lat:42.3251,lng:-72.6412,
+  sectors:["hs"], issues:["wag","hou"], members:60, liaison:"Center staff",
+  about:"Worker-center committee for immigrant care and farm workers in the Valley."},
+ {id:"g_t25", name:"Teamsters 25 Warehouse Group", node:"l25", rel:"within", city:"Charlestown", lat:42.3782,lng:-71.0602,
+  sectors:["lg"], issues:["saf","sch"], members:44, liaison:"Shop floor rep",
+  about:"Warehouse members coordinating on injury rates."},
+ {id:"g_ghoc", name:"Springfield Group Home Workers OC", node:"indep", rel:"unaffiliated", city:"Springfield", lat:42.1015,lng:-72.5898,
+  sectors:["hs"], issues:["und","wag"], members:12, liaison:"—", quiet:true,
+  about:"Pre-affiliation organizing committee (quiet mode)."},
+];
+const G = Object.fromEntries(GROUPS.map(g=>[g.id,g]));
+
+/* ---------- USUnions / SolidBase safe aggregate snapshot ---------- */
+const USUNIONS_SNAPSHOT = Object.freeze({
+  provenance:{
+    repository:"Woop91/SolidBase",
+    sourceFile:"src/07_DevTools.gs",
+    sourceFunction:"seedUnionStatsData",
+    mode:"repo-demo",
+    production:false
+  },
+  engagement:{
+    surveyParticipation:62,
+    weeklyQuestionVotes:147,
+    eventAttendance:78,
+    grievanceFilingRate:4.2,
+    stewardContactRate:31,
+    resourceDownloads:215
+  },
+  membershipTrends:[
+    {month:"Sep",total:842,newMembers:12,departed:3},
+    {month:"Oct",total:851,newMembers:15,departed:6},
+    {month:"Nov",total:858,newMembers:11,departed:4},
+    {month:"Dec",total:862,newMembers:9,departed:5},
+    {month:"Jan",total:869,newMembers:14,departed:7},
+    {month:"Feb",total:878,newMembers:16,departed:7}
+  ],
+  workloadSummary:{
+    avgCaseload:23.4,
+    highCaseloadPct:18,
+    submissionRate:71,
+    trendDirection:"increasing"
+  },
+  importBoundary:{
+    allowed:[
+      "Organization name, abbreviation, local number and parent union",
+      "State or region and public organization website",
+      "Public office city/state for proximity placement",
+      "Aggregate engagement, membership-trend and workload metrics"
+    ],
+    blocked:[
+      "Member names, roster rows or personal identifiers",
+      "Grievance, discipline or case-level records",
+      "Email addresses, phone numbers or private contacts",
+      "Street addresses, steward names or authentication data"
+    ]
+  },
+  liveAdapter:[
+    {fn:"dataGetEngagementStats(sessionToken)",use:"Aggregate participation and activity"},
+    {fn:"dataGetWorkloadSummaryStats(sessionToken)",use:"Aggregate steward workload"},
+    {fn:"dataGetMemberCount(sessionToken)",use:"Single total only; never roster rows"},
+    {fn:"CONFIG_HEADER_MAP_",use:"Local identity and public geography mapping"}
+  ]
+});
+
+/* ---------- app state ---------- */
+const state = {
+  meId:"g_ghjc",
+  links:new Set(["g_dds","g_mna"]),
+  follows:new Set(["g_cpc"]),
+  pending:new Set(),
+  pledged:new Set(), rsvpd:new Set(),
+  expanded:new Set(["aflcio","soc","indep","seiu","seiuma","l509","massfed"]),
+  near:{radius:100, sector:"", kinds:{group:true, clc:true, node:true}},
+  dir:{q:"", sector:"", issue:"", fam:"", near:false},
+  pick:{step:1, sel:null, open:new Set(["aflcio","seiu","seiuma","l509"]), rel:null, sectors:new Set(["hs"]), issues:new Set(["und"]), q:""},
+  tableMode:{sector:false, region:false},
+};
+const me = () => G[state.meId];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const R_EARTH = 3958.8;
+function miles(a,b){ if(a.lat==null||b.lat==null) return null;
+  const t=x=>x*Math.PI/180, dLa=t(b.lat-a.lat), dLo=t(b.lng-a.lng);
+  const h=Math.sin(dLa/2)**2 + Math.cos(t(a.lat))*Math.cos(t(b.lat))*Math.sin(dLo/2)**2;
+  return 2*R_EARTH*Math.asin(Math.sqrt(h)); }
+function bearing(a,b){ const t=x=>x*Math.PI/180;
+  const y=Math.sin(t(b.lng-a.lng))*Math.cos(t(b.lat));
+  const x=Math.cos(t(a.lat))*Math.sin(t(b.lat)) - Math.sin(t(a.lat))*Math.cos(t(b.lat))*Math.cos(t(b.lng-a.lng));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360; }
+const band = n => n<10 ? "<10" : n<50 ? "10–50" : n<200 ? "50–200" : "200+";
+const fmt = n => n.toLocaleString("en-US");
+function groupsUnder(nodeId){ const set=new Set([nodeId]); let grew=true;
+  while(grew){ grew=false; NODES.forEach(n=>{ if(n.parent && set.has(n.parent) && !set.has(n.id)){ set.add(n.id); grew=true; } }); }
+  return GROUPS.filter(g=>set.has(g.node)); }
+const visibleGroups = () => GROUPS.filter(g=>!g.quiet || g.id===state.meId);
+const isLinked = id => state.links.has(id);
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function showTip(html,x,y){ tip.innerHTML=html; tip.style.display="block"; moveTip(x,y); }
+function moveTip(x,y){ const w=tip.offsetWidth,h=tip.offsetHeight;
+  tip.style.left=Math.min(x+14, innerWidth-w-8)+"px";
+  tip.style.top =Math.max(8, Math.min(y+14, innerHeight-h-8))+"px"; }
+function hideTip(){ tip.style.display="none"; }
+
+/* ---------- header / tabs ---------- */
+function renderMe(){ const m=me();
+  $("#mecard").innerHTML = `Signed in as <b>${esc(m.name)}</b>
+    <span class="lin">${esc(m.rel==="unaffiliated" ? "Independent (pre-affiliation)" : linLabel(m.node))}
+    · ${m.rel==="claims"?"official":m.rel} · ${esc(m.city)}, MA</span>`; }
+function switchView(v){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.v===v)));
+  document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on", s.id==="view-"+v));
+  ({picker:renderPicker, nearby:renderNearby, directory:renderDirectory,
+    tree:renderTree, network:renderNetwork, admin:renderAdmin, usunions:renderUSUnions})[v]();
+  hideTip(); window.scrollTo({top:0}); }
+$("#tabs").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) switchView(b.dataset.v); });
+
+/* ================= 7 · USUNIONS DATA ================= */
+function membershipTrendChart(rows){
+  const width=620, height=230, left=42, right=18, top=28, bottom=38;
+  const totals=rows.map(r=>r.total), min=Math.min(...totals)-5, max=Math.max(...totals)+5;
+  const x=i=>left+i*((width-left-right)/(rows.length-1));
+  const y=v=>top+(max-v)*((height-top-bottom)/(max-min));
+  const points=rows.map((r,i)=>`${x(i)},${y(r.total)}`).join(" ");
+  const guide=[min,Math.round((min+max)/2),max];
+  return `<svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img"
+      aria-labelledby="us-trend-title us-trend-desc">
+    <title id="us-trend-title">USUnions demo membership trend from September through February</title>
+    <desc id="us-trend-desc">Membership increases from 842 in September to 878 in February.</desc>
+    ${guide.map(v=>`<g><line class="axis" x1="${left}" y1="${y(v)}" x2="${width-right}" y2="${y(v)}"/>
+      <text x="2" y="${y(v)+4}">${v}</text></g>`).join("")}
+    <polyline class="trend" points="${points}"/>
+    ${rows.map((r,i)=>`<g>
+      <circle class="point" cx="${x(i)}" cy="${y(r.total)}" r="5"/>
+      <text class="value" text-anchor="middle" x="${x(i)}" y="${y(r.total)-11}">${r.total}</text>
+      <text text-anchor="middle" x="${x(i)}" y="${height-12}">${esc(r.month)}</text>
+    </g>`).join("")}
+  </svg>
+  <p class="note">Demo snapshot change: <b>+${totals.at(-1)-totals[0]}</b> members across six monthly rows.</p>`;
+}
+function renderUSUnions(){
+  const d=USUNIONS_SNAPSHOT, last=d.membershipTrends.at(-1);
+  const metrics=[
+    ["Demo members",fmt(last.total),"+36 since Sep"],
+    ["Survey participation",d.engagement.surveyParticipation+"%","aggregate rate"],
+    ["Weekly question votes",fmt(d.engagement.weeklyQuestionVotes),"aggregate count"],
+    ["Event attendance",fmt(d.engagement.eventAttendance),"aggregate count"]
+  ];
+  $("#us-metrics").innerHTML=metrics.map(([k,v,x])=>`<article><div class="k">${esc(k)}</div>
+    <div class="v">${esc(v)}</div><div class="d">${esc(x)}</div></article>`).join("");
+  $("#us-trend").innerHTML=membershipTrendChart(d.membershipTrends);
+  $("#us-workload").innerHTML=[
+    ["Average caseload",d.workloadSummary.avgCaseload],
+    ["High caseload",d.workloadSummary.highCaseloadPct+"%"],
+    ["Submission rate",d.workloadSummary.submissionRate+"%"],
+    ["Direction",d.workloadSummary.trendDirection]
+  ].map(([k,v])=>`<div class="contract-row"><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join("");
+  $("#us-allowed").innerHTML=d.importBoundary.allowed.map(x=>`<li><span class="mark" aria-hidden="true">✓</span><span>${esc(x)}</span></li>`).join("");
+  $("#us-blocked").innerHTML=d.importBoundary.blocked.map(x=>`<li><span class="mark" aria-hidden="true">×</span><span>${esc(x)}</span></li>`).join("");
+  $("#us-contract").innerHTML=d.liveAdapter.map(x=>`<div class="contract-row"><code>${esc(x.fn)}</code><span>${esc(x.use)}</span></div>`).join("");
+}
+
+/* ================= 1 · BRANCH PICKER ================= */
+function pickTreeRow(n, depth){
+  const has = kids(n.id).length>0, open = state.pick.open.has(n.id);
+  const g = groupsUnder(n.id).filter(x=>!x.quiet);
+  const sel = state.pick.sel===n.id;
+  let row = `<div class="tnode ${sel?"sel":""}" data-pid="${n.id}" role="button" tabindex="0">
+    <span class="car">${has ? (open?"▾":"▸") : "·"}</span>
+    <span><span class="nm">${esc(n.name)}</span> <span class="ty">${TYPE_LABEL[n.type]}</span></span>
+    ${g.length?`<span class="band">${g.length} group${g.length>1?"s":""} on platform</span>`:""}
+  </div>`;
+  if(has && open) row += `<div class="indent">${kids(n.id).map(k=>pickTreeRow(k,depth+1)).join("")}</div>`;
+  return row; }
+function renderPicker(){
+  const p = state.pick, body = $("#pickbody");
+  $("#steps").innerHTML = ["1 · Find your branch","2 · Your relationship","3 · Profile & confirm"]
+    .map((s,i)=>`<span class="${p.step===i+1?"on":""}">${s}</span>`).join("");
+  if(p.step===1){
+    const q = p.q.trim().toLowerCase();
+    const hits = q ? NODES.filter(n=>n.name.toLowerCase().includes(q)).slice(0,8) : [];
+    body.innerHTML = `<div class="pickcols">
+      <div class="card">
+        <input type="search" id="pickq" placeholder="Search the whole tree — try “509”, “nurses”, “labor council”…"
+          value="${esc(p.q)}" style="width:100%; font:inherit; font-size:14px; padding:9px 12px; border:1px solid var(--ring); border-radius:9px; background:var(--surface)">
+        ${q ? `<div style="margin-top:8px">${hits.length ? hits.map(h=>`
+            <div class="tnode ${p.sel===h.id?"sel":""}" data-pid="${h.id}"><span class="car">→</span>
+              <span><span class="nm">${esc(h.name)}</span><br><span class="lineage">${esc(linLabel(h.id))}</span></span></div>`).join("")
+          : `<p class="note" style="padding:8px 4px">No match in the spine. <button class="btn small" id="propose">Propose a missing body</button></p>`}</div>`
+        : `<div class="treecol" style="margin-top:8px">${NODES.filter(n=>!n.parent).map(r=>pickTreeRow(r,0)).join("")}</div>`}
+      </div>
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:6px">Your selection</h3>
+        ${p.sel ? `<p class="lineage" style="font-size:13.5px">${esc(linLabel(p.sel))}</p>
+          <div class="tagrow">${(N[p.sel].sectors||[]).map(s=>`<span class="chip">${SECTORS[s]}</span>`).join("")}
+            <span class="chip gray">${TYPE_LABEL[N[p.sel].type]}</span>
+            ${N[p.sel].est?`<span class="chip gray">~${fmt(N[p.sel].est)} members</span>`:""}</div>
+          <p class="note" style="margin-top:10px">Placing here immediately shows you nearby locals, sibling
+            chapters, and your central labor council.</p>
+          <button class="btn primary" id="tostep2" style="margin-top:12px">Continue →</button>`
+        : `<p class="note">Drill into the tree or search, then choose the body you belong under.
+           Not affiliated with any union yet? Pick <b>Independent &amp; pre-affiliation</b> — you still
+           get the map.</p>`}
+      </div></div>`;
+    body.querySelectorAll("[data-pid]").forEach(el=>{
+      el.addEventListener("click", ()=>{ const id=el.dataset.pid;
+        if(kids(id).length && !state.pick.q){ state.pick.open.has(id) ? state.pick.open.delete(id) : state.pick.open.add(id); }
+        state.pick.sel = id; renderPicker(); });
+    });
+    const qi = $("#pickq");
+    qi.addEventListener("input", ()=>{ state.pick.q=qi.value; renderPicker(); $("#pickq").focus();
+      const v=$("#pickq"); v.setSelectionRange(v.value.length, v.value.length); });
+    const ts2=$("#tostep2"); if(ts2) ts2.addEventListener("click", ()=>{ p.step=2; renderPicker(); });
+    const pr=$("#propose"); if(pr) pr.addEventListener("click", ()=>alert("In the real build this opens the “propose a node” form → admin review queue."));
+  }
+  if(p.step===2){
+    const sel=N[p.sel];
+    const opts=[
+      {k:"claims", t:`We <b>are</b> ${esc(sel.name)}`, d:"The official body itself. Needs verification (officer email, a verified parent body vouching, or admin review). One verified claim per node."},
+      {k:"within", t:`We're a group <b>within</b> ${esc(sel.name)}`, d:"A committee, caucus, regional crew, or workplace group under this body. No verification needed; several groups can live under one node."},
+      {k:"unaffiliated", t:"We're not affiliated yet", d:"Register under Independent & pre-affiliation. You stay discoverable on your terms — and can browse which union families organize your sector nearby."}];
+    $("#pickbody").innerHTML = `<div class="card" style="max-width:640px">
+      <p class="lineage" style="margin-bottom:4px">${esc(linLabel(p.sel))}</p>
+      ${opts.map(o=>`<label class="relopt ${p.rel===o.k?"sel":""}"><input type="radio" name="rel" ${p.rel===o.k?"checked":""} data-rel="${o.k}">
+        <span><b>${o.t}</b><span class="note">${o.d}</span></span></label>`).join("")}
+      <div style="display:flex; gap:8px; margin-top:14px">
+        <button class="btn" id="back1">← Back</button>
+        <button class="btn primary" id="tostep3" ${p.rel?"":"disabled"}>Continue →</button></div></div>`;
+    document.querySelectorAll("[data-rel]").forEach(r=>r.addEventListener("change",()=>{ p.rel=r.dataset.rel; renderPicker(); }));
+    $("#back1").addEventListener("click",()=>{ p.step=1; renderPicker(); });
+    const t3=$("#tostep3"); if(t3) t3.addEventListener("click",()=>{ p.step=3; renderPicker(); });
+  }
+  if(p.step===3){
+    const chip=(dict,set,key)=>Object.entries(dict).map(([k,v])=>
+      `<button class="fchip" data-${key}="${k}" aria-pressed="${set.has(k)}">${v}</button>`).join("");
+    $("#pickbody").innerHTML = `<div class="card" style="max-width:640px">
+      <p class="lineage">${esc(linLabel(p.sel))} · <b>${p.rel==="claims"?"official (pending verification)":p.rel}</b></p>
+      <p style="font-weight:600; margin:12px 0 6px">Sectors</p><div class="tagrow">${chip(SECTORS,p.sectors,"sec")}</div>
+      <p style="font-weight:600; margin:14px 0 6px">Issues you're working on</p><div class="tagrow">${chip(ISSUES,p.issues,"iss")}</div>
+      <p style="font-weight:600; margin:14px 0 6px">Home base</p>
+      <p class="note">Springfield, MA (from your account — editable in the real build). Location powers
+        “near you” but is only ever shown as city-level.</p>
+      <div style="display:flex; gap:8px; margin-top:16px">
+        <button class="btn" id="back2">← Back</button>
+        <button class="btn primary" id="place">Place my group</button></div>
+      <div id="placed"></div></div>`;
+    document.querySelectorAll("[data-sec]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.sec;
+      p.sectors.has(k)?p.sectors.delete(k):p.sectors.add(k); renderPicker(); }));
+    document.querySelectorAll("[data-iss]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.iss;
+      p.issues.has(k)?p.issues.delete(k):p.issues.add(k); renderPicker(); }));
+    $("#back2").addEventListener("click",()=>{ p.step=2; renderPicker(); });
+    $("#place").addEventListener("click",()=>{
+      const m=me(); m.node=p.sel; m.rel=p.rel==="claims"?"claims":p.rel; m.sectors=[...p.sectors]; m.issues=[...p.issues];
+      renderMe();
+      const nearby = visibleGroups().filter(g=>g.id!==m.id && miles(m,g)!=null && miles(m,g)<=50).length;
+      $("#placed").innerHTML = `<div class="placedone">
+        <p><b>Placed.</b> ${esc(m.name)} now sits at <b>${esc(linLabel(p.sel))}</b>.</p>
+        <p class="note" style="margin-top:4px">Unlocked: ${nearby} groups within 50 miles, your regional
+          labor council, and cross-sector suggestions.</p>
+        <button class="btn primary" style="margin-top:10px" id="gonear">See who's near you →</button></div>`;
+      $("#gonear").addEventListener("click",()=>switchView("nearby"));
+    });
+  }
+}
+
+/* ================= 2 · NEAR YOU (radar + list) ================= */
+function nearEntities(){
+  const m=me(), out=[];
+  visibleGroups().forEach(g=>{ if(g.id===m.id) return;
+    const d=miles(m,g); if(d==null) return;
+    out.push({kind:"group", id:g.id, name:g.name, d, brg:bearing(m,g), sectors:g.sectors,
+      ll:g.lat.toFixed(3)+","+g.lng.toFixed(3), sub:g.rel==="unaffiliated"?"Independent":linLabel(g.node), g}); });
+  NODES.filter(n=>n.type==="clc"||n.type==="state_fed").forEach(n=>{
+    const d=miles(m,n); if(d==null) return;
+    out.push({kind:"clc", id:n.id, name:n.name, d, brg:bearing(m,n), sectors:[],
+      ll:n.lat.toFixed(3)+","+n.lng.toFixed(3), sub:TYPE_LABEL[n.type]+" · cross-union body", n}); });
+  NODES.filter(n=>n.type==="local").forEach(n=>{
+    if(groupsUnder(n.id).filter(g=>!g.quiet).length) return;      // active groups already plotted
+    const d=miles(m,n); if(d==null) return;
+    out.push({kind:"node", id:n.id, name:n.name, d, brg:bearing(m,n), sectors:n.sectors||[],
+      ll:n.lat.toFixed(3)+","+n.lng.toFixed(3), sub:linLabel(n.id)+" · no platform presence yet", n}); });
+  return out; }
+const dLabel = d => d<1 ? "<1 mi" : d.toFixed(0)+" mi";
+function renderNearby(){
+  const f=state.near;
+  $("#nearfilters").innerHTML = `
+    ${[25,50,100].map(r=>`<button class="fchip" data-rad="${r}" aria-pressed="${f.radius===r}">≤ ${r} mi</button>`).join("")}
+    <select id="nearsec"><option value="">All sectors</option>
+      ${Object.entries(SECTORS).map(([k,v])=>`<option value="${k}" ${f.sector===k?"selected":""}>${v}</option>`).join("")}</select>
+    <span class="note">from ${esc(me().city)}, MA</span>`;
+  document.querySelectorAll("[data-rad]").forEach(b=>b.addEventListener("click",()=>{ f.radius=+b.dataset.rad; renderNearby(); }));
+  $("#nearsec").addEventListener("change",e=>{ f.sector=e.target.value; renderNearby(); });
+
+  $("#radarlegend").innerHTML = `
+    <button class="fchip" data-kind="group" aria-pressed="${f.kinds.group}"><i style="background:#4a3aa7"></i>Platform groups</button>
+    <button class="fchip" data-kind="clc" aria-pressed="${f.kinds.clc}"><i style="background:#eda100"></i>Labor councils &amp; state fed</button>
+    <button class="fchip" data-kind="node" aria-pressed="${f.kinds.node}"><i style="background:#fcfcfb; border:1.5px solid #898781"></i>Locals with no presence yet</button>`;
+  document.querySelectorAll("[data-kind]").forEach(b=>b.addEventListener("click",()=>{ f.kinds[b.dataset.kind]=!f.kinds[b.dataset.kind]; renderNearby(); }));
+
+  const all = nearEntities();
+  const rows = all.filter(e=>e.d<=f.radius && f.kinds[e.kind] && (!f.sector || e.sectors.includes(f.sector)))
+                  .sort((a,b)=>a.d-b.d);
+
+  /* radar SVG — rings 25/50/100 mi */
+  const S=520,C=S/2,RMAX=225, sc=mi=>mi/100*RMAX;
+  let svg = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Proximity map of ${rows.length} bodies around ${esc(me().city)}">`;
+  [25,50,100].forEach(r=>{ svg+=`<circle cx="${C}" cy="${C}" r="${sc(r)}" fill="none" stroke="#e1e0d9" stroke-width="1"/>
+    <text x="${C+4}" y="${C-sc(r)-4}" font-size="10.5" fill="#898781">${r} mi</text>`; });
+  svg+=`<line x1="${C}" y1="${C-RMAX}" x2="${C}" y2="${C+RMAX}" stroke="#e1e0d9" stroke-width="1"/>
+        <line x1="${C-RMAX}" y1="${C}" x2="${C+RMAX}" y2="${C}" stroke="#e1e0d9" stroke-width="1"/>
+        <text x="${C}" y="${C-RMAX-8}" font-size="10.5" fill="#898781" text-anchor="middle">N</text>`;
+  const clusters={}; rows.forEach(e=>{ (clusters[e.ll]=clusters[e.ll]||[]).push(e); });
+  const labeled=[];                                   // placed CLC label anchors, for collision-skip
+  rows.forEach(e=>{
+    const mates=clusters[e.ll], idx=mates.indexOf(e);
+    const rad=Math.max(sc(Math.min(e.d,100)), e.d<1?20:0), a=(e.brg-90)*Math.PI/180;
+    let x=C+rad*Math.cos(a), y=C+rad*Math.sin(a);
+    if(mates.length>1){ const fa=2*Math.PI*idx/mates.length;      // fan co-located dots
+      x+=14*Math.cos(fa); y+=14*Math.sin(fa); }
+    const core = e.kind==="group" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>`
+      : e.kind==="clc" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>`
+      : `<circle class="core" cx="${x}" cy="${y}" r="5" fill="#fcfcfb" stroke="#898781" stroke-width="1.5"/>`;
+    let lbl="";
+    if(e.kind==="clc" && !labeled.some(p=>Math.hypot(p[0]-x,p[1]-y)<48)){   // label only if it won't collide
+      lbl=`<text x="${x}" y="${y-10}" font-size="10" fill="#52514e" text-anchor="middle">${esc(e.name.split(" ").slice(0,2).join(" "))}</text>`;
+      labeled.push([x,y]); }
+    svg += `<g class="dot" data-near="${e.id}" tabindex="0" role="button"
+      aria-label="${esc(e.name)}, ${dLabel(e.d)}">${lbl}<circle cx="${x}" cy="${y}" r="16" fill="transparent"/>${core}</g>`;
+  });
+  svg+=`<circle cx="${C}" cy="${C}" r="7" fill="#312578" stroke="#fcfcfb" stroke-width="2"/>
+        <text x="${C}" y="${C+22}" font-size="11" font-weight="600" fill="#312578" text-anchor="middle">You</text></svg>`;
+  $("#radar").innerHTML=svg;
+
+  $("#nearlisthead").textContent = `${rows.length} within ${f.radius} miles`;
+  $("#nearlist").innerHTML = rows.map(e=>`<div class="listrow">
+      <span style="flex:none; width:10px; height:10px; border-radius:99px; ${e.kind==="group"?"background:#4a3aa7":e.kind==="clc"?"background:#eda100":"background:#fcfcfb; border:1.5px solid #898781"}"></span>
+      <span><span class="nm" data-open="${e.kind==="group"?e.id:""}" data-node="${e.kind!=="group"?e.id:""}">${esc(e.name)}</span><br>
+        <span class="lineage">${esc(e.sub)}</span></span>
+      <span class="mi">${dLabel(e.d)}</span></div>`).join("")
+    || `<p class="note">Nothing in range with these filters — widen the radius.</p>`;
+
+  const hook=(el,e)=>{ const html=`<div class="t1">${esc(e.name)}</div><div class="t2">${esc(e.sub)} · ${dLabel(e.d)}</div>`;
+    el.addEventListener("mousemove",ev=>showTip(html,ev.clientX,ev.clientY));
+    el.addEventListener("mouseleave",hideTip);
+    el.addEventListener("focus",()=>{ const r=el.getBoundingClientRect(); showTip(html,r.right,r.top); });
+    el.addEventListener("blur",hideTip);
+    el.addEventListener("click",()=>{ hideTip(); e.kind==="group" ? openProfile(e.id) : openNodeCard(e.id); });
+    el.addEventListener("keydown",ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); el.click(); } }); };
+  document.querySelectorAll("[data-near]").forEach(el=>hook(el, rows.find(r=>r.id===el.dataset.near)));
+  document.querySelectorAll("#nearlist .nm").forEach(el=>el.addEventListener("click",()=>{
+    el.dataset.open ? openProfile(el.dataset.open) : openNodeCard(el.dataset.node); }));
+}
+
+/* ================= 3 · DIRECTORY ================= */
+function renderDirectory(){
+  const f=state.dir;
+  $("#dirfilters").innerHTML = `
+    <input type="search" id="dirq" placeholder="Search groups &amp; bodies…" value="${esc(f.q)}">
+    <select id="dirsec"><option value="">Sector — any</option>${Object.entries(SECTORS).map(([k,v])=>`<option value="${k}" ${f.sector===k?"selected":""}>${v}</option>`).join("")}</select>
+    <select id="diriss"><option value="">Issue — any</option>${Object.entries(ISSUES).map(([k,v])=>`<option value="${k}" ${f.issue===k?"selected":""}>${v}</option>`).join("")}</select>
+    <select id="dirfam"><option value="">Family — any</option>${["SEIU","AFSCME","AFT","IBEW","Teamsters (IBT)","UFCW","UNITE HERE","USW","IAFF","Independent & pre-affiliation"].map(x=>`<option ${f.fam===x?"selected":""}>${x}</option>`).join("")}</select>
+    <button class="fchip" id="dirnear" aria-pressed="${f.near}">≤ 50 mi of me</button>`;
+  $("#dirq").addEventListener("input",e=>{ f.q=e.target.value; renderDirectory(); const v=$("#dirq"); v.focus(); v.setSelectionRange(v.value.length,v.value.length); });
+  $("#dirsec").addEventListener("change",e=>{ f.sector=e.target.value; renderDirectory(); });
+  $("#diriss").addEventListener("change",e=>{ f.issue=e.target.value; renderDirectory(); });
+  $("#dirfam").addEventListener("change",e=>{ f.fam=e.target.value; renderDirectory(); });
+  $("#dirnear").addEventListener("click",()=>{ f.near=!f.near; renderDirectory(); });
+
+  const m=me(), q=f.q.trim().toLowerCase();
+  const rows = visibleGroups().filter(g=>g.id!==m.id).filter(g=>{
+    if(q && !(g.name+" "+linLabel(g.node)).toLowerCase().includes(q)) return false;
+    if(f.sector && !g.sectors.includes(f.sector)) return false;
+    if(f.issue && !g.issues.includes(f.issue)) return false;
+    if(f.fam){ const fr=famRoot(g.node); if((fr?fr.name:"")!==f.fam) return false; }
+    if(f.near){ const d=miles(m,g); if(d==null||d>50) return false; }
+    return true; });
+  $("#dirgrid").innerHTML = rows.map(g=>{
+    const d=miles(m,g), linked=isLinked(g.id);
+    return `<div class="card gcard">
+      <div class="toprow"><h3 data-open="${g.id}">${esc(g.name)}</h3>${d!=null?`<span class="dist">${d.toFixed(0)} mi</span>`:""}</div>
+      <p class="lineage">${g.rel==="unaffiliated"?"Independent (pre-affiliation)":esc(linLabel(g.node))}</p>
+      <div class="tagrow">
+        ${g.verified?`<span class="chip ok">✓ Official</span>`:""}
+        ${linked?`<span class="chip">Linked</span>`:""}
+        ${g.sectors.map(s=>`<span class="chip gray">${SECTORS[s]}</span>`).join("")}
+        ${g.issues.map(i=>`<span class="chip gold">${ISSUES[i]}</span>`).join("")}
+        <span class="chip gray">${band(g.members)} members</span></div>
+      <div class="actions">
+        ${linked ? `<button class="btn small done">Linked ✓</button>`
+          : state.pending.has(g.id) ? `<button class="btn small done">Intro requested ✓</button>`
+          : `<button class="btn small primary" data-req="${g.id}">Request intro</button>`}
+        <button class="btn small ${state.follows.has(g.id)?"done":""}" data-fol="${g.id}">${state.follows.has(g.id)?"Following ✓":"Follow"}</button>
+      </div></div>`; }).join("") || `<p class="note">No groups match those filters.</p>`;
+  $("#dirnote").textContent = "1 group is in quiet mode and not shown — quiet groups see outward but appear only to groups they explicitly approve. Issue tags are member-tier fields; liaison contacts only ever open through an accepted intro.";
+  wireCardButtons(renderDirectory);
+}
+function wireCardButtons(rerender){
+  document.querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>openProfile(el.dataset.open)));
+  document.querySelectorAll("[data-req]").forEach(b=>b.addEventListener("click",()=>{ state.pending.add(b.dataset.req); rerender(); }));
+  document.querySelectorAll("[data-fol]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.fol;
+    state.follows.has(id)?state.follows.delete(id):state.follows.add(id); rerender(); }));
+}
+
+/* ================= 4 · TREE ================= */
+function treeRow(n){
+  const ch=kids(n.id), open=state.expanded.has(n.id);
+  const gs=groupsUnder(n.id).filter(g=>!g.quiet);
+  const direct=GROUPS.filter(g=>g.node===n.id && !g.quiet);
+  let html=`<div class="tnode ${ch.length?"haskids":""}" data-tid="${n.id}">
+    <span class="car">${ch.length?(open?"▾":"▸"):"·"}</span>
+    <span><span class="nm">${esc(n.name)}</span> <span class="ty">${TYPE_LABEL[n.type]}</span>
+      ${n.city?`<span class="lineage"> · ${esc(n.city)}, ${esc(n.st)}</span>`:""}</span>
+    ${n.est?`<span class="band">~${fmt(n.est)} members</span>`:""}
+    ${gs.length?`<span class="band" style="background:var(--brand-wash); color:var(--brand-deep)">${gs.length} on platform</span>`:""}</div>`;
+  if(open){
+    if(direct.length) html+=`<div class="indent">${direct.map(g=>`
+      <div class="tnode" data-gid="${g.id}"><span class="car" style="color:#4a3aa7">●</span>
+        <span><span class="nm">${esc(g.name)}</span> <span class="ty">group · ${g.rel==="claims"?"official":g.rel}</span></span>
+        <span class="band">${band(g.members)} members</span></div>`).join("")}</div>`;
+    if(ch.length) html+=`<div class="indent">${ch.map(treeRow).join("")}</div>`;
+  }
+  return html; }
+function renderTree(){
+  $("#bigtree").innerHTML = NODES.filter(n=>!n.parent).map(treeRow).join("");
+  document.querySelectorAll("[data-tid]").forEach(el=>el.addEventListener("click",()=>{
+    const id=el.dataset.tid; if(!kids(id).length) return openNodeCard(id);
+    state.expanded.has(id)?state.expanded.delete(id):state.expanded.add(id); renderTree(); }));
+  document.querySelectorAll("[data-gid]").forEach(el=>el.addEventListener("click",()=>openProfile(el.dataset.gid)));
+}
+
+/* ================= 5 · NETWORK ================= */
+const SUGGESTIONS=[
+ {id:"g_dmhw", why:"Sibling branch — SEIU 509", txt:"Same local, different chapter, 8 miles away — also working health & safety."},
+ {id:"g_afs",  why:"Same terrain — state human services", txt:"AFSCME stewards in the same state facilities world, one county over."},
+ {id:"g_pvwc", why:"Sector neighbor — 10 mi", txt:"Worker-center committee organizing care workers in your valley."},
+ {id:"g_1199", why:"Same fight — Understaffing", txt:"Nursing-home workers running a staffing campaign across the state."}];
+function renderNetwork(){
+  $("#sugs").innerHTML = SUGGESTIONS.filter(s=>!isLinked(s.id)).map(s=>{ const g=G[s.id];
+    return `<div class="sug"><div class="bd">
+      <span class="why">${esc(s.why)}</span>
+      <p style="margin-top:5px"><b data-open="${g.id}" style="cursor:pointer">${esc(g.name)}</b></p>
+      <p class="note">${esc(s.txt)}</p></div>
+      ${state.pending.has(g.id)?`<button class="btn small done">Requested ✓</button>`:`<button class="btn small primary" data-req="${g.id}">Request intro</button>`}
+    </div>`; }).join("") || `<p class="note">You're linked with every current suggestion — nice.</p>`;
+  const linkRows=[...state.links].map(id=>({id, t:"Linked", d:"Contact open · campaign invites on"}));
+  const folRows=[...state.follows].filter(id=>!state.links.has(id)).map(id=>({id, t:"Following", d:"Public feed in your home stream"}));
+  $("#netlinks").innerHTML=[...linkRows,...folRows].map(r=>`<div class="listrow">
+      <span class="chip ${r.t==="Linked"?"":"gray"}">${r.t}</span>
+      <span><span class="nm" data-open="${r.id}">${esc(G[r.id].name)}</span><br><span class="lineage">${esc(r.d)}</span></span></div>`).join("");
+  $("#netaid").innerHTML=`
+    <div class="aid"><span class="kind">Mutual aid · turnout ask</span>
+      <p style="font-weight:600; margin-top:3px">Informational picket at Baystate — Thu 5pm</p>
+      <p class="note">From <b>MNA Baystate RNs</b> (linked) · Issue: Understaffing</p>
+      ${state.pledged.has("aid1")?`<button class="btn small done" style="margin-top:8px">Pledged 6 members ✓</button>`
+        :`<button class="btn small primary" style="margin-top:8px" data-pledge="aid1">Pledge turnout</button>`}</div>
+    <div class="aid"><span class="kind">Joint action</span>
+      <p style="font-weight:600; margin-top:3px">Pack the State House caseloads hearing</p>
+      <p class="note">Convened by <b>DDS Chapter — official</b> · ${5+(state.rsvpd.has("act1")?1:0)} groups in</p>
+      ${state.rsvpd.has("act1")?`<button class="btn small done" style="margin-top:8px">Your group is in ✓</button>`
+        :`<button class="btn small primary" style="margin-top:8px" data-rsvp="act1">Join as a group</button>`}</div>`;
+  $("#netalli").innerHTML=`<div class="aid"><span class="kind" style="color:var(--brand-deep)">Sector council</span>
+      <p style="font-weight:600; margin-top:3px">Massachusetts Human Services Table</p>
+      <p class="note">5 member groups · 900+ combined members · 3 union families + 1 worker center.
+        Aggregate footprint only — alliances never see each other's rosters.</p>
+      <div class="tagrow">${["g_dds","g_cpc","g_1199","g_pvwc","g_ghjc"].map(id=>`<span class="chip gray">${esc(G[id].name)}</span>`).join("")}</div></div>`;
+  wireCardButtons(renderNetwork);
+  document.querySelectorAll("[data-pledge]").forEach(b=>b.addEventListener("click",()=>{ state.pledged.add(b.dataset.pledge); renderNetwork(); }));
+  document.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>{ state.rsvpd.add(b.dataset.rsvp); renderNetwork(); }));
+}
+
+/* ================= 6 · ADMIN ================= */
+const DIST_SECTOR=[["Human services",2410],["Healthcare",1450],["Education",830],["Public sector",615],
+  ["Hospitality",350],["Transit & logistics",290],["Building trades",240],["Other",245]];
+const DIST_REGION=[["Greater Boston",2880],["Western Mass",1345],["Central Mass",810],
+  ["Southeast & Cape",690],["Merrimack Valley",405],["North Shore",300]];
+const WHITESPACE=[["32BJ SEIU — District 615","SEIU › District 615 · Boston","18,000"],
+  ["UFCW Local 1445","UFCW · Dedham","5,600"],["IBEW Local 7","IBEW · Springfield","1,900"],
+  ["IAFF Local 718","IAFF · Boston","1,500"],["USW Local 12003","USW · Dorchester","1,100"]];
+function barChart(el, rows, highlight){
+  const W=470, rowH=34, padL=150, padR=56, H=rows.length*rowH+26;
+  const max=Math.max(...rows.map(r=>r[1])), scale=v=>v/max*(W-padL-padR);
+  const ticks=[0, Math.round(max/2/100)*100, Math.round(max/100)*100];
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">`;
+  ticks.forEach(t=>{ const x=padL+scale(Math.min(t,max));
+    s+=`<line x1="${x}" y1="6" x2="${x}" y2="${H-20}" stroke="#e1e0d9" stroke-width="1"/>
+        <text x="${x}" y="${H-6}" font-size="10.5" fill="#898781" text-anchor="middle" style="font-variant-numeric:tabular-nums">${fmt(t)}</text>`; });
+  s+=`<line x1="${padL}" y1="6" x2="${padL}" y2="${H-20}" stroke="#c3c2b7" stroke-width="1"/>`;
+  rows.forEach((r,i)=>{ const y=10+i*rowH, w=Math.max(scale(r[1]),2), big=r[0]===highlight;
+    s+=`<g class="bar" tabindex="0" data-bar="${esc(r[0])}|${r[1]}" aria-label="${esc(r[0])}: ${fmt(r[1])} members">
+      <text x="${padL-8}" y="${y+13}" font-size="11.5" fill="#52514e" text-anchor="end">${esc(r[0])}</text>
+      <path class="fill" d="M${padL} ${y} h${w-4} a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-${w-4} z" fill="#4a3aa7"/>
+      ${big?`<text x="${padL+w+6}" y="${y+13}" font-size="11.5" font-weight="600" fill="#0b0b0b" style="font-variant-numeric:tabular-nums">${fmt(r[1])}</text>`:""}</g>`; });
+  s+=`</svg>`;
+  el.innerHTML=s;
+  el.querySelectorAll(".bar").forEach(b=>{ const [nm,v]=b.dataset.bar.split("|");
+    const html=`<div class="t1">${esc(nm)}</div><div class="t2">${fmt(+v)} members mapped</div>`;
+    b.addEventListener("mousemove",ev=>showTip(html,ev.clientX,ev.clientY));
+    b.addEventListener("mouseleave",hideTip);
+    b.addEventListener("focus",()=>{ const r=b.getBoundingClientRect(); showTip(html,r.right,r.top); });
+    b.addEventListener("blur",hideTip); });
+}
+function tableView(el, rows, col){
+  el.innerHTML=`<table class="tv"><thead><tr><th>${col}</th><th style="text-align:right">Members</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td style="text-align:right">${fmt(r[1])}</td></tr>`).join("")}</tbody></table>`;
+}
+function renderAdmin(){
+  $("#tiles").innerHTML=[["Groups placed","214","+18 this month"],["Placement rate","82%","+4 pts"],
+    ["Members mapped","6,430","+310"],["Cross-group links","391","+42"]]
+    .map(t=>`<div class="card tile"><div class="lbl">${t[0]}</div><div class="val">${t[1]}</div>
+      <div class="delta up">▲ ${t[2]}</div></div>`).join("");
+  const draw=()=>{ state.tableMode.sector ? tableView($("#chart-sector"),DIST_SECTOR,"Sector") : barChart($("#chart-sector"),DIST_SECTOR,"Human services");
+                   state.tableMode.region ? tableView($("#chart-region"),DIST_REGION,"Region") : barChart($("#chart-region"),DIST_REGION,"Greater Boston");
+                   document.querySelectorAll(".tbl").forEach(b=>b.textContent=state.tableMode[b.dataset.t]?"Chart":"Table"); };
+  draw();
+  document.querySelectorAll(".tbl").forEach(b=>{ b.onclick=()=>{ state.tableMode[b.dataset.t]=!state.tableMode[b.dataset.t]; draw(); }; });
+  $("#whitespace").innerHTML=`<table class="tv"><thead><tr><th>Body (from the spine)</th><th>Where</th>
+      <th style="text-align:right">Est. members</th><th></th></tr></thead><tbody>
+    ${WHITESPACE.map(w=>`<tr><td style="font-weight:600">${esc(w[0])}</td><td>${esc(w[1])}</td>
+      <td style="text-align:right">${w[2]}</td><td style="text-align:right"><span class="chip gray">no presence</span></td></tr>`).join("")}
+    </tbody></table>
+    <p class="note" style="margin-top:10px">Ranked by estimated membership (OLMS / scrape). This list is the
+    growth map: where organized labor exists but 509DDS doesn't yet.</p>`;
+}
+
+/* ================= profile modal & node card ================= */
+let tier="member";
+function openProfile(id){
+  const g=G[id]; if(!g) return;
+  tier = isLinked(id) ? "linked" : "member";
+  drawProfile(g); $("#overlay").classList.add("on");
+}
+function drawProfile(g){
+  const linked=isLinked(g.id), can=t=>({public:0,member:1,linked:2})[tier]>=({public:0,member:1,linked:2})[t];
+  const lock=t=>`<p class="locked">Hidden at this tier — visible to ${t==="member"?"verified members":"linked groups"}.</p>`;
+  $("#modal").innerHTML=`<button class="closex" id="mx" aria-label="Close">✕</button>
+    <h3>${esc(g.name)} ${g.verified?`<span class="chip ok">✓ Official</span>`:""} ${linked?`<span class="chip">Linked</span>`:""}</h3>
+    <p class="lineage" style="margin-top:2px">${g.rel==="unaffiliated"?"Independent (pre-affiliation)":esc(linLabel(g.node))} · ${esc(g.city)}, MA</p>
+    <div><span class="note">Previewing as — the group's visibility dial in action:</span><br>
+      <span class="tierseg">${["public","member","linked"].map(t=>`<button data-tier="${t}" aria-pressed="${tier===t}">${t==="public"?"Public card":t==="member"?"Verified member":"Linked group"}</button>`).join("")}</span></div>
+    <div class="field"><div class="k">Sector &amp; size</div>
+      <div class="tagrow">${g.sectors.map(s=>`<span class="chip gray">${SECTORS[s]}</span>`).join("")}<span class="chip gray">${band(g.members)} members</span></div></div>
+    <div class="field"><div class="k">About</div>${can("member")?`<p>${esc(g.about)}</p>`:lock("member")}</div>
+    <div class="field"><div class="k">Issues</div>${can("member")?`<div class="tagrow">${g.issues.map(i=>`<span class="chip gold">${ISSUES[i]}</span>`).join("")}</div>`:lock("member")}</div>
+    <div class="field"><div class="k">Liaison</div>${can("linked")?`<p>${esc(g.liaison)} · <button class="btn small">Message</button></p>`
+      : can("member")?`<p class="note">Reachable through an intro request — contacts open when the liaison accepts.</p>`:lock("linked")}</div>
+    <div class="field"><div class="k">Active campaigns</div>${can("linked")?`<p>Staffing-ratio campaign · State House caseloads hearing</p>`:lock("linked")}</div>
+    <div style="display:flex; gap:8px; margin-top:14px">
+      ${linked?`<button class="btn done">Linked ✓</button>`:state.pending.has(g.id)?`<button class="btn done">Intro requested ✓</button>`:`<button class="btn primary" id="mreq">Request intro</button>`}
+      <button class="btn" id="mfol">${state.follows.has(g.id)?"Following ✓":"Follow"}</button>
+      ${linked?`<button class="btn" id="minv">Invite to campaign</button>`:""}</div>`;
+  $("#mx").addEventListener("click",closeModal);
+  document.querySelectorAll("[data-tier]").forEach(b=>b.addEventListener("click",()=>{ tier=b.dataset.tier; drawProfile(g); }));
+  const rq=$("#mreq"); if(rq) rq.addEventListener("click",()=>{ state.pending.add(g.id); drawProfile(g); });
+  $("#mfol").addEventListener("click",()=>{ state.follows.has(g.id)?state.follows.delete(g.id):state.follows.add(g.id); drawProfile(g); });
+  const iv=$("#minv"); if(iv) iv.addEventListener("click",()=>alert("In the real build: pick one of your campaigns → sends a group-to-group invite."));
+}
+function openNodeCard(id){
+  const n=N[id]; const gs=groupsUnder(id).filter(g=>!g.quiet);
+  $("#modal").innerHTML=`<button class="closex" id="mx" aria-label="Close">✕</button>
+    <h3>${esc(n.name)}</h3>
+    <p class="lineage" style="margin-top:2px">${esc(linLabel(id))}${n.city?` · ${esc(n.city)}, ${esc(n.st)}`:""}</p>
+    <div class="tagrow"><span class="chip gray">${TYPE_LABEL[n.type]}</span>
+      ${n.est?`<span class="chip gray">~${fmt(n.est)} members</span>`:""}
+      ${(n.sectors||[]).map(s=>`<span class="chip gray">${SECTORS[s]}</span>`).join("")}</div>
+    <div class="field"><div class="k">Platform presence</div>
+      ${gs.length?`<div style="margin-top:4px">${gs.map(g=>`<p><b data-open="${g.id}" style="cursor:pointer">${esc(g.name)}</b> <span class="note">· ${band(g.members)} members</span></p>`).join("")}</div>`
+      :`<p class="note">No groups here yet — this is what the admin coverage list counts as whitespace.
+        In the real build: “Start a group under this body”.</p>`}</div>
+    <p class="note" style="margin-top:8px">Spine data: public record (your scrape + OLMS + published lists).</p>`;
+  $("#mx").addEventListener("click",closeModal);
+  document.querySelectorAll("#modal [data-open]").forEach(el=>el.addEventListener("click",()=>openProfile(el.dataset.open)));
+  $("#overlay").classList.add("on");
+}
+function closeModal(){ $("#overlay").classList.remove("on"); }
+$("#overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
+addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ---------- boot ---------- */
+renderMe(); renderPicker();
+
+</script>
+</body>
+</html>
