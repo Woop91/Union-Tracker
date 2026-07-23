@@ -18,7 +18,7 @@
     "test:atlas": "jest test/union-atlas-data.test.js --verbose --runInBand",
     "contrast:audit": "node scripts/contrast-audit.mjs",
     "data:import": "node scripts/import-union-atlas-data.mjs",
-    "data:build": "node scripts/build-union-atlas-data.mjs",
+    "data:build": "node scripts/build-union-atlas-data.mjs && node scripts/build-union-atlas-page.mjs",
     "data:verify": "node scripts/verify-union-atlas-data.mjs",
     "atlas:theme": "node scripts/build-union-atlas-theme.mjs",
     "deploy": "bash scripts/deploy.sh",

@@ -3,7 +3,7 @@
 ## Product intent
 
 - **Audience:** union members, organizers, local leaders, and platform administrators.
-- **Primary job:** place a group in the labor movement, find nearby unions, and inspect safe aggregate data.
+- **Primary job:** find nearby unions, search canonical records, and inspect source coverage.
 - **Signature element:** the north/east/south/west bullseye remains the main geographic orientation device.
 
 ## Design source
@@ -33,16 +33,17 @@ minimum 44-pixel target where they are directly interactive.
 
 ## Standalone boundary
 
-The Atlas remains one offline-capable HTML document. It loads no remote fonts,
-stylesheets, scripts, images, or design-system runtime.
+The Atlas is an offline-capable local package. Its HTML loads one generated
+repository-local data script and no remote fonts, stylesheets, scripts, images,
+or design-system runtime.
 
 ## Mobile behavior
 
 - The header becomes a compact two-column identity block with safe-area padding.
 - Navigation stays horizontally scrollable and keeps the active task centered.
 - Search and filter controls become touch-sized responsive grids.
-- Picker steps, directory actions, network requests, and modal actions remain at least 44 pixels high.
-- Admin charts default to data tables below 520 pixels; wide coverage tables scroll inside their card.
-- The member profile becomes a full-width bottom sheet on phones.
-- The membership trend remains legible through contained horizontal chart scrolling.
+- ZIP plotting, paging, theme, and navigation controls remain at least 44 pixels high.
+- Wide source tables scroll inside their cards.
+- The compass scales to the available card width while its results move below it.
+- Summary and source-coverage metrics collapse from four columns to two, then one.
 - Breakpoints are verified at 320, 375, 390, 768, and 1440 pixels.

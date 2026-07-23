@@ -1,30 +1,26 @@
-# Standalone Union Atlas data
+# Source-backed Union Atlas data
 
-`union-atlas.json` is the complete local data package used by the Common Ground
-Union Atlas prototype. The repository does not need the original collection
-session, a spreadsheet, Google Apps Script, or a network request to render the
-prototype.
+`union-atlas.json` is the complete repository-local directory package used by
+the Common Ground Union Atlas.
 
 ## Included
 
-- 45 public labor organizations and connective bodies
-- 14 fictional/demo platform groups
-- Sector, issue, and organization-type taxonomies
-- Network suggestions, mutual-aid activity, joint action, and alliance data
-- Admin distributions and Atlas coverage gaps
-- Complete safe USUnions/SolidBase aggregate demo snapshot
-- Public local-union identity/geography import schema
-- Provenance and privacy metadata
+- 20,699 canonical union records from `Woop91/USUnions`
+- Exact source repository commit and source-manifest checksum
+- OLMS identity, affiliation, level, public headquarters city/state/ZIP,
+  latest reported membership, filing form, public website, and enrichment state
+- 2025 U.S. Census Gazetteer ZCTA representative coordinates
+- Derived affiliation, state, and completeness rollups
+
+Every displayed organization and metric comes from those source records or is
+calculated directly from them. Missing values remain missing.
 
 ## Excluded
 
 - Member rosters and personal identifiers
 - Grievance, discipline, and case-level records
-- Email addresses, phone numbers, and private contacts
-- Street addresses, steward identities, session tokens, and authentication data
-
-These exclusions are intentional. They are application records, not Union Atlas
-directory data. Importing them would make the Atlas unsafe, not more complete.
+- Private email addresses or phone numbers
+- Street addresses, session tokens, and authentication data
 
 ## Build and verification
 
@@ -33,6 +29,6 @@ npm run data:build
 npm run data:verify
 ```
 
-`data:build` creates `manifest.json` with the data-file SHA-256 and record
-counts. `data:verify` checks referential integrity, source independence, privacy
-boundaries, and parity with the standalone HTML.
+`data:build` creates the manifest, browser data module, and Atlas HTML.
+`data:verify` checks source identity, uniqueness, completeness, geography,
+privacy boundaries, package parity, and checksums.

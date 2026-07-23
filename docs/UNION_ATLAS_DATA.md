@@ -1,47 +1,38 @@
-# Union Atlas data bridge
+# Union Atlas data provenance
 
-The Union Atlas prototype in `docs/union-atlas.html` uses the repository-local
-`data/union-atlas.json` package. That package includes every dataset used by the
-prototype plus the safe USUnions aggregate and schema import.
+The Atlas uses a repository-local public filing directory:
 
-## Provenance
-
+- Canonical source: `Woop91/USUnions`
+- Source grain: one canonical OLMS union record
+- Record count: 20,699
+- Geography: public headquarters city/state/ZIP from OLMS filings
+- Coordinates: 2025 U.S. Census Gazetteer ZCTA representative points
 - Local package: `data/union-atlas.json`
-- Imported from: `Woop91/SolidBase`
-- Product name: SolidBase / USUnions
-- Snapshot mode: seeded repository demo data
-- Production status: not production and not synchronized
+- Browser package: `docs/union-atlas-data.js`
 
-The prototype has no runtime network, spreadsheet, Apps Script, or source-repo
-dependency. It can be opened directly from disk.
+The exact source commit, source-manifest SHA-256, row coverage, coordinate
+source, and package checksum are stored in `data/manifest.json`.
 
-## Imported
+## Display rule
 
-- Aggregate engagement rates and counts
-- Six monthly aggregate membership totals
-- Aggregate steward workload indicators
-- A mapping contract for public local-union identity and geography fields
+The Atlas displays only source fields or values computed directly from source
+rows. Missing values are shown as not reported. It does not invent platform
+groups, campaigns, relationships, activities, membership trends, or engagement
+metrics.
 
-## Excluded
+## Privacy boundary
 
-- Member or roster rows
-- Grievance, discipline, or case records
-- Email addresses, phone numbers, and private contacts
-- Street addresses, steward names, session tokens, and authentication data
+The package contains organization-level public filing data. It excludes member
+rosters, grievances, cases, authentication records, private contacts, personal
+identifiers, and street addresses.
 
-The imported membership total is deliberately shown in a separate data view.
-It is not added to Atlas organization counts or the invented platform-group
-counts because the populations may overlap.
+## Importing a new source snapshot
 
-## Live adapter boundary
+Run the importer against an authenticated local checkout of the private
+USUnions repository and the official Census ZCTA Gazetteer text file:
 
-A future authenticated adapter can call these existing SolidBase functions:
-
-- `dataGetEngagementStats(sessionToken)`
-- `dataGetWorkloadSummaryStats(sessionToken)`
-- `dataGetMemberCount(sessionToken)`
-
-Only aggregate results may enter the Atlas. `CONFIG_HEADER_MAP_` can map
-organization name, abbreviation, local number, parent union, state/region,
-public website, and a public office city/state. Placeholder configuration
-values are not factual organization data and must never be published.
+```text
+node scripts/import-union-atlas-data.mjs --source <USUnions checkout> --zcta <Gazetteer text file>
+npm run data:build
+npm run data:verify
+```
