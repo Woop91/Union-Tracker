@@ -1,15 +1,19 @@
 # Union Atlas data bridge
 
-The Union Atlas prototype in `docs/union-atlas.html` incorporates the safe,
-aggregate demo snapshot defined by `seedUnionStatsData()` in
-`src/07_DevTools.gs`.
+The Union Atlas prototype in `docs/union-atlas.html` uses the repository-local
+`data/union-atlas.json` package. That package includes every dataset used by the
+prototype plus the safe USUnions aggregate and schema import.
 
 ## Provenance
 
-- Repository: `Woop91/SolidBase`
+- Local package: `data/union-atlas.json`
+- Imported from: `Woop91/SolidBase`
 - Product name: SolidBase / USUnions
 - Snapshot mode: seeded repository demo data
 - Production status: not production and not synchronized
+
+The prototype has no runtime network, spreadsheet, Apps Script, or source-repo
+dependency. It can be opened directly from disk.
 
 ## Imported
 

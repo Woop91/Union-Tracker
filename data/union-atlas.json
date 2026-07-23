@@ -1,0 +1,1124 @@
+{
+  "metadata": {
+    "formatVersion": 1,
+    "project": "Common Ground Union Atlas",
+    "selfContained": true,
+    "generatedAt": "2026-07-23",
+    "sources": [
+      "docs/union-atlas.html legacy embedded dataset",
+      "src/07_DevTools.gs seedUnionStatsData",
+      "src/01_Core.gs CONFIG_HEADER_MAP_"
+    ],
+    "notice": "Atlas organizations are public bodies. Platform activity and USUnions metrics are demo data.",
+    "privacy": "No member roster, grievance, contact, address, authentication, or case-level data."
+  },
+  "taxonomies": {
+    "sectors": {
+      "hs": "Human services",
+      "hc": "Healthcare",
+      "ed": "Education",
+      "ps": "Public sector",
+      "bt": "Building trades",
+      "ho": "Hospitality",
+      "lg": "Transit & logistics",
+      "rg": "Retail & grocery",
+      "mu": "Manufacturing & utilities",
+      "pr": "Property services"
+    },
+    "issues": {
+      "und": "Understaffing",
+      "wag": "Wages",
+      "saf": "Health & safety",
+      "prv": "Privatization",
+      "con": "Contract fight",
+      "cas": "Caseloads",
+      "sch": "Scheduling",
+      "hou": "Housing"
+    },
+    "organizationTypes": {
+      "federation": "Federation",
+      "international": "International",
+      "intermediate": "Council / district",
+      "local": "Local",
+      "chapter_unit": "Chapter",
+      "state_fed": "State federation",
+      "clc": "Central labor council",
+      "worker_center": "Worker center",
+      "independent_root": "Independent"
+    }
+  },
+  "organizations": [
+    {
+      "id": "aflcio",
+      "parent": null,
+      "type": "federation",
+      "name": "AFL-CIO",
+      "city": "Washington",
+      "st": "DC"
+    },
+    {
+      "id": "soc",
+      "parent": null,
+      "type": "federation",
+      "name": "Strategic Organizing Center",
+      "city": "Washington",
+      "st": "DC"
+    },
+    {
+      "id": "indep",
+      "parent": null,
+      "type": "independent_root",
+      "name": "Independent & pre-affiliation"
+    },
+    {
+      "id": "seiu",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "SEIU",
+      "full": "Service Employees International Union",
+      "est": 2000000
+    },
+    {
+      "id": "seiuma",
+      "parent": "seiu",
+      "type": "intermediate",
+      "name": "SEIU Massachusetts State Council",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589
+    },
+    {
+      "id": "l509",
+      "parent": "seiuma",
+      "type": "local",
+      "name": "SEIU Local 509",
+      "city": "Marlborough",
+      "st": "MA",
+      "lat": 42.3459,
+      "lng": -71.5523,
+      "est": 20000,
+      "sectors": [
+        "hs",
+        "ed"
+      ]
+    },
+    {
+      "id": "ch_dds",
+      "parent": "l509",
+      "type": "chapter_unit",
+      "name": "DDS Chapter",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 7500,
+      "sectors": [
+        "hs"
+      ]
+    },
+    {
+      "id": "ch_dmh",
+      "parent": "l509",
+      "type": "chapter_unit",
+      "name": "DMH Chapter",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 3000,
+      "sectors": [
+        "hs"
+      ]
+    },
+    {
+      "id": "ch_dcf",
+      "parent": "l509",
+      "type": "chapter_unit",
+      "name": "DCF Chapter",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 3500,
+      "sectors": [
+        "hs"
+      ]
+    },
+    {
+      "id": "ch_cp",
+      "parent": "l509",
+      "type": "chapter_unit",
+      "name": "Community Providers Chapter",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 6000,
+      "sectors": [
+        "hs"
+      ]
+    },
+    {
+      "id": "l1199",
+      "parent": "seiuma",
+      "type": "local",
+      "name": "1199SEIU — Massachusetts",
+      "city": "Dorchester",
+      "st": "MA",
+      "lat": 42.297,
+      "lng": -71.075,
+      "est": 23000,
+      "sectors": [
+        "hc"
+      ]
+    },
+    {
+      "id": "l888",
+      "parent": "seiuma",
+      "type": "local",
+      "name": "SEIU Local 888",
+      "city": "Charlestown",
+      "st": "MA",
+      "lat": 42.3782,
+      "lng": -71.0602,
+      "est": 8500,
+      "sectors": [
+        "ps"
+      ]
+    },
+    {
+      "id": "d615",
+      "parent": "seiuma",
+      "type": "local",
+      "name": "32BJ SEIU — District 615",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 18000,
+      "sectors": [
+        "pr"
+      ]
+    },
+    {
+      "id": "ibt",
+      "parent": "soc",
+      "type": "international",
+      "name": "Teamsters (IBT)",
+      "est": 1300000
+    },
+    {
+      "id": "jc10",
+      "parent": "ibt",
+      "type": "intermediate",
+      "name": "Teamsters Joint Council 10",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589
+    },
+    {
+      "id": "l25",
+      "parent": "jc10",
+      "type": "local",
+      "name": "Teamsters Local 25",
+      "city": "Charlestown",
+      "st": "MA",
+      "lat": 42.3782,
+      "lng": -71.0602,
+      "est": 12000,
+      "sectors": [
+        "lg"
+      ]
+    },
+    {
+      "id": "afscme",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "AFSCME",
+      "est": 1400000
+    },
+    {
+      "id": "c93",
+      "parent": "afscme",
+      "type": "intermediate",
+      "name": "AFSCME Council 93",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 45000,
+      "sectors": [
+        "ps",
+        "hs"
+      ]
+    },
+    {
+      "id": "l402",
+      "parent": "c93",
+      "type": "local",
+      "name": "AFSCME Local 402",
+      "city": "Worcester",
+      "st": "MA",
+      "lat": 42.2626,
+      "lng": -71.8023,
+      "est": 900,
+      "sectors": [
+        "hs",
+        "ps"
+      ]
+    },
+    {
+      "id": "aft",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "AFT",
+      "est": 1700000
+    },
+    {
+      "id": "aftma",
+      "parent": "aft",
+      "type": "intermediate",
+      "name": "AFT Massachusetts",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 23000,
+      "sectors": [
+        "ed"
+      ]
+    },
+    {
+      "id": "btu",
+      "parent": "aftma",
+      "type": "local",
+      "name": "Boston Teachers Union — Local 66",
+      "city": "Dorchester",
+      "st": "MA",
+      "lat": 42.297,
+      "lng": -71.075,
+      "est": 10000,
+      "sectors": [
+        "ed"
+      ]
+    },
+    {
+      "id": "ibew",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "IBEW",
+      "est": 750000
+    },
+    {
+      "id": "l103",
+      "parent": "ibew",
+      "type": "local",
+      "name": "IBEW Local 103",
+      "city": "Dorchester",
+      "st": "MA",
+      "lat": 42.297,
+      "lng": -71.075,
+      "est": 7000,
+      "sectors": [
+        "bt"
+      ]
+    },
+    {
+      "id": "l7",
+      "parent": "ibew",
+      "type": "local",
+      "name": "IBEW Local 7",
+      "city": "Springfield",
+      "st": "MA",
+      "lat": 42.1015,
+      "lng": -72.5898,
+      "est": 1900,
+      "sectors": [
+        "bt"
+      ]
+    },
+    {
+      "id": "ufcw",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "UFCW",
+      "est": 1200000
+    },
+    {
+      "id": "l1445",
+      "parent": "ufcw",
+      "type": "local",
+      "name": "UFCW Local 1445",
+      "city": "Dedham",
+      "st": "MA",
+      "lat": 42.2436,
+      "lng": -71.166,
+      "est": 5600,
+      "sectors": [
+        "rg"
+      ]
+    },
+    {
+      "id": "uh",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "UNITE HERE",
+      "est": 300000
+    },
+    {
+      "id": "l26",
+      "parent": "uh",
+      "type": "local",
+      "name": "UNITE HERE Local 26",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 12000,
+      "sectors": [
+        "ho"
+      ]
+    },
+    {
+      "id": "usw",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "USW",
+      "est": 850000
+    },
+    {
+      "id": "l12003",
+      "parent": "usw",
+      "type": "local",
+      "name": "USW Local 12003",
+      "city": "Dorchester",
+      "st": "MA",
+      "lat": 42.297,
+      "lng": -71.075,
+      "est": 1100,
+      "sectors": [
+        "mu"
+      ]
+    },
+    {
+      "id": "iaff",
+      "parent": "aflcio",
+      "type": "international",
+      "name": "IAFF",
+      "est": 330000
+    },
+    {
+      "id": "l718",
+      "parent": "iaff",
+      "type": "local",
+      "name": "IAFF Local 718 — Boston Fire",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "est": 1500,
+      "sectors": [
+        "ps"
+      ]
+    },
+    {
+      "id": "massfed",
+      "parent": "aflcio",
+      "type": "state_fed",
+      "name": "Massachusetts AFL-CIO",
+      "city": "Malden",
+      "st": "MA",
+      "lat": 42.4251,
+      "lng": -71.0662
+    },
+    {
+      "id": "gblc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Greater Boston Labor Council",
+      "city": "Boston",
+      "st": "MA",
+      "lat": 42.3601,
+      "lng": -71.0589
+    },
+    {
+      "id": "wmalf",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Western Mass Area Labor Federation",
+      "city": "Springfield",
+      "st": "MA",
+      "lat": 42.1015,
+      "lng": -72.5898
+    },
+    {
+      "id": "cmclc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Central Massachusetts AFL-CIO",
+      "city": "Worcester",
+      "st": "MA",
+      "lat": 42.2626,
+      "lng": -71.8023
+    },
+    {
+      "id": "mvclc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Merrimack Valley Central Labor Council",
+      "city": "Lowell",
+      "st": "MA",
+      "lat": 42.6334,
+      "lng": -71.3162
+    },
+    {
+      "id": "nsclc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "North Shore Central Labor Council",
+      "city": "Lynn",
+      "st": "MA",
+      "lat": 42.4668,
+      "lng": -70.9495
+    },
+    {
+      "id": "nclc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Norfolk County Labor Council",
+      "city": "Quincy",
+      "st": "MA",
+      "lat": 42.2529,
+      "lng": -71.0023
+    },
+    {
+      "id": "gsmlc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Greater Southeastern Mass. Labor Council",
+      "city": "New Bedford",
+      "st": "MA",
+      "lat": 41.6362,
+      "lng": -70.9342
+    },
+    {
+      "id": "pbclc",
+      "parent": "massfed",
+      "type": "clc",
+      "name": "Plymouth/Bristol Central Labor Council",
+      "city": "Brockton",
+      "st": "MA",
+      "lat": 42.0834,
+      "lng": -71.0184
+    },
+    {
+      "id": "mna",
+      "parent": "indep",
+      "type": "local",
+      "name": "Massachusetts Nurses Association",
+      "city": "Canton",
+      "st": "MA",
+      "lat": 42.1584,
+      "lng": -71.1448,
+      "est": 25000,
+      "sectors": [
+        "hc"
+      ]
+    },
+    {
+      "id": "bwc",
+      "parent": "indep",
+      "type": "worker_center",
+      "name": "Brazilian Worker Center",
+      "city": "Allston",
+      "st": "MA",
+      "lat": 42.3539,
+      "lng": -71.1337,
+      "sectors": [
+        "hs",
+        "bt"
+      ]
+    },
+    {
+      "id": "pvwc",
+      "parent": "indep",
+      "type": "worker_center",
+      "name": "Pioneer Valley Workers Center",
+      "city": "Northampton",
+      "st": "MA",
+      "lat": 42.3251,
+      "lng": -72.6412,
+      "sectors": [
+        "hs"
+      ]
+    }
+  ],
+  "platformGroups": [
+    {
+      "id": "g_ghjc",
+      "name": "Group-Home Justice Crew",
+      "node": "ch_dds",
+      "rel": "within",
+      "city": "Springfield",
+      "lat": 42.1015,
+      "lng": -72.5898,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "und",
+        "saf",
+        "wag"
+      ],
+      "members": 34,
+      "liaison": "R. Alvarez (steward)",
+      "about": "Members across western-Mass DDS group homes organizing on chronic understaffing and unsafe overnight ratios."
+    },
+    {
+      "id": "g_dds",
+      "name": "DDS Chapter — official",
+      "node": "ch_dds",
+      "rel": "claims",
+      "verified": true,
+      "city": "Boston",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "und",
+        "cas",
+        "con"
+      ],
+      "members": 480,
+      "liaison": "Chapter VP office",
+      "about": "Official chapter body for SEIU 509 members at the Department of Developmental Services."
+    },
+    {
+      "id": "g_dmhw",
+      "name": "DMH Western Mass Members",
+      "node": "ch_dmh",
+      "rel": "within",
+      "city": "Northampton",
+      "lat": 42.3251,
+      "lng": -72.6412,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "cas",
+        "saf"
+      ],
+      "members": 41,
+      "liaison": "K. Osei",
+      "about": "DMH members west of Worcester coordinating on caseloads and site safety."
+    },
+    {
+      "id": "g_dcfw",
+      "name": "DCF Worcester Unit",
+      "node": "ch_dcf",
+      "rel": "within",
+      "city": "Worcester",
+      "lat": 42.2626,
+      "lng": -71.8023,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "cas"
+      ],
+      "members": 58,
+      "liaison": "M. Nguyen",
+      "about": "DCF Worcester-area unit; caseload caps campaign."
+    },
+    {
+      "id": "g_cpc",
+      "name": "Community Providers Collective",
+      "node": "ch_cp",
+      "rel": "within",
+      "city": "Brockton",
+      "lat": 42.0834,
+      "lng": -71.0184,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "wag",
+        "und"
+      ],
+      "members": 120,
+      "liaison": "D. Jean-Baptiste",
+      "about": "Provider-agency members organizing for rate-tied raises."
+    },
+    {
+      "id": "g_1199",
+      "name": "1199 Nursing Home Workers United",
+      "node": "l1199",
+      "rel": "within",
+      "city": "Dorchester",
+      "lat": 42.297,
+      "lng": -71.075,
+      "sectors": [
+        "hc"
+      ],
+      "issues": [
+        "wag",
+        "und"
+      ],
+      "members": 210,
+      "liaison": "Organizing desk",
+      "about": "Nursing-home members coordinating across chains."
+    },
+    {
+      "id": "g_afs",
+      "name": "AFSCME 402 Stewards Circle",
+      "node": "l402",
+      "rel": "within",
+      "city": "Worcester",
+      "lat": 42.2626,
+      "lng": -71.8023,
+      "sectors": [
+        "hs",
+        "ps"
+      ],
+      "issues": [
+        "con",
+        "wag"
+      ],
+      "members": 26,
+      "liaison": "Chief steward",
+      "about": "Stewards at state facilities — same buildings, different local."
+    },
+    {
+      "id": "g_btu",
+      "name": "BTU Paraprofessionals Caucus",
+      "node": "btu",
+      "rel": "within",
+      "city": "Dorchester",
+      "lat": 42.297,
+      "lng": -71.075,
+      "sectors": [
+        "ed"
+      ],
+      "issues": [
+        "wag"
+      ],
+      "members": 95,
+      "liaison": "Caucus co-chairs",
+      "about": "Paraprofessional caucus inside Boston Teachers Union."
+    },
+    {
+      "id": "g_mna",
+      "name": "MNA Baystate RNs",
+      "node": "mna",
+      "rel": "within",
+      "city": "Springfield",
+      "lat": 42.1015,
+      "lng": -72.5898,
+      "sectors": [
+        "hc"
+      ],
+      "issues": [
+        "und",
+        "saf"
+      ],
+      "members": 150,
+      "liaison": "Unit chair",
+      "about": "RN bargaining unit at Baystate; staffing-ratio fight."
+    },
+    {
+      "id": "g_888",
+      "name": "Local 888 Library Workers",
+      "node": "l888",
+      "rel": "within",
+      "city": "Boston",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "sectors": [
+        "ps"
+      ],
+      "issues": [
+        "wag",
+        "sch"
+      ],
+      "members": 33,
+      "liaison": "Unit rep",
+      "about": "Municipal library workers across greater Boston."
+    },
+    {
+      "id": "g_uh26",
+      "name": "Hotel Housekeepers Committee (L26)",
+      "node": "l26",
+      "rel": "within",
+      "city": "Boston",
+      "lat": 42.3601,
+      "lng": -71.0589,
+      "sectors": [
+        "ho"
+      ],
+      "issues": [
+        "sch",
+        "saf"
+      ],
+      "members": 76,
+      "liaison": "Committee line",
+      "about": "Housekeeping committee inside UNITE HERE Local 26."
+    },
+    {
+      "id": "g_pvwc",
+      "name": "PVWC Comité de Trabajadores",
+      "node": "pvwc",
+      "rel": "claims",
+      "verified": true,
+      "city": "Northampton",
+      "lat": 42.3251,
+      "lng": -72.6412,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "wag",
+        "hou"
+      ],
+      "members": 60,
+      "liaison": "Center staff",
+      "about": "Worker-center committee for immigrant care and farm workers in the Valley."
+    },
+    {
+      "id": "g_t25",
+      "name": "Teamsters 25 Warehouse Group",
+      "node": "l25",
+      "rel": "within",
+      "city": "Charlestown",
+      "lat": 42.3782,
+      "lng": -71.0602,
+      "sectors": [
+        "lg"
+      ],
+      "issues": [
+        "saf",
+        "sch"
+      ],
+      "members": 44,
+      "liaison": "Shop floor rep",
+      "about": "Warehouse members coordinating on injury rates."
+    },
+    {
+      "id": "g_ghoc",
+      "name": "Springfield Group Home Workers OC",
+      "node": "indep",
+      "rel": "unaffiliated",
+      "city": "Springfield",
+      "lat": 42.1015,
+      "lng": -72.5898,
+      "sectors": [
+        "hs"
+      ],
+      "issues": [
+        "und",
+        "wag"
+      ],
+      "members": 12,
+      "liaison": "—",
+      "quiet": true,
+      "about": "Pre-affiliation organizing committee (quiet mode)."
+    }
+  ],
+  "suggestions": [
+    {
+      "id": "g_dmhw",
+      "why": "Sibling branch — SEIU 509",
+      "txt": "Same local, different chapter, 8 miles away — also working health & safety."
+    },
+    {
+      "id": "g_afs",
+      "why": "Same terrain — state human services",
+      "txt": "AFSCME stewards in the same state facilities world, one county over."
+    },
+    {
+      "id": "g_pvwc",
+      "why": "Sector neighbor — 10 mi",
+      "txt": "Worker-center committee organizing care workers in your valley."
+    },
+    {
+      "id": "g_1199",
+      "why": "Same fight — Understaffing",
+      "txt": "Nursing-home workers running a staffing campaign across the state."
+    }
+  ],
+  "admin": {
+    "tiles": [
+      {
+        "label": "Groups placed",
+        "value": "214",
+        "delta": "+18 this month"
+      },
+      {
+        "label": "Placement rate",
+        "value": "82%",
+        "delta": "+4 pts"
+      },
+      {
+        "label": "Members mapped",
+        "value": "6,430",
+        "delta": "+310"
+      },
+      {
+        "label": "Cross-group links",
+        "value": "391",
+        "delta": "+42"
+      }
+    ],
+    "sectorDistribution": [
+      [
+        "Human services",
+        2410
+      ],
+      [
+        "Healthcare",
+        1450
+      ],
+      [
+        "Education",
+        830
+      ],
+      [
+        "Public sector",
+        615
+      ],
+      [
+        "Hospitality",
+        350
+      ],
+      [
+        "Transit & logistics",
+        290
+      ],
+      [
+        "Building trades",
+        240
+      ],
+      [
+        "Other",
+        245
+      ]
+    ],
+    "regionDistribution": [
+      [
+        "Greater Boston",
+        2880
+      ],
+      [
+        "Western Mass",
+        1345
+      ],
+      [
+        "Central Mass",
+        810
+      ],
+      [
+        "Southeast & Cape",
+        690
+      ],
+      [
+        "Merrimack Valley",
+        405
+      ],
+      [
+        "North Shore",
+        300
+      ]
+    ],
+    "coverageGaps": [
+      [
+        "32BJ SEIU — District 615",
+        "SEIU › District 615 · Boston",
+        "18,000"
+      ],
+      [
+        "UFCW Local 1445",
+        "UFCW · Dedham",
+        "5,600"
+      ],
+      [
+        "IBEW Local 7",
+        "IBEW · Springfield",
+        "1,900"
+      ],
+      [
+        "IAFF Local 718",
+        "IAFF · Boston",
+        "1,500"
+      ],
+      [
+        "USW Local 12003",
+        "USW · Dorchester",
+        "1,100"
+      ]
+    ]
+  },
+  "network": {
+    "mutualAid": {
+      "id": "aid1",
+      "kind": "Mutual aid · turnout ask",
+      "title": "Informational picket at Baystate — Thu 5pm",
+      "sourceGroupId": "g_mna",
+      "issue": "Understaffing"
+    },
+    "jointAction": {
+      "id": "act1",
+      "kind": "Joint action",
+      "title": "Pack the State House caseloads hearing",
+      "sourceGroupId": "g_dds",
+      "participatingGroups": 5
+    },
+    "alliance": {
+      "name": "Massachusetts Human Services Table",
+      "type": "Sector council",
+      "combinedMembers": "900+",
+      "unionFamilies": 3,
+      "workerCenters": 1,
+      "groupIds": [
+        "g_dds",
+        "g_cpc",
+        "g_1199",
+        "g_pvwc",
+        "g_ghjc"
+      ]
+    }
+  },
+  "usUnions": {
+    "provenance": {
+      "repository": "Woop91/SolidBase",
+      "importedFrom": "Woop91/SolidBase",
+      "sourceFile": "src/07_DevTools.gs",
+      "sourceFunction": "seedUnionStatsData",
+      "mode": "repo-demo",
+      "production": false
+    },
+    "engagement": {
+      "surveyParticipation": 62,
+      "weeklyQuestionVotes": 147,
+      "eventAttendance": 78,
+      "grievanceFilingRate": 4.2,
+      "stewardContactRate": 31,
+      "resourceDownloads": 215
+    },
+    "membershipTrends": [
+      {
+        "month": "Sep",
+        "total": 842,
+        "newMembers": 12,
+        "departed": 3
+      },
+      {
+        "month": "Oct",
+        "total": 851,
+        "newMembers": 15,
+        "departed": 6
+      },
+      {
+        "month": "Nov",
+        "total": 858,
+        "newMembers": 11,
+        "departed": 4
+      },
+      {
+        "month": "Dec",
+        "total": 862,
+        "newMembers": 9,
+        "departed": 5
+      },
+      {
+        "month": "Jan",
+        "total": 869,
+        "newMembers": 14,
+        "departed": 7
+      },
+      {
+        "month": "Feb",
+        "total": 878,
+        "newMembers": 16,
+        "departed": 7
+      }
+    ],
+    "workloadSummary": {
+      "avgCaseload": 23.4,
+      "highCaseloadPct": 18,
+      "submissionRate": 71,
+      "trendDirection": "increasing"
+    },
+    "importBoundary": {
+      "allowed": [
+        "Organization name, abbreviation, local number and parent union",
+        "State or region and public organization website",
+        "Public office city/state for proximity placement",
+        "Aggregate engagement, membership-trend and workload metrics"
+      ],
+      "blocked": [
+        "Member names, roster rows or personal identifiers",
+        "Grievance, discipline or case-level records",
+        "Email addresses, phone numbers or private contacts",
+        "Street addresses, steward names or authentication data"
+      ]
+    },
+    "liveAdapter": [
+      {
+        "fn": "dataGetEngagementStats(sessionToken)",
+        "use": "Aggregate participation and activity"
+      },
+      {
+        "fn": "dataGetWorkloadSummaryStats(sessionToken)",
+        "use": "Aggregate steward workload"
+      },
+      {
+        "fn": "dataGetMemberCount(sessionToken)",
+        "use": "Single total only; never roster rows"
+      },
+      {
+        "fn": "CONFIG_HEADER_MAP_",
+        "use": "Local identity and public geography mapping"
+      }
+    ],
+    "publicIdentitySchema": [
+      {
+        "key": "ORG_NAME",
+        "label": "Organization Name",
+        "type": "text"
+      },
+      {
+        "key": "ORG_ABBREV",
+        "label": "Organization Abbreviation",
+        "type": "text"
+      },
+      {
+        "key": "LOCAL_NUMBER",
+        "label": "Local Number",
+        "type": "text"
+      },
+      {
+        "key": "UNION_PARENT",
+        "label": "Parent Union",
+        "type": "text"
+      },
+      {
+        "key": "STATE_REGION",
+        "label": "State or Region",
+        "type": "text"
+      },
+      {
+        "key": "ORG_WEBSITE",
+        "label": "Public Organization Website",
+        "type": "url"
+      },
+      {
+        "key": "OFFICE_LOCATIONS",
+        "label": "Public Office Locations",
+        "type": "list"
+      }
+    ]
+  }
+}

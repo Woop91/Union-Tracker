@@ -3,6 +3,8 @@ const path = require('path');
 
 const atlasPath = path.join(__dirname, '..', 'docs', 'union-atlas.html');
 const atlas = fs.readFileSync(atlasPath, 'utf8');
+const dataPath = path.join(__dirname, '..', 'data', 'union-atlas.json');
+const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
 describe('Union Atlas USUnions data bridge', () => {
   test('includes the exact seeded aggregate snapshot', () => {
@@ -30,5 +32,15 @@ describe('Union Atlas USUnions data bridge', () => {
   test('keeps the imported total separate from Atlas counts', () => {
     expect(atlas).toContain('keeps local operations separate from Atlas-wide organization and proximity counts');
     expect(atlas).toContain('Demo members');
+  });
+
+  test('includes the complete standalone data package', () => {
+    expect(data.metadata.selfContained).toBe(true);
+    expect(data.organizations).toHaveLength(45);
+    expect(data.platformGroups).toHaveLength(14);
+    expect(data.suggestions).toHaveLength(4);
+    expect(data.admin.coverageGaps).toHaveLength(5);
+    expect(data.usUnions.membershipTrends).toHaveLength(6);
+    expect(data.usUnions.publicIdentitySchema).toHaveLength(7);
   });
 });

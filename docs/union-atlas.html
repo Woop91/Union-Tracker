@@ -338,8 +338,8 @@
       <div>
         <h3>SolidBase local-union snapshot</h3>
         <div class="source-meta">
-          <span><b>Repository:</b> Woop91/SolidBase</span>
-          <span><b>Source:</b> <code>src/07_DevTools.gs</code></span>
+          <span><b>Imported from:</b> Woop91/SolidBase</span>
+          <span><b>Local package:</b> <code>data/union-atlas.json</code></span>
           <span><b>Scope:</b> aggregate demo data</span>
         </div>
       </div>
@@ -510,8 +510,9 @@ const G = Object.fromEntries(GROUPS.map(g=>[g.id,g]));
 /* ---------- USUnions / SolidBase safe aggregate snapshot ---------- */
 const USUNIONS_SNAPSHOT = Object.freeze({
   provenance:{
-    repository:"Woop91/SolidBase",
-    sourceFile:"src/07_DevTools.gs",
+    repository:"local:data/union-atlas.json",
+    importedFrom:"Woop91/SolidBase",
+    sourceFile:"data/union-atlas.json",
     sourceFunction:"seedUnionStatsData",
     mode:"repo-demo",
     production:false

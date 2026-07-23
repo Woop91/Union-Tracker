@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "dataFile": "union-atlas.json",
+  "sha256": "12d9d0c1295bbfa674b792b11d3b2f83befe2eded4b6c2a87041148e5040332c",
+  "counts": {
+    "organizations": 45,
+    "platformGroups": 14,
+    "sectors": 10,
+    "issues": 8,
+    "suggestions": 4,
+    "coverageGaps": 5,
+    "membershipTrendRows": 6,
+    "publicIdentityFields": 7
+  },
+  "selfContained": true,
+  "productionData": false
+}
