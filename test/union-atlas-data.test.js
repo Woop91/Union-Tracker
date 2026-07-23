@@ -5,6 +5,10 @@ const atlasPath = path.join(__dirname, '..', 'docs', 'union-atlas.html');
 const atlas = fs.readFileSync(atlasPath, 'utf8');
 const dataPath = path.join(__dirname, '..', 'data', 'union-atlas.json');
 const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+const tokensPath = path.join(__dirname, '..', 'design', 'solid-ground', 'tokens.css');
+const tokens = fs.readFileSync(tokensPath, 'utf8').trim();
+const themeReadmePath = path.join(__dirname, '..', 'design', 'solid-ground', 'README.md');
+const themeReadme = fs.readFileSync(themeReadmePath, 'utf8');
 
 describe('Union Atlas USUnions data bridge', () => {
   test('includes the exact seeded aggregate snapshot', () => {
@@ -42,5 +46,45 @@ describe('Union Atlas USUnions data bridge', () => {
     expect(data.admin.coverageGaps).toHaveLength(5);
     expect(data.usUnions.membershipTrends).toHaveLength(6);
     expect(data.usUnions.publicIdentitySchema).toHaveLength(7);
+  });
+});
+
+describe('Union Atlas Solid Ground visual system', () => {
+  test('records the exact design source and Claude session', () => {
+    expect(themeReadme).toContain('42d54f1619fab56717f4cc2f0b3f4f289aa57b3c');
+    expect(themeReadme).toContain('05fd27e3-7aa0-4384-934c-1c26921914cf');
+  });
+
+  test('embeds the copied token source in the standalone page', () => {
+    const embedded = atlas
+      .split('<!-- BEGIN SOLID GROUND TOKENS -->')[1]
+      .split('<!-- END SOLID GROUND TOKENS -->')[0]
+      .trim();
+    expect(embedded).toContain(tokens);
+  });
+
+  test('supports explicit light and dark themes', () => {
+    expect(atlas).toContain('<html lang="en" data-theme="light">');
+    expect(atlas).toContain('html[data-theme="dark"]');
+    expect(atlas).toContain('id="theme-toggle"');
+    expect(atlas).toContain('localStorage.setItem("union-atlas-theme"');
+  });
+
+  test('keeps the visual runtime self-contained', () => {
+    expect(atlas).not.toMatch(/<script[^>]+src=["']https?:/i);
+    expect(atlas).not.toMatch(/<link[^>]+href=["']https?:/i);
+    expect(atlas).not.toMatch(/url\(\s*["']?https?:/i);
+  });
+
+  test('uses semantic tokens instead of raw colors in application styles', () => {
+    const application = atlas.split('<!-- END SOLID GROUND TOKENS -->')[1];
+    expect(application).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(application).not.toMatch(/rgba?\([^)]*\)/i);
+  });
+
+  test('keeps compass points keyboard operable without SVG click shims', () => {
+    expect(atlas).toContain('el.addEventListener("keydown"');
+    expect(atlas).toContain('activate();');
+    expect(atlas).not.toContain('el.click();');
   });
 });

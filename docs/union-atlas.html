@@ -1,69 +1,221 @@
 <!DOCTYPE html>
-<html lang="en" style="color-scheme: light">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%234a3aa7'/><circle cx='16' cy='16' r='5' fill='%23eda100'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%230e4034'/><circle cx='16' cy='16' r='5' fill='%23efa738'/></svg>">
 <title>Common Ground — Union Atlas + USUnions data</title>
+<!-- BEGIN SOLID GROUND TOKENS -->
+<style id="solid-ground-tokens">
+/* Solid Ground design tokens — GENERATED from tokens.json by build-tokens.mjs. Do not edit by hand. */
+:root {
+
+  /* ── color ─────────────────────────────────── */
+  --sg-color-ink: #14201c; /* Primary text / darkest ink on light surfaces (--ink) */
+  --sg-color-ink-2: #3d4a44; /* Softer prose/body ink for long copy (email body, Field Guide, decks) */
+  --sg-color-sec: #5c6a63; /* Secondary text (--sec, desktop) */
+  --sg-color-muted: #8a938c; /* Muted/tertiary text and meta (--muted) */
+  --sg-color-faint: #b2bab3; /* Faint labels, disabled text, email footer faint (--faint) */
+  --sg-color-canvas: #f6f2e9; /* Page canvas cream (--canvas) */
+  --sg-color-card: #ffffff; /* White card surface (--card) */
+  --sg-color-card-2: #efe9dc; /* Raised/inset neutral panel (--card2) */
+  --sg-color-track: #e7e1d3; /* Slider/progress/rail track (--track) */
+  --sg-color-border: #d7d0c2; /* Hairline border / divider on light (--border, --line) */
+  --sg-color-green: #0e4034; /* Deep green primary surface / brand green (--green, 'Ground') */
+  --sg-color-pine: #0a2f26; /* Darkest pine green: logo chip, deep accents, email dark rules (--greenDeep, 'Pine') */
+  --sg-color-forest: #0d241e; /* Near-black forest: page bg, toasts, dark cards (R12 canonical near-black) */
+  --sg-color-sidebar: #124639; /* App sidebar base green (--sidebar) */
+  --sg-color-side-text: #a8c9bb; /* Sidebar idle-link text (--sideText) */
+  --sg-color-green-text: #1b6e49; /* Green link/emphasis text; steward identity (--greenText2 === --steward, R4) */
+  --sg-color-hero: #137c54; /* Hero / mid emphasis green (--hero, --greenText) */
+  --sg-color-sage: #9fbcb0; /* Muted sage green: secondary text on dark surfaces, decorative fills (recurring non-token, site oddity 13) */
+  --sg-color-green-soft: #dce9e2; /* Soft green positive inset (--greenSoft === --stewardSoft, R4) */
+  --sg-color-green-tint: #cfe0d8; /* Mid green tint: on-dark positive fills, chips (recurring non-token, R6) */
+  --sg-color-green-faint: #c6dbcf; /* Faintest green wash (--greenFaint) */
+  --sg-color-gold: #efa738; /* Brand gold accent / CTA fill (--gold, 'Gold') */
+  --sg-color-ink-on-gold: #241a08; /* Dark ink for CTA/button labels on gold fill (R3 winner) */
+  --sg-color-gold-soft: #f7c56e; /* Soft light gold: gradient stops, glow highlights */
+  --sg-color-warn: #b07a12; /* Warning amber text/icon (--warn) */
+  --sg-color-warn-soft: #fbefd5; /* Soft amber warning inset (--warnSoft) */
+  --sg-color-terra: #c25b3a; /* Terracotta accent (--terra, desktop, 'Terra'; R1 winner) */
+  --sg-color-terra-soft: #f4e0d7; /* Soft terracotta inset (--terraSoft) */
+  --sg-color-terra-faint: #eccfc2; /* Faint terracotta wash (--terraFaint) */
+  --sg-color-danger: #c0492c; /* Danger/destructive red (--danger) */
+  --sg-color-danger-soft: #f7ddd3; /* Soft danger inset (--dangerSoft) */
+  --sg-color-case: #2f6fb0; /* Casework blue role color (--case) */
+  --sg-color-case-deep: #275a92; /* Deep casework blue (ramp step, R10) */
+  --sg-color-case-soft: #ddeaf6; /* Soft casework blue inset (--caseSoft) */
+  --sg-color-purple: #6a3fc0; /* Rewards/Learn purple accent (R9 promotion; was un-tokenized) */
+  --sg-color-purple-deep: #4d2f96; /* Deep rewards purple (R9) */
+  --sg-color-purple-soft: #ece2fb; /* Soft purple tint for rewards/Learn cards (R9) */
+  --sg-color-success: #2f9e6b; /* Success green (--success) */
+
+  /* ── font ──────────────────────────────────── */
+  --sg-font-family-display: 'Archivo', 'Arial', 'Helvetica', sans-serif; /* Display/headings (--display) */
+  --sg-font-family-body: 'Public Sans', 'Arial', 'Helvetica', sans-serif; /* Body & UI (--body) */
+  --sg-font-family-mono: 'Spline Sans Mono', 'Consolas', monospace; /* Data, PINs, receipts, code (--utility) */
+  --sg-font-size-micro: 9px; /* Smallest micro labels */
+  --sg-font-size-label: 11px; /* Uppercase eyebrow/tag labels */
+  --sg-font-size-caption: 11.5px; /* Captions, footnotes, email footers (brand half-pixel ramp) */
+  --sg-font-size-compact: 12px; /* Dense UI text (most-used size) */
+  --sg-font-size-small: 12.5px; /* Small secondary text (half-pixel ramp) */
+  --sg-font-size-base: 13px; /* Base UI text */
+  --sg-font-size-body: 14px; /* Body copy */
+  --sg-font-size-lead: 15px; /* Lead/intro text */
+  --sg-font-size-subhead: 17px; /* Subheadings */
+  --sg-font-size-title: 21px; /* Section titles */
+  --sg-font-size-display: 24px; /* Display headings */
+  --sg-font-weight-regular: 400; /* Body regular (Public Sans) */
+  --sg-font-weight-medium: 500; /* Medium */
+  --sg-font-weight-semibold: 600; /* Semibold UI emphasis */
+  --sg-font-weight-bold: 700; /* Bold (Public Sans/Archivo) */
+  --sg-font-weight-extrabold: 800; /* Extrabold — brand signature display weight (Archivo) */
+  --sg-font-weight-black: 900; /* Archivo Black headings */
+
+  /* ── space ─────────────────────────────────── */
+  --sg-space-s0: 0px; /* Zero gap */
+  --sg-space-s4: 4px; /* Hairline gap */
+  --sg-space-s6: 6px; /* Tight gap */
+  --sg-space-s8: 8px; /* Small gap */
+  --sg-space-s9: 9px; /* Small gap (brand odd step) */
+  --sg-space-s10: 10px; /* Compact gap */
+  --sg-space-s11: 11px; /* Compact gap */
+  --sg-space-s12: 12px; /* Default gap / inset (most-used) */
+  --sg-space-s13: 13px; /* Medium gap */
+  --sg-space-s14: 14px; /* Medium gap */
+  --sg-space-s16: 16px; /* Card padding */
+  --sg-space-s18: 18px; /* Card padding / section gap */
+  --sg-space-s20: 20px; /* Section gap */
+  --sg-space-s24: 24px; /* Large section gap */
+
+  /* ── radius ────────────────────────────────── */
+  --sg-radius-xs: 6px; /* Chip/tag radius (desktop; mobile forces 99px, R14) */
+  --sg-radius-sm: 9px; /* Small button/input radius */
+  --sg-radius-md: 11px; /* Button / email CTA radius */
+  --sg-radius-lg: 14px; /* Panel radius */
+  --sg-radius-card: 18px; /* Large card/sheet radius */
+  --sg-radius-pill: 99px; /* Pill/fully-rounded (R8 winner over 999px) */
+  --sg-radius-round: 50%; /* Circles: avatars, dots, rings */
+
+  /* ── shadow ────────────────────────────────── */
+  --sg-shadow-sm: 0 1px 3px rgba(0,0,0,.25); /* Subtle raise (buttons, small chips) */
+  --sg-shadow-lift: 0 6px 16px rgba(27,42,36,.06); /* Soft card lift */
+  --sg-shadow-card: 0 12px 26px rgba(17,25,35,.08); /* Elevated card */
+  --sg-shadow-pop: 0 14px 28px -14px rgba(0,0,0,.2); /* Popover/menu float */
+  --sg-shadow-modal: 0 16px 34px rgba(17,25,35,.14); /* Modal/dialog */
+
+  /* ── motion ────────────────────────────────── */
+  --sg-motion-duration-quick: 120ms; /* Quick interaction (hover, toggle) */
+  --sg-motion-duration-base: 200ms; /* Base transition */
+  --sg-motion-duration-moderate: 300ms; /* Moderate transition */
+  --sg-motion-duration-slow: 450ms; /* Slow entrance */
+  --sg-motion-duration-slower: 550ms; /* Slower entrance / toast */
+  --sg-motion-ease-standard: cubic-bezier(.4,0,.2,1); /* Standard ease (interaction) */
+  --sg-motion-ease-emphasized: cubic-bezier(.22,1,.36,1); /* Emphasized/decelerate entrance */
+  --sg-motion-ease-spring: cubic-bezier(.34,1.3,.5,1); /* Overshoot spring (pop-in) */
+
+  /* ── alpha ─────────────────────────────────── */
+  --sg-alpha-divider: 0.08; /* Ink at 8% — hairline dividers (--divider = rgba(20,32,28,.08); R7) */
+  --sg-alpha-side-active: 0.14; /* Gold at 14% — active sidebar item wash (--sideActive = rgba(239,167,56,.14)) */
+}
+</style>
+<!-- END SOLID GROUND TOKENS -->
 <style>
   :root{
-    --background:#f9f9f7; --foreground:#0b0b0b; --card:#fcfcfb; --card-foreground:#0b0b0b;
-    --popover:#fcfcfb; --popover-foreground:#0b0b0b; --primary:#4a3aa7; --primary-foreground:#ffffff;
-    --secondary:#eeecf8; --secondary-foreground:#312578; --muted-surface:#f0efec; --muted-foreground:#686660;
-    --accent:#fdf3dd; --accent-foreground:#6a4700; --destructive:#b42318; --destructive-foreground:#ffffff;
-    --border:#85837c; --input:#77756f; --focus-ring:#4a3aa7;
-    --page:var(--background); --surface:var(--card); --ink:var(--foreground); --ink2:#52514e; --muted:var(--muted-foreground);
-    --grid:#e1e0d9; --baseline:#c3c2b7; --ring:rgba(11,11,11,.10);
-    --brand:var(--primary); --brand-deep:var(--secondary-foreground); --brand-wash:var(--secondary);
-    --gold:#eda100; --gold-wash:#fdf3dd; --good:#006300; --danger:#d03b3b;
-    --r:12px; --shadow:0 1px 2px rgba(11,11,11,.05),0 4px 14px rgba(11,11,11,.05);
+    --background:var(--sg-color-canvas); --foreground:var(--sg-color-ink);
+    --card:var(--sg-color-card); --card-foreground:var(--sg-color-ink);
+    --popover:var(--sg-color-card); --popover-foreground:var(--sg-color-ink);
+    --primary:var(--sg-color-green); --primary-foreground:var(--sg-color-canvas);
+    --secondary:var(--sg-color-card-2); --secondary-foreground:var(--sg-color-green);
+    --muted-surface:var(--sg-color-card-2); --muted-foreground:var(--sg-color-sec);
+    --accent:var(--sg-color-gold); --accent-foreground:var(--sg-color-ink-on-gold);
+    --destructive:var(--sg-color-danger); --destructive-foreground:var(--sg-color-card);
+    --border:var(--sg-color-muted); --input:var(--sg-color-sec); --focus-ring:var(--sg-color-green-text);
+    --page:var(--background); --surface:var(--card); --ink:var(--foreground);
+    --ink2:var(--sg-color-ink-2); --muted:var(--muted-foreground);
+    --grid:var(--sg-color-border); --baseline:var(--sg-color-border); --ring:var(--focus-ring);
+    --brand:var(--primary); --brand-deep:var(--sg-color-pine); --brand-wash:var(--sg-color-green-soft);
+    --gold:var(--sg-color-gold); --gold-wash:var(--sg-color-warn-soft);
+    --good:var(--sg-color-green-text); --danger:var(--destructive);
+    --r:var(--sg-radius-lg); --shadow:var(--sg-shadow-lift);
+  }
+  html[data-theme="dark"]{
+    --background:var(--sg-color-forest); --foreground:var(--sg-color-canvas);
+    --card:var(--sg-color-green); --card-foreground:var(--sg-color-canvas);
+    --popover:var(--sg-color-pine); --popover-foreground:var(--sg-color-canvas);
+    --primary:var(--sg-color-gold); --primary-foreground:var(--sg-color-ink-on-gold);
+    --secondary:var(--sg-color-sidebar); --secondary-foreground:var(--sg-color-canvas);
+    --muted-surface:var(--sg-color-pine); --muted-foreground:var(--sg-color-side-text);
+    --accent:var(--sg-color-gold); --accent-foreground:var(--sg-color-ink-on-gold);
+    --destructive:var(--sg-color-danger-soft); --destructive-foreground:var(--sg-color-pine);
+    --border:var(--sg-color-sage); --input:var(--sg-color-side-text); --focus-ring:var(--sg-color-gold);
+    --ink2:var(--sg-color-green-tint); --grid:var(--sg-color-sidebar);
+    --baseline:var(--sg-color-sage); --ring:var(--focus-ring);
+    --brand:var(--sg-color-gold); --brand-deep:var(--sg-color-canvas);
+    --brand-wash:var(--sg-color-sidebar); --gold-wash:var(--sg-color-gold);
+    --good:var(--sg-color-green-tint); --danger:var(--sg-color-terra-soft);
   }
   *{box-sizing:border-box; margin:0}
+  html{color-scheme:light}
+  html[data-theme="dark"]{color-scheme:dark}
   html,body{background:var(--page); color:var(--ink);
-    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;}
+    font:var(--sg-font-size-body)/1.55 var(--sg-font-family-body);}
+  h1,h2,h3,h4{font-family:var(--sg-font-family-display)}
   button{font:inherit; cursor:pointer}
   .wrap{max-width:1080px; margin:0 auto; padding:0 20px 72px}
 
   /* ---------- header ---------- */
-  header.top{background:var(--brand-deep); color:#fff; padding:18px 0 0}
+  header.top{background:
+      radial-gradient(120% 180% at 88% -60%,color-mix(in srgb,var(--sg-color-gold) 22%,transparent),transparent 48%),
+      var(--sg-color-forest);
+    color:var(--sg-color-canvas); padding:22px 0 0; border-bottom:3px solid var(--sg-color-gold)}
   header.top .wrap{padding-bottom:0}
   .brandrow{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
-  .brandrow h1{font-size:19px; font-weight:700; letter-spacing:.2px}
+  .brandrow h1{font-size:24px; font-weight:900; letter-spacing:-.02em}
+  .brandrow h1 .ground{color:var(--sg-color-gold)}
   .brandrow .proto{font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px;
-    background:rgba(255,255,255,.14); padding:2px 8px; border-radius:99px}
-  .brandrow .sub{color:rgba(255,255,255,.75); font-size:13px}
-  .mecard{margin-top:12px; font-size:13px; color:rgba(255,255,255,.9); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-  .mecard .lin{background:rgba(255,255,255,.12); border-radius:8px; padding:3px 10px}
+    background:color-mix(in srgb,var(--sg-color-gold) 14%,transparent); color:var(--sg-color-gold-soft);
+    border:1px solid color-mix(in srgb,var(--sg-color-gold) 24%,transparent);
+    padding:3px 9px; border-radius:var(--sg-radius-pill)}
+  .brandrow .sub{color:var(--sg-color-sage); font-size:var(--sg-font-size-base)}
+  .theme-toggle{margin-left:auto;border:1px solid color-mix(in srgb,var(--sg-color-canvas) 24%,transparent);
+    background:color-mix(in srgb,var(--sg-color-canvas) 8%,transparent);color:var(--sg-color-canvas);
+    min-height:36px;padding:6px 12px;border-radius:var(--sg-radius-pill);font-weight:700;font-size:12px}
+  .theme-toggle:hover{border-color:var(--sg-color-gold);color:var(--sg-color-gold-soft)}
+  .mecard{margin-top:12px; font-size:13px; color:var(--sg-color-canvas); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .mecard .lin{background:color-mix(in srgb,var(--sg-color-canvas) 9%,transparent); border-radius:var(--sg-radius-sm); padding:4px 10px}
   nav.tabs{display:flex; gap:2px; margin-top:14px; overflow-x:auto}
-  nav.tabs button{background:transparent; border:0; color:rgba(255,255,255,.72); padding:10px 14px 12px;
-    font-weight:600; font-size:13.5px; border-radius:10px 10px 0 0; white-space:nowrap}
-  nav.tabs button:hover{color:#fff}
-  nav.tabs button[aria-selected="true"]{background:var(--page); color:var(--brand-deep)}
+  nav.tabs button{background:transparent; border:0; color:var(--sg-color-side-text); padding:11px 14px 13px;
+    font-weight:700; font-size:13px; border-radius:var(--sg-radius-md) var(--sg-radius-md) 0 0; white-space:nowrap}
+  nav.tabs button:hover{color:var(--sg-color-canvas);background:color-mix(in srgb,var(--sg-color-gold) 8%,transparent)}
+  nav.tabs button[aria-selected="true"]{background:var(--page); color:var(--primary);
+    box-shadow:inset 0 3px 0 var(--sg-color-gold)}
 
   main{padding-top:22px}
   .view{display:none} .view.on{display:block}
   .viewhead{margin-bottom:16px}
-  .viewhead h2{font-size:20px; font-weight:700}
+  .viewhead h2{font-size:24px; font-weight:800; letter-spacing:-.015em;color:var(--secondary-foreground)}
   .viewhead p{color:var(--ink2); max-width:64ch; margin-top:3px}
 
   /* ---------- shared bits ---------- */
-  .card{background:var(--surface); border:1px solid var(--ring); border-radius:var(--r);
+  .card{background:var(--surface); color:var(--card-foreground); border:1px solid var(--border); border-radius:var(--sg-radius-card);
     box-shadow:var(--shadow); padding:16px}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
   @media(max-width:820px){.grid2{grid-template-columns:1fr}}
   .chip{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
     padding:2px 9px; border-radius:99px; background:var(--brand-wash); color:var(--brand-deep)}
-  .chip.gold{background:var(--gold-wash); color:#7a5200}
-  .chip.gray{background:#f0efec; color:var(--ink2)}
-  .chip.ok{background:#e7f3e7; color:var(--good)}
+  .chip.gold{background:var(--gold-wash); color:var(--accent-foreground)}
+  .chip.gray{background:var(--muted-surface); color:var(--muted-foreground)}
+  .chip.ok{background:var(--brand-wash); color:var(--good)}
   .lineage{font-size:12px; color:var(--ink2)}
   .lineage b{color:var(--brand-deep)}
   .tagrow{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px}
   .btn{border:1px solid var(--input); background:var(--surface); border-radius:9px; padding:7px 13px;
     font-weight:600; font-size:13px; color:var(--ink)}
   .btn:hover{border-color:var(--brand); color:var(--brand-deep)}
-  .btn.primary{background:var(--brand); border-color:var(--brand); color:#fff}
-  .btn.primary:hover{background:var(--brand-deep); color:#fff}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-foreground);
+    box-shadow:var(--sg-shadow-sm)}
+  .btn.primary:hover{background:var(--sg-color-gold-soft); color:var(--sg-color-ink-on-gold)}
   .btn.small{padding:4px 10px; font-size:12px; border-radius:8px}
   .btn.done{background:var(--brand-wash); border-color:transparent; color:var(--brand-deep); cursor:default}
   .note{font-size:12.5px; color:var(--muted)}
@@ -73,12 +225,12 @@
   .filters input[type=search]{min-width:200px}
   .fchip{border:1px solid var(--input); background:var(--surface); border-radius:99px; padding:5px 12px;
     font-size:12.5px; font-weight:600; color:var(--ink2)}
-  .fchip[aria-pressed="true"]{background:var(--brand); border-color:var(--brand); color:#fff}
+  .fchip[aria-pressed="true"]{background:var(--primary); border-color:var(--primary); color:var(--primary-foreground)}
 
   /* ---------- branch picker ---------- */
   .steps{display:flex; gap:6px; margin-bottom:14px; font-size:12.5px; font-weight:600; color:var(--muted)}
-  .steps span{padding:3px 10px; border-radius:99px; background:#f0efec}
-  .steps span.on{background:var(--brand); color:#fff}
+  .steps span{padding:3px 10px; border-radius:var(--sg-radius-pill); background:var(--muted-surface)}
+  .steps span.on{background:var(--primary); color:var(--primary-foreground)}
   .pickcols{display:grid; grid-template-columns:1fr 1fr; gap:14px}
   @media(max-width:820px){.pickcols{grid-template-columns:1fr}}
   .treecol{max-height:430px; overflow:auto}
@@ -88,9 +240,9 @@
   .tnode .car{width:14px; color:var(--muted); font-size:11px; flex:none; text-align:center}
   .tnode .nm{font-weight:600; font-size:13.5px}
   .tnode .ty{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px}
-  .tnode .band{margin-left:auto; font-size:11px; color:var(--ink2); background:#f0efec; padding:1px 7px; border-radius:99px; flex:none}
+  .tnode .band{margin-left:auto; font-size:11px; color:var(--muted-foreground); background:var(--muted-surface); padding:1px 7px; border-radius:var(--sg-radius-pill); flex:none}
   .indent{margin-left:18px; border-left:1px solid var(--grid); padding-left:6px}
-  .relopt{display:flex; gap:10px; padding:12px; border:1.5px solid var(--ring); border-radius:10px; cursor:pointer; margin-top:8px}
+  .relopt{display:flex; gap:10px; padding:12px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; margin-top:8px}
   .relopt:hover{border-color:var(--brand)}
   .relopt.sel{border-color:var(--brand); background:var(--brand-wash)}
   .relopt b{display:block; font-size:14px}
@@ -113,7 +265,7 @@
   @media(max-width:900px){.radarwrap{grid-template-columns:1fr}}
   .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--ink2); margin-bottom:8px}
   .legend i{display:inline-block; width:10px; height:10px; border-radius:99px; margin-right:6px; vertical-align:-1px}
-  .legend .fchip[aria-pressed="true"] i{box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
+  .legend .fchip[aria-pressed="true"] i{box-shadow:0 0 0 1.5px var(--primary-foreground)}
   svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
   .dot{cursor:pointer}
   .dot:focus{outline:none}
@@ -134,8 +286,8 @@
   .sug .why{font-size:12px; color:var(--brand-deep); background:var(--brand-wash); border-radius:99px; padding:1px 8px; font-weight:600}
   .sug .bd{flex:1}
   .netlist .listrow{border-bottom:1px solid var(--grid)}
-  .aid{border:1px solid var(--ring); border-radius:10px; padding:12px; margin-top:10px}
-  .aid .kind{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#7a5200}
+  .aid{border:1px solid var(--border); border-radius:10px; padding:12px; margin-top:10px}
+  .aid .kind{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--accent-foreground)}
 
   /* ---------- admin ---------- */
   .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px}
@@ -199,13 +351,13 @@
   }
 
   /* ---------- modal ---------- */
-  .overlay{position:fixed; inset:0; background:rgba(11,11,11,.35); display:none; align-items:flex-start; justify-content:center; padding:6vh 16px; z-index:50}
+  .overlay{position:fixed; inset:0; background:color-mix(in srgb,var(--sg-color-forest) 72%,transparent); display:none; align-items:flex-start; justify-content:center; padding:6vh 16px; z-index:50}
   .overlay.on{display:flex}
-  .modal{background:var(--surface); border-radius:14px; max-width:560px; width:100%; padding:20px; box-shadow:0 12px 48px rgba(11,11,11,.25); max-height:86vh; overflow:auto}
+  .modal{background:var(--popover); color:var(--popover-foreground); border-radius:var(--sg-radius-card); max-width:560px; width:100%; padding:20px; box-shadow:var(--sg-shadow-modal); max-height:86vh; overflow:auto}
   .modal h3{font-size:18px}
-  .tierseg{display:inline-flex; border:1px solid var(--ring); border-radius:9px; overflow:hidden; margin:12px 0 4px}
+  .tierseg{display:inline-flex; border:1px solid var(--border); border-radius:9px; overflow:hidden; margin:12px 0 4px}
   .tierseg button{border:0; background:var(--surface); padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--ink2)}
-  .tierseg button[aria-pressed="true"]{background:var(--brand); color:#fff}
+  .tierseg button[aria-pressed="true"]{background:var(--primary); color:var(--primary-foreground)}
   .field{padding:10px 0; border-bottom:1px solid var(--grid)}
   .field:last-child{border-bottom:0}
   .field .k{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted)}
@@ -213,21 +365,92 @@
   .closex{float:right; border:0; background:transparent; font-size:18px; color:var(--muted); padding:2px 8px}
 
   /* ---------- tooltip ---------- */
-  #tip{position:fixed; z-index:80; background:var(--ink); color:#fff; font-size:12.5px; padding:7px 10px;
-    border-radius:8px; pointer-events:none; display:none; max-width:250px; box-shadow:0 4px 14px rgba(11,11,11,.3)}
+  #tip{position:fixed; z-index:80; background:var(--sg-color-forest); color:var(--sg-color-canvas); font-size:12.5px; padding:7px 10px;
+    border-radius:var(--sg-radius-sm); pointer-events:none; display:none; max-width:250px; box-shadow:var(--sg-shadow-pop)}
   #tip .t1{font-weight:700}
-  #tip .t2{color:rgba(255,255,255,.75)}
+  #tip .t2{color:var(--sg-color-green-tint)}
 
-  footer{margin-top:36px; font-size:12px; color:var(--muted); border-top:1px solid var(--grid); padding-top:12px}
+  /* ---------- Solid Ground Atlas composition ---------- */
+  main{padding-top:28px}
+  .viewhead{border-left:3px solid var(--sg-color-gold);padding-left:14px;margin-bottom:20px}
+  .view-kicker{display:block;margin-bottom:3px;
+    font-family:var(--sg-font-family-mono);font-size:10px;font-weight:700;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--sg-color-warn)}
+  html[data-theme="dark"] .view-kicker{color:var(--sg-color-gold-soft)}
+  .viewhead p{font-size:var(--sg-font-size-body);line-height:1.55}
+  .card{transition:transform var(--sg-motion-duration-quick) var(--sg-motion-ease-standard),
+    box-shadow var(--sg-motion-duration-quick) var(--sg-motion-ease-standard)}
+  .gcard:hover{transform:translateY(-2px);box-shadow:var(--sg-shadow-card)}
+  .gcard:focus-within{box-shadow:0 0 0 3px var(--focus-ring),var(--sg-shadow-card)}
+  .radarwrap>.card:first-child{position:relative;border-top:3px solid var(--sg-color-gold);
+    background:
+      radial-gradient(circle at 50% 54%,color-mix(in srgb,var(--sg-color-green) 6%,transparent) 0 2px,transparent 3px),
+      var(--card)}
+  .radarwrap>.card:last-child{border-top:3px solid var(--sg-color-green-text)}
+  html[data-theme="dark"] .radarwrap>.card:last-child{border-top-color:var(--sg-color-gold)}
+  #radar svg,.trend-chart{display:block;margin:auto;max-width:100%}
+  .tile{border-top:3px solid var(--sg-color-gold)}
+  .tile .val,.metricrail .v{font-family:var(--sg-font-family-display);font-weight:800;color:var(--secondary-foreground)}
+  .source-banner{border-left:0;border-top:3px solid var(--sg-color-gold);
+    background:
+      radial-gradient(100% 160% at 100% 0,color-mix(in srgb,var(--sg-color-gold) 18%,transparent),transparent 48%),
+      var(--sg-color-forest);
+    color:var(--sg-color-canvas)}
+  .source-banner .source-meta{color:var(--sg-color-green-tint)}
+  .source-banner code{color:var(--sg-color-gold-soft)}
+  .source-banner .stamp{border-color:var(--sg-color-gold);color:var(--sg-color-gold-soft);
+    border-radius:var(--sg-radius-sm);font-family:var(--sg-font-family-display)}
+  .metricrail{border-radius:var(--sg-radius-card);box-shadow:var(--sg-shadow-lift)}
+  .metricrail article{border-top:3px solid var(--sg-color-gold)}
+  .metricrail .k,.tile .lbl{font-family:var(--sg-font-family-mono);letter-spacing:.06em}
+  .contract{border-top-color:var(--sg-color-gold)}
+  .contract-row code{font-family:var(--sg-font-family-mono)}
+  table.tv th{font-family:var(--sg-font-family-display);font-size:11px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted-foreground);padding:9px 8px}
+  table.tv td{padding:9px 8px}
+  .listrow:hover,.contract-row:hover,table.tv tbody tr:hover{background:var(--muted-surface)}
+  .aid{border-color:var(--border);border-left:3px solid var(--sg-color-gold)}
+  .btn,.fchip,.filters select,.filters input[type=search]{min-height:40px}
+  .btn,.fchip{transition:background var(--sg-motion-duration-quick) var(--sg-motion-ease-standard),
+    color var(--sg-motion-duration-quick) var(--sg-motion-ease-standard),
+    border-color var(--sg-motion-duration-quick) var(--sg-motion-ease-standard),
+    transform var(--sg-motion-duration-quick) var(--sg-motion-ease-standard)}
+  .btn:hover,.fchip:hover{transform:translateY(-1px)}
+  .btn:disabled{opacity:.65;cursor:not-allowed;transform:none}
+  .tnode:hover,.relopt:hover{background:var(--brand-wash)}
+  .tnode.sel,.relopt.sel{box-shadow:inset 3px 0 0 var(--sg-color-gold)}
+  footer{margin-top:40px;font-size:12px;color:var(--sg-color-sage);background:var(--sg-color-forest);
+    border-top:3px solid var(--sg-color-gold);border-radius:var(--sg-radius-lg);
+    padding:16px 18px;line-height:1.6}
+  @media(max-width:820px){
+    .wrap{padding-left:16px;padding-right:16px}
+    header.top .wrap{padding-left:16px;padding-right:16px}
+    nav.tabs{margin-left:-4px;margin-right:-4px}
+    nav.tabs button{min-height:44px}
+    .theme-toggle,.fchip,.btn,.filters select,.filters input[type=search]{min-height:44px}
+  }
+  @media(max-width:520px){
+    .brandrow{align-items:center}
+    .brandrow h1{width:100%}
+    .theme-toggle{margin-left:0}
+    .viewhead h2{font-size:21px}
+    .metricrail article{min-height:104px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{scroll-behavior:auto!important;animation-duration:.001ms!important;transition-duration:.001ms!important}
+  }
+
+  footer{margin-top:36px}
 </style>
 </head>
 <body>
 
 <header class="top"><div class="wrap">
   <div class="brandrow">
-    <h1>Common Ground</h1>
+    <h1>Common <span class="ground">Ground</span></h1>
     <span class="sub">the 509DDS Union Atlas</span>
     <span class="proto">Clickable prototype · USUnions demo snapshot</span>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Dark theme</button>
   </div>
   <div class="mecard" id="mecard"></div>
   <nav class="tabs" id="tabs" role="tablist">
@@ -246,6 +469,7 @@
   <!-- 1 · BRANCH PICKER -->
   <section class="view on" id="view-picker">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>Place your group in the labor movement</h2>
       <p>Step 2 of group creation. Pick your branch of the union family tree — or register as
          not-yet-affiliated. Placement is what switches on nearby locals, discovery, and linking.</p>
@@ -257,6 +481,7 @@
   <!-- 2 · NEAR YOU -->
   <section class="view" id="view-nearby">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>Near you</h2>
       <p>Groups, active locals, and connective bodies around your home base — the cross-union
          strength next door. Hover or tap any dot; the list is the same data in table form.</p>
@@ -271,6 +496,7 @@
   <!-- 3 · DIRECTORY -->
   <section class="view" id="view-directory">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>Directory</h2>
       <p>Browse and search every discoverable group and body — by sector, issue, union family, and
          distance. What each card shows is governed by that group's visibility tier.</p>
@@ -283,6 +509,7 @@
   <!-- 4 · TREE -->
   <section class="view" id="view-tree">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>The reference tree</h2>
       <p>The Atlas spine: federations, internationals, intermediate bodies, locals, chapters —
          plus state federations and central labor councils. Counts are presence bands, never exact
@@ -294,6 +521,7 @@
   <!-- 5 · NETWORK -->
   <section class="view" id="view-network">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>My network</h2>
       <p>Suggestions explain <em>why</em> they were made. Links unlock contact; campaigns and
          alliances are where linked groups act together.</p>
@@ -311,6 +539,7 @@
   <!-- 6 · ADMIN -->
   <section class="view" id="view-admin">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>Distribution &amp; coverage <span class="chip gray" style="vertical-align:2px">platform staff view</span></h2>
       <p>What placement buys the back office: where members sit by sector, region, and family —
          and the whitespace where the spine shows organized labor but the platform has no presence
@@ -330,6 +559,7 @@
   <!-- 7 · USUNIONS DATA -->
   <section class="view" id="view-usunions">
     <div class="viewhead">
+      <span class="view-kicker">Solid Ground / Union Atlas</span>
       <h2>USUnions data bridge</h2>
       <p>Safe, aggregate operational data from the copied SolidBase / USUnions repository.
          This view keeps local operations separate from Atlas-wide organization and proximity counts.</p>
@@ -610,7 +840,11 @@ function renderMe(){ const m=me();
     <span class="lin">${esc(m.rel==="unaffiliated" ? "Independent (pre-affiliation)" : linLabel(m.node))}
     · ${m.rel==="claims"?"official":m.rel} · ${esc(m.city)}, MA</span>`; }
 function switchView(v){
-  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.v===v)));
+  document.querySelectorAll("nav.tabs button").forEach(b=>{
+    const selected=b.dataset.v===v;
+    b.setAttribute("aria-selected",String(selected));
+    if(selected) b.scrollIntoView({block:"nearest",inline:"center"});
+  });
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on", s.id==="view-"+v));
   ({picker:renderPicker, nearby:renderNearby, directory:renderDirectory,
     tree:renderTree, network:renderNetwork, admin:renderAdmin, usunions:renderUSUnions})[v]();
@@ -684,7 +918,7 @@ function renderPicker(){
     body.innerHTML = `<div class="pickcols">
       <div class="card">
         <input type="search" id="pickq" placeholder="Search the whole tree — try “509”, “nurses”, “labor council”…"
-          value="${esc(p.q)}" style="width:100%; font:inherit; font-size:14px; padding:9px 12px; border:1px solid var(--ring); border-radius:9px; background:var(--surface)">
+          value="${esc(p.q)}" style="width:100%; font:inherit; font-size:14px; padding:9px 12px; border:1px solid var(--input); border-radius:9px; background:var(--surface); color:var(--foreground)">
         ${q ? `<div style="margin-top:8px">${hits.length ? hits.map(h=>`
             <div class="tnode ${p.sel===h.id?"sel":""}" data-pid="${h.id}"><span class="car">→</span>
               <span><span class="nm">${esc(h.name)}</span><br><span class="lineage">${esc(linLabel(h.id))}</span></span></div>`).join("")
@@ -794,9 +1028,9 @@ function renderNearby(){
   $("#nearsec").addEventListener("change",e=>{ f.sector=e.target.value; renderNearby(); });
 
   $("#radarlegend").innerHTML = `
-    <button class="fchip" data-kind="group" aria-pressed="${f.kinds.group}"><i style="background:#4a3aa7"></i>Platform groups</button>
-    <button class="fchip" data-kind="clc" aria-pressed="${f.kinds.clc}"><i style="background:#eda100"></i>Labor councils &amp; state fed</button>
-    <button class="fchip" data-kind="node" aria-pressed="${f.kinds.node}"><i style="background:#fcfcfb; border:1.5px solid #898781"></i>Locals with no presence yet</button>`;
+    <button class="fchip" data-kind="group" aria-pressed="${f.kinds.group}"><i style="background:var(--sg-color-green-text)"></i>Platform groups</button>
+    <button class="fchip" data-kind="clc" aria-pressed="${f.kinds.clc}"><i style="background:var(--sg-color-gold)"></i>Labor councils &amp; state fed</button>
+    <button class="fchip" data-kind="node" aria-pressed="${f.kinds.node}"><i style="background:var(--card); border:1.5px solid var(--muted-foreground)"></i>Locals with no presence yet</button>`;
   document.querySelectorAll("[data-kind]").forEach(b=>b.addEventListener("click",()=>{ f.kinds[b.dataset.kind]=!f.kinds[b.dataset.kind]; renderNearby(); }));
 
   const all = nearEntities();
@@ -806,11 +1040,11 @@ function renderNearby(){
   /* radar SVG — rings 25/50/100 mi */
   const S=520,C=S/2,RMAX=225, sc=mi=>mi/100*RMAX;
   let svg = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Proximity map of ${rows.length} bodies around ${esc(me().city)}">`;
-  [25,50,100].forEach(r=>{ svg+=`<circle cx="${C}" cy="${C}" r="${sc(r)}" fill="none" stroke="#e1e0d9" stroke-width="1"/>
-    <text x="${C+4}" y="${C-sc(r)-4}" font-size="10.5" fill="#898781">${r} mi</text>`; });
-  svg+=`<line x1="${C}" y1="${C-RMAX}" x2="${C}" y2="${C+RMAX}" stroke="#e1e0d9" stroke-width="1"/>
-        <line x1="${C-RMAX}" y1="${C}" x2="${C+RMAX}" y2="${C}" stroke="#e1e0d9" stroke-width="1"/>
-        <text x="${C}" y="${C-RMAX-8}" font-size="10.5" fill="#898781" text-anchor="middle">N</text>`;
+  [25,50,100].forEach(r=>{ svg+=`<circle cx="${C}" cy="${C}" r="${sc(r)}" fill="none" stroke="var(--border)" stroke-width="1"/>
+    <text x="${C+4}" y="${C-sc(r)-4}" font-size="10.5" fill="var(--muted-foreground)">${r} mi</text>`; });
+  svg+=`<line x1="${C}" y1="${C-RMAX}" x2="${C}" y2="${C+RMAX}" stroke="var(--border)" stroke-width="1"/>
+        <line x1="${C-RMAX}" y1="${C}" x2="${C+RMAX}" y2="${C}" stroke="var(--border)" stroke-width="1"/>
+        <text x="${C}" y="${C-RMAX-8}" font-size="10.5" fill="var(--muted-foreground)" text-anchor="middle">N</text>`;
   const clusters={}; rows.forEach(e=>{ (clusters[e.ll]=clusters[e.ll]||[]).push(e); });
   const labeled=[];                                   // placed CLC label anchors, for collision-skip
   rows.forEach(e=>{
@@ -819,35 +1053,36 @@ function renderNearby(){
     let x=C+rad*Math.cos(a), y=C+rad*Math.sin(a);
     if(mates.length>1){ const fa=2*Math.PI*idx/mates.length;      // fan co-located dots
       x+=14*Math.cos(fa); y+=14*Math.sin(fa); }
-    const core = e.kind==="group" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>`
-      : e.kind==="clc" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>`
-      : `<circle class="core" cx="${x}" cy="${y}" r="5" fill="#fcfcfb" stroke="#898781" stroke-width="1.5"/>`;
+    const core = e.kind==="group" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="var(--sg-color-green-text)" stroke="var(--card)" stroke-width="2"/>`
+      : e.kind==="clc" ? `<circle class="core" cx="${x}" cy="${y}" r="6" fill="var(--sg-color-gold)" stroke="var(--card)" stroke-width="2"/>`
+      : `<circle class="core" cx="${x}" cy="${y}" r="5" fill="var(--card)" stroke="var(--muted-foreground)" stroke-width="1.5"/>`;
     let lbl="";
     if(e.kind==="clc" && !labeled.some(p=>Math.hypot(p[0]-x,p[1]-y)<48)){   // label only if it won't collide
-      lbl=`<text x="${x}" y="${y-10}" font-size="10" fill="#52514e" text-anchor="middle">${esc(e.name.split(" ").slice(0,2).join(" "))}</text>`;
+      lbl=`<text x="${x}" y="${y-10}" font-size="10" fill="var(--foreground)" text-anchor="middle">${esc(e.name.split(" ").slice(0,2).join(" "))}</text>`;
       labeled.push([x,y]); }
     svg += `<g class="dot" data-near="${e.id}" tabindex="0" role="button"
       aria-label="${esc(e.name)}, ${dLabel(e.d)}">${lbl}<circle cx="${x}" cy="${y}" r="16" fill="transparent"/>${core}</g>`;
   });
-  svg+=`<circle cx="${C}" cy="${C}" r="7" fill="#312578" stroke="#fcfcfb" stroke-width="2"/>
-        <text x="${C}" y="${C+22}" font-size="11" font-weight="600" fill="#312578" text-anchor="middle">You</text></svg>`;
+  svg+=`<circle cx="${C}" cy="${C}" r="7" fill="var(--sg-color-terra)" stroke="var(--card)" stroke-width="2"/>
+        <text x="${C}" y="${C+22}" font-size="11" font-weight="700" fill="var(--foreground)" text-anchor="middle">You</text></svg>`;
   $("#radar").innerHTML=svg;
 
   $("#nearlisthead").textContent = `${rows.length} within ${f.radius} miles`;
   $("#nearlist").innerHTML = rows.map(e=>`<div class="listrow">
-      <span style="flex:none; width:10px; height:10px; border-radius:99px; ${e.kind==="group"?"background:#4a3aa7":e.kind==="clc"?"background:#eda100":"background:#fcfcfb; border:1.5px solid #898781"}"></span>
+      <span style="flex:none; width:10px; height:10px; border-radius:var(--sg-radius-pill); ${e.kind==="group"?"background:var(--sg-color-green-text)":e.kind==="clc"?"background:var(--sg-color-gold)":"background:var(--card); border:1.5px solid var(--muted-foreground)"}"></span>
       <span><span class="nm" data-open="${e.kind==="group"?e.id:""}" data-node="${e.kind!=="group"?e.id:""}">${esc(e.name)}</span><br>
         <span class="lineage">${esc(e.sub)}</span></span>
       <span class="mi">${dLabel(e.d)}</span></div>`).join("")
     || `<p class="note">Nothing in range with these filters — widen the radius.</p>`;
 
   const hook=(el,e)=>{ const html=`<div class="t1">${esc(e.name)}</div><div class="t2">${esc(e.sub)} · ${dLabel(e.d)}</div>`;
+    const activate=()=>{ hideTip(); e.kind==="group" ? openProfile(e.id) : openNodeCard(e.id); };
     el.addEventListener("mousemove",ev=>showTip(html,ev.clientX,ev.clientY));
     el.addEventListener("mouseleave",hideTip);
     el.addEventListener("focus",()=>{ const r=el.getBoundingClientRect(); showTip(html,r.right,r.top); });
     el.addEventListener("blur",hideTip);
-    el.addEventListener("click",()=>{ hideTip(); e.kind==="group" ? openProfile(e.id) : openNodeCard(e.id); });
-    el.addEventListener("keydown",ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); el.click(); } }); };
+    el.addEventListener("click",activate);
+    el.addEventListener("keydown",ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); activate(); } }); };
   document.querySelectorAll("[data-near]").forEach(el=>hook(el, rows.find(r=>r.id===el.dataset.near)));
   document.querySelectorAll("#nearlist .nm").forEach(el=>el.addEventListener("click",()=>{
     el.dataset.open ? openProfile(el.dataset.open) : openNodeCard(el.dataset.node); }));
@@ -916,7 +1151,7 @@ function treeRow(n){
     ${gs.length?`<span class="band" style="background:var(--brand-wash); color:var(--brand-deep)">${gs.length} on platform</span>`:""}</div>`;
   if(open){
     if(direct.length) html+=`<div class="indent">${direct.map(g=>`
-      <div class="tnode" data-gid="${g.id}"><span class="car" style="color:#4a3aa7">●</span>
+      <div class="tnode" data-gid="${g.id}"><span class="car" style="color:var(--sg-color-green-text)">●</span>
         <span><span class="nm">${esc(g.name)}</span> <span class="ty">group · ${g.rel==="claims"?"official":g.rel}</span></span>
         <span class="band">${band(g.members)} members</span></div>`).join("")}</div>`;
     if(ch.length) html+=`<div class="indent">${ch.map(treeRow).join("")}</div>`;
@@ -984,14 +1219,14 @@ function barChart(el, rows, highlight){
   const ticks=[0, Math.round(max/2/100)*100, Math.round(max/100)*100];
   let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">`;
   ticks.forEach(t=>{ const x=padL+scale(Math.min(t,max));
-    s+=`<line x1="${x}" y1="6" x2="${x}" y2="${H-20}" stroke="#e1e0d9" stroke-width="1"/>
-        <text x="${x}" y="${H-6}" font-size="10.5" fill="#898781" text-anchor="middle" style="font-variant-numeric:tabular-nums">${fmt(t)}</text>`; });
-  s+=`<line x1="${padL}" y1="6" x2="${padL}" y2="${H-20}" stroke="#c3c2b7" stroke-width="1"/>`;
+    s+=`<line x1="${x}" y1="6" x2="${x}" y2="${H-20}" stroke="var(--border)" stroke-width="1"/>
+        <text x="${x}" y="${H-6}" font-size="10.5" fill="var(--muted-foreground)" text-anchor="middle" style="font-variant-numeric:tabular-nums">${fmt(t)}</text>`; });
+  s+=`<line x1="${padL}" y1="6" x2="${padL}" y2="${H-20}" stroke="var(--border)" stroke-width="1"/>`;
   rows.forEach((r,i)=>{ const y=10+i*rowH, w=Math.max(scale(r[1]),2), big=r[0]===highlight;
     s+=`<g class="bar" tabindex="0" data-bar="${esc(r[0])}|${r[1]}" aria-label="${esc(r[0])}: ${fmt(r[1])} members">
-      <text x="${padL-8}" y="${y+13}" font-size="11.5" fill="#52514e" text-anchor="end">${esc(r[0])}</text>
-      <path class="fill" d="M${padL} ${y} h${w-4} a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-${w-4} z" fill="#4a3aa7"/>
-      ${big?`<text x="${padL+w+6}" y="${y+13}" font-size="11.5" font-weight="600" fill="#0b0b0b" style="font-variant-numeric:tabular-nums">${fmt(r[1])}</text>`:""}</g>`; });
+      <text x="${padL-8}" y="${y+13}" font-size="11.5" fill="var(--muted-foreground)" text-anchor="end">${esc(r[0])}</text>
+      <path class="fill" d="M${padL} ${y} h${w-4} a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-${w-4} z" fill="var(--sg-color-green-text)"/>
+      ${big?`<text x="${padL+w+6}" y="${y+13}" font-size="11.5" font-weight="700" fill="var(--foreground)" style="font-variant-numeric:tabular-nums">${fmt(r[1])}</text>`:""}</g>`; });
   s+=`</svg>`;
   el.innerHTML=s;
   el.querySelectorAll(".bar").forEach(b=>{ const [nm,v]=b.dataset.bar.split("|");
@@ -1076,6 +1311,20 @@ function openNodeCard(id){
 function closeModal(){ $("#overlay").classList.remove("on"); }
 $("#overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
 addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ---------- theme ---------- */
+const themeButton=$("#theme-toggle");
+function setTheme(theme){
+  const dark=theme==="dark";
+  document.documentElement.dataset.theme=dark?"dark":"light";
+  themeButton.setAttribute("aria-pressed",String(dark));
+  themeButton.textContent=dark?"Light theme":"Dark theme";
+  try{ localStorage.setItem("union-atlas-theme",dark?"dark":"light"); }catch(_){}
+}
+let savedTheme="light";
+try{ savedTheme=localStorage.getItem("union-atlas-theme")||"light"; }catch(_){}
+setTheme(savedTheme);
+themeButton.addEventListener("click",()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark"));
 
 /* ---------- boot ---------- */
 renderMe(); renderPicker();

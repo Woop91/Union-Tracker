@@ -20,6 +20,7 @@
     "data:import": "node scripts/import-union-atlas-data.mjs",
     "data:build": "node scripts/build-union-atlas-data.mjs",
     "data:verify": "node scripts/verify-union-atlas-data.mjs",
+    "atlas:theme": "node scripts/build-union-atlas-theme.mjs",
     "deploy": "bash scripts/deploy.sh",
     "deploy:dry": "bash scripts/deploy.sh --dry",
     "deploy:dev": "npm run lint && npm run build && clasp push --force",
