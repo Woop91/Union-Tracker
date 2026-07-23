@@ -87,4 +87,26 @@ describe('Union Atlas Solid Ground visual system', () => {
     expect(atlas).toContain('activate();');
     expect(atlas).not.toContain('el.click();');
   });
+
+  test('defines narrow-phone, phone, and tablet layouts', () => {
+    expect(atlas).toContain('@media(max-width:360px)');
+    expect(atlas).toContain('@media(max-width:520px)');
+    expect(atlas).toContain('@media(max-width:820px)');
+    expect(atlas).toContain('env(safe-area-inset-top)');
+    expect(atlas).toContain('env(safe-area-inset-bottom)');
+  });
+
+  test('contains overflow and touch-target safeguards for mobile', () => {
+    expect(atlas).toContain('html,body{max-width:100%;overflow-x:hidden}');
+    expect(atlas).toContain('min-height:44px');
+    expect(atlas).toContain('overscroll-behavior-inline:contain');
+    expect(atlas).toContain('#whitespace table{min-width:560px}');
+  });
+
+  test('uses compact admin tables and a mobile bottom-sheet dialog', () => {
+    expect(atlas).toContain('sector:matchMedia("(max-width:520px)").matches');
+    expect(atlas).toContain('region:matchMedia("(max-width:520px)").matches');
+    expect(atlas).toContain('max-height:94dvh');
+    expect(atlas).toContain('class="modal-actions"');
+  });
 });

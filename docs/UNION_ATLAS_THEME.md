@@ -35,3 +35,14 @@ minimum 44-pixel target where they are directly interactive.
 
 The Atlas remains one offline-capable HTML document. It loads no remote fonts,
 stylesheets, scripts, images, or design-system runtime.
+
+## Mobile behavior
+
+- The header becomes a compact two-column identity block with safe-area padding.
+- Navigation stays horizontally scrollable and keeps the active task centered.
+- Search and filter controls become touch-sized responsive grids.
+- Picker steps, directory actions, network requests, and modal actions remain at least 44 pixels high.
+- Admin charts default to data tables below 520 pixels; wide coverage tables scroll inside their card.
+- The member profile becomes a full-width bottom sheet on phones.
+- The membership trend remains legible through contained horizontal chart scrolling.
+- Breakpoints are verified at 320, 375, 390, 768, and 1440 pixels.
