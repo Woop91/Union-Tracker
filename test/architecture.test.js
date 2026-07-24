@@ -1231,9 +1231,9 @@ describe('A19: TestRunner invocation safety (this-binding)', () => {
     // Count all this[...] references — if new ones are added without updating
     // this threshold, the test fails to prompt a review.
     const thisRefs = (testsSrc.match(/\bthis\[/g) || []);
-    // Current known count: 18 (14 assertEquals + 1 apply + 2 in grievanceDraftFnsExist + 1 canary)
+    // Current known count: 19 (15 assertEquals + 1 apply + 2 in grievanceDraftFnsExist + 1 canary)
     // If this number changes, the developer must verify the runner provides correct this-binding.
-    expect(thisRefs.length).toBeLessThanOrEqual(18);
+    expect(thisRefs.length).toBeLessThanOrEqual(19);
     expect(thisRefs.length).toBeGreaterThanOrEqual(12); // catch accidental removal
   });
 

@@ -596,6 +596,7 @@ module.exports = [
         test_endpoints_checklistFnsExist: 'readonly',
         test_endpoints_contactNotificationFnsExist: 'readonly',
         test_endpoints_coreGrievanceFnsExist: 'readonly',
+        test_endpoints_extendedDataFnsExist: 'readonly',
         test_endpoints_grievanceDraftFnsExist: 'readonly',
         test_endpoints_meetingFnsExist: 'readonly',
         test_endpoints_notificationCountExists: 'readonly',

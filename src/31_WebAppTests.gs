@@ -784,6 +784,32 @@ function test_endpoints_coreGrievanceFnsExist() {
   }
 }
 
+/** Tests endpoints: every remaining data wrapper exists. */
+function test_endpoints_extendedDataFnsExist() {
+  var fns = [
+    'dataAddMemberFromWebapp', 'dataAddNonMemberContact', 'dataApplyColorTheme', 'dataBulkCreateFolders',
+    'dataBulkExportCsv', 'dataBulkUpdateStatus', 'dataCreateTaskForSteward', 'dataDeleteMeetingMinutes',
+    'dataDeleteNonMemberContact', 'dataGetAddMemberOptions', 'dataGetAgencyDirectorOverrides', 'dataGetAllStewardContactLogs',
+    'dataGetAuditLog', 'dataGetBadgeCounts', 'dataGetBroadcastFilterOptions', 'dataGetCaseActivityLog',
+    'dataGetCorrelationAlerts', 'dataGetCorrelationSummary', 'dataGetDeadlineCalendarData', 'dataGetFilterDropdownValues',
+    'dataGetGrievanceFeedbackStats', 'dataGetGrievanceFormOptions', 'dataGetGrievanceForSigning', 'dataGetInsightsBatch',
+    'dataGetLeaderDashboard', 'dataGetLeaderMentor', 'dataGetLeaderOutreachLog', 'dataGetLeaderUnitMembers',
+    'dataGetLeaderUnitMentorships', 'dataGetMemberCaseFolderUrl', 'dataGetMemberCount', 'dataGetMemberGrievanceHotSpots',
+    'dataGetMemberGrievanceStats', 'dataGetMembersPaginated', 'dataGetMyEngagementScore', 'dataGetNonMemberContacts',
+    'dataGetOrgHealthScores', 'dataGetPendingGrievanceFeedback', 'dataGetPomsReference', 'dataGetResourceStats',
+    'dataGetSheetHealth', 'dataGetStewardAssignedMemberTasks', 'dataGetStewardDashboardInit', 'dataGetStewardFeedbackSummary',
+    'dataGetStewardSurveyTracking', 'dataGetUsageAnalytics', 'dataGetUsageStats', 'dataGetWebAppSearchResults',
+    'dataGetWorkloadSummaryStats', 'dataInitiateGrievance', 'dataLeaderBroadcast', 'dataLogLeaderOutreach',
+    'dataLogResourceClick', 'dataLogTabVisit', 'dataLogUsageEvents', 'dataMarkWelcomeDismissed',
+    'dataMemberAssignSteward', 'dataRefreshNavData', 'dataSetDefaultView', 'dataStaffCompleteMemberTask',
+    'dataSubmitGrievanceFeedback', 'dataSubmitGrievanceSignature', 'dataUpdateAgencyDirectorOverrides',
+    'dataUpdateMemberBySteward', 'dataUpdateNonMemberContact', 'dataWebAppCheckIn', 'dataWebCheckInMember'
+  ];
+  for (var i = 0; i < fns.length; i++) {
+    TestRunner.assertEquals('function', typeof this[fns[i]], fns[i] + ' exists');
+  }
+}
+
 /** Tests endpoints: task fns exist. */
 function test_endpoints_taskFnsExist() {
   var fns = [

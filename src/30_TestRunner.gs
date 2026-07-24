@@ -957,6 +957,7 @@ function _getTestRegistry() {
     // ── endpoints suite (Comprehensive data* wrapper existence & auth) ──
     { name: 'test_endpoints_thisBindingCanary',            fn: test_endpoints_thisBindingCanary },
     { name: 'test_endpoints_coreGrievanceFnsExist',        fn: test_endpoints_coreGrievanceFnsExist },
+    { name: 'test_endpoints_extendedDataFnsExist',         fn: test_endpoints_extendedDataFnsExist },
     { name: 'test_endpoints_taskFnsExist',                 fn: test_endpoints_taskFnsExist },
     { name: 'test_endpoints_surveyFeedbackFnsExist',       fn: test_endpoints_surveyFeedbackFnsExist },
     { name: 'test_endpoints_contactNotificationFnsExist',  fn: test_endpoints_contactNotificationFnsExist },

@@ -145,8 +145,8 @@ describe('this[...] usage in GAS test files', () => {
 
   test('this[...] count does not grow without review', () => {
     const count = (testsSrc.match(/\bthis\[/g) || []).length;
-    // Current count: 18. Update this if intentionally adding more.
-    expect(count).toBeLessThanOrEqual(18);
+    // Current count: 19. Update this if intentionally adding more.
+    expect(count).toBeLessThanOrEqual(19);
     expect(count).toBeGreaterThanOrEqual(12);
   });
 });
@@ -189,27 +189,6 @@ describe('Endpoint existence tests cover all data* wrappers', () => {
 
     const untested = [...dataFns].filter(fn => !testedFns.has(fn));
 
-    // Allow a threshold for wrappers tested indirectly via other suites
-    // (e.g., workload SSO, broadcast filters, badge counts, task delegation, scale system,
-    // e-signature, form options, filter dropdown values — v4.33.0,
-    // onboarding wizard — v4.34.x, case activity log — v4.34.0,
-    // access log viewer — v4.36.0, grievance initiation — v4.36.0,
-    // default view preference — v4.37.1, usage analytics — v4.40.0,
-    // webapp one-tap check-in — v4.43.1,
-    // leader hub endpoints — v4.46.0,
-    // non-member contacts — v4.48.0,
-    // add member from webapp — v4.49.0,
-    // directory explorer steward update — v4.51.0,
-    // leader unit mentorships — v4.51.1,
-    // minutes delete wrapper — v4.52.1,
-    // org health scores — v4.54.0,
-    // agency director overrides — v4.55.0)
-    expect(untested.length).toBeLessThanOrEqual(70);
-
-    // If there are untested functions, log them for visibility
-    if (untested.length > 0) {
-      // eslint-disable-next-line no-console
-      console.log('Untested data* wrappers:', untested);
-    }
+    expect(untested).toEqual([]);
   });
 });
