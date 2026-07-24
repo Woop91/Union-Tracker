@@ -1,0 +1,111 @@
+/* Solid Ground design tokens — GENERATED from tokens.json by build-tokens.mjs. Do not edit by hand. */
+:root {
+
+  /* ── color ─────────────────────────────────── */
+  --sg-color-ink: #14201c; /* Primary text / darkest ink on light surfaces (--ink) */
+  --sg-color-ink-2: #3d4a44; /* Softer prose/body ink for long copy (email body, Field Guide, decks) */
+  --sg-color-sec: #5c6a63; /* Secondary text (--sec, desktop) */
+  --sg-color-muted: #8a938c; /* Muted/tertiary text and meta (--muted) */
+  --sg-color-faint: #b2bab3; /* Faint labels, disabled text, email footer faint (--faint) */
+  --sg-color-canvas: #f6f2e9; /* Page canvas cream (--canvas) */
+  --sg-color-card: #ffffff; /* White card surface (--card) */
+  --sg-color-card-2: #efe9dc; /* Raised/inset neutral panel (--card2) */
+  --sg-color-track: #e7e1d3; /* Slider/progress/rail track (--track) */
+  --sg-color-border: #d7d0c2; /* Hairline border / divider on light (--border, --line) */
+  --sg-color-green: #0e4034; /* Deep green primary surface / brand green (--green, 'Ground') */
+  --sg-color-pine: #0a2f26; /* Darkest pine green: logo chip, deep accents, email dark rules (--greenDeep, 'Pine') */
+  --sg-color-forest: #0d241e; /* Near-black forest: page bg, toasts, dark cards (R12 canonical near-black) */
+  --sg-color-sidebar: #124639; /* App sidebar base green (--sidebar) */
+  --sg-color-side-text: #a8c9bb; /* Sidebar idle-link text (--sideText) */
+  --sg-color-green-text: #1b6e49; /* Green link/emphasis text; steward identity (--greenText2 === --steward, R4) */
+  --sg-color-hero: #137c54; /* Hero / mid emphasis green (--hero, --greenText) */
+  --sg-color-sage: #9fbcb0; /* Muted sage green: secondary text on dark surfaces, decorative fills (recurring non-token, site oddity 13) */
+  --sg-color-green-soft: #dce9e2; /* Soft green positive inset (--greenSoft === --stewardSoft, R4) */
+  --sg-color-green-tint: #cfe0d8; /* Mid green tint: on-dark positive fills, chips (recurring non-token, R6) */
+  --sg-color-green-faint: #c6dbcf; /* Faintest green wash (--greenFaint) */
+  --sg-color-gold: #efa738; /* Brand gold accent / CTA fill (--gold, 'Gold') */
+  --sg-color-ink-on-gold: #241a08; /* Dark ink for CTA/button labels on gold fill (R3 winner) */
+  --sg-color-gold-soft: #f7c56e; /* Soft light gold: gradient stops, glow highlights */
+  --sg-color-warn: #b07a12; /* Warning amber text/icon (--warn) */
+  --sg-color-warn-soft: #fbefd5; /* Soft amber warning inset (--warnSoft) */
+  --sg-color-terra: #c25b3a; /* Terracotta accent (--terra, desktop, 'Terra'; R1 winner) */
+  --sg-color-terra-soft: #f4e0d7; /* Soft terracotta inset (--terraSoft) */
+  --sg-color-terra-faint: #eccfc2; /* Faint terracotta wash (--terraFaint) */
+  --sg-color-danger: #c0492c; /* Danger/destructive red (--danger) */
+  --sg-color-danger-soft: #f7ddd3; /* Soft danger inset (--dangerSoft) */
+  --sg-color-case: #2f6fb0; /* Casework blue role color (--case) */
+  --sg-color-case-deep: #275a92; /* Deep casework blue (ramp step, R10) */
+  --sg-color-case-soft: #ddeaf6; /* Soft casework blue inset (--caseSoft) */
+  --sg-color-purple: #6a3fc0; /* Rewards/Learn purple accent (R9 promotion; was un-tokenized) */
+  --sg-color-purple-deep: #4d2f96; /* Deep rewards purple (R9) */
+  --sg-color-purple-soft: #ece2fb; /* Soft purple tint for rewards/Learn cards (R9) */
+  --sg-color-success: #2f9e6b; /* Success green (--success) */
+
+  /* ── font ──────────────────────────────────── */
+  --sg-font-family-display: 'Archivo', 'Arial', 'Helvetica', sans-serif; /* Display/headings (--display) */
+  --sg-font-family-body: 'Public Sans', 'Arial', 'Helvetica', sans-serif; /* Body & UI (--body) */
+  --sg-font-family-mono: 'Spline Sans Mono', 'Consolas', monospace; /* Data, PINs, receipts, code (--utility) */
+  --sg-font-size-micro: 9px; /* Smallest micro labels */
+  --sg-font-size-label: 11px; /* Uppercase eyebrow/tag labels */
+  --sg-font-size-caption: 11.5px; /* Captions, footnotes, email footers (brand half-pixel ramp) */
+  --sg-font-size-compact: 12px; /* Dense UI text (most-used size) */
+  --sg-font-size-small: 12.5px; /* Small secondary text (half-pixel ramp) */
+  --sg-font-size-base: 13px; /* Base UI text */
+  --sg-font-size-body: 14px; /* Body copy */
+  --sg-font-size-lead: 15px; /* Lead/intro text */
+  --sg-font-size-subhead: 17px; /* Subheadings */
+  --sg-font-size-title: 21px; /* Section titles */
+  --sg-font-size-display: 24px; /* Display headings */
+  --sg-font-weight-regular: 400; /* Body regular (Public Sans) */
+  --sg-font-weight-medium: 500; /* Medium */
+  --sg-font-weight-semibold: 600; /* Semibold UI emphasis */
+  --sg-font-weight-bold: 700; /* Bold (Public Sans/Archivo) */
+  --sg-font-weight-extrabold: 800; /* Extrabold — brand signature display weight (Archivo) */
+  --sg-font-weight-black: 900; /* Archivo Black headings */
+
+  /* ── space ─────────────────────────────────── */
+  --sg-space-s0: 0px; /* Zero gap */
+  --sg-space-s4: 4px; /* Hairline gap */
+  --sg-space-s6: 6px; /* Tight gap */
+  --sg-space-s8: 8px; /* Small gap */
+  --sg-space-s9: 9px; /* Small gap (brand odd step) */
+  --sg-space-s10: 10px; /* Compact gap */
+  --sg-space-s11: 11px; /* Compact gap */
+  --sg-space-s12: 12px; /* Default gap / inset (most-used) */
+  --sg-space-s13: 13px; /* Medium gap */
+  --sg-space-s14: 14px; /* Medium gap */
+  --sg-space-s16: 16px; /* Card padding */
+  --sg-space-s18: 18px; /* Card padding / section gap */
+  --sg-space-s20: 20px; /* Section gap */
+  --sg-space-s24: 24px; /* Large section gap */
+
+  /* ── radius ────────────────────────────────── */
+  --sg-radius-xs: 6px; /* Chip/tag radius (desktop; mobile forces 99px, R14) */
+  --sg-radius-sm: 9px; /* Small button/input radius */
+  --sg-radius-md: 11px; /* Button / email CTA radius */
+  --sg-radius-lg: 14px; /* Panel radius */
+  --sg-radius-card: 18px; /* Large card/sheet radius */
+  --sg-radius-pill: 99px; /* Pill/fully-rounded (R8 winner over 999px) */
+  --sg-radius-round: 50%; /* Circles: avatars, dots, rings */
+
+  /* ── shadow ────────────────────────────────── */
+  --sg-shadow-sm: 0 1px 3px rgba(0,0,0,.25); /* Subtle raise (buttons, small chips) */
+  --sg-shadow-lift: 0 6px 16px rgba(27,42,36,.06); /* Soft card lift */
+  --sg-shadow-card: 0 12px 26px rgba(17,25,35,.08); /* Elevated card */
+  --sg-shadow-pop: 0 14px 28px -14px rgba(0,0,0,.2); /* Popover/menu float */
+  --sg-shadow-modal: 0 16px 34px rgba(17,25,35,.14); /* Modal/dialog */
+
+  /* ── motion ────────────────────────────────── */
+  --sg-motion-duration-quick: 120ms; /* Quick interaction (hover, toggle) */
+  --sg-motion-duration-base: 200ms; /* Base transition */
+  --sg-motion-duration-moderate: 300ms; /* Moderate transition */
+  --sg-motion-duration-slow: 450ms; /* Slow entrance */
+  --sg-motion-duration-slower: 550ms; /* Slower entrance / toast */
+  --sg-motion-ease-standard: cubic-bezier(.4,0,.2,1); /* Standard ease (interaction) */
+  --sg-motion-ease-emphasized: cubic-bezier(.22,1,.36,1); /* Emphasized/decelerate entrance */
+  --sg-motion-ease-spring: cubic-bezier(.34,1.3,.5,1); /* Overshoot spring (pop-in) */
+
+  /* ── alpha ─────────────────────────────────── */
+  --sg-alpha-divider: 0.08; /* Ink at 8% — hairline dividers (--divider = rgba(20,32,28,.08); R7) */
+  --sg-alpha-side-active: 0.14; /* Gold at 14% — active sidebar item wash (--sideActive = rgba(239,167,56,.14)) */
+}

@@ -1,0 +1,31 @@
+{
+  "formatVersion": 2,
+  "dataFile": "union-atlas.json",
+  "browserDataFile": "../docs/union-atlas-data.js",
+  "sha256": "cf8b8cc8d95c1dac510fb202c7ec170c21a8a0061382b19385c18c785c4fbd9e",
+  "counts": {
+    "unions": 20699,
+    "uniqueIds": 20699,
+    "affiliations": 162,
+    "statesAndTerritories": 56,
+    "zctaCoordinates": 33791,
+    "geocodedUnions": 18709,
+    "membershipRecords": 19554,
+    "websites": 5276
+  },
+  "source": {
+    "name": "USUnions canonical directory",
+    "repository": "Woop91/USUnions",
+    "commit": "c09446b0ceab7af2b95c779cfa5211396b393d61",
+    "path": "data/unions/**/*.json",
+    "manifestSha256": "d6a201e0cfe8bfd5d2c6b2d687aa8c213a38f1538cb11610837a3b4a20b05926"
+  },
+  "coordinateSource": {
+    "name": "2025 U.S. Census Gazetteer ZIP Code Tabulation Areas",
+    "url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_zcta_national.zip",
+    "path": "2025_Gaz_zcta_national.txt",
+    "purpose": "Representative latitude and longitude for distance and bearing calculations"
+  },
+  "selfContained": true,
+  "syntheticRecords": 0
+}
