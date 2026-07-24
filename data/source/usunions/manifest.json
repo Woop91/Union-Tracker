@@ -1,0 +1,89 @@
+{
+  "formatVersion": 1,
+  "repository": "Woop91/USUnions",
+  "commit": "55a20f1433d7a38f7af3077de7464760f1bc188f",
+  "generatedAt": "2026-07-24T22:45:50.699Z",
+  "privacy": "Organization-level public filing, NLRB case, and research data only. Private contacts, authentication data, and personal records are excluded.",
+  "files": [
+    {
+      "path": "data/organizing/attempts.jsonl",
+      "records": 23497,
+      "sourceSha256": "4a348f3f5939be5f4eb5919d77fd2843071394821e53823ab19df0af0730e516",
+      "localPath": "data/organizing/attempts.jsonl.gz",
+      "localSha256": "849521756ed6ce35a890c1027b02a6a0c414c542769d1d265229ff00c3766de5",
+      "sourceBytes": 61824833,
+      "localBytes": 6606822,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/organizing/groups.jsonl",
+      "records": 5714,
+      "sourceSha256": "b6f1fcc644b98eb76059cf3dd0f07bda85d560d1244f17760735632e90dafaa0",
+      "localPath": "data/organizing/groups.jsonl.gz",
+      "localSha256": "e700410fac65327726e8b8e7cc31ef4301ec01a2a3f27d765e98a10b33c2e76e",
+      "sourceBytes": 9465864,
+      "localBytes": 1044895,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/organizing/summary.json",
+      "records": null,
+      "sourceSha256": "09a1c7c8130458cf15db56ac267bb840c7a26081bfe1436c6b3f63a0b07dac19",
+      "localPath": "data/organizing/summary.json",
+      "localSha256": "09a1c7c8130458cf15db56ac267bb840c7a26081bfe1436c6b3f63a0b07dac19",
+      "sourceBytes": 20285,
+      "localBytes": 20285,
+      "compression": "none"
+    },
+    {
+      "path": "data/organizing/trends.json",
+      "records": null,
+      "sourceSha256": "32dd4799255a60177298d3c4591ddff1ec428ad953826d64f93cec1122da381a",
+      "localPath": "data/organizing/trends.json.gz",
+      "localSha256": "563a51fcb13c2e451fc134e57fe9e8fe84eaafe5838e4daae778d66bde86d334",
+      "sourceBytes": 7130310,
+      "localBytes": 399795,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/research/articles.jsonl",
+      "records": 64,
+      "sourceSha256": "e500de592d077ad558f96915fa0c86991a4f64ce5b6f01e66742f89fb7b8e72b",
+      "localPath": "data/research/articles.jsonl.gz",
+      "localSha256": "db30933ca2133285e746ab9e3bf7547d1c2fdd0271056feffb534a20d58fb47f",
+      "sourceBytes": 76973,
+      "localBytes": 12524,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/research/sources.jsonl",
+      "records": 10,
+      "sourceSha256": "9f7d105df4688c6075cffb02a7cb9e6f2d7b57b26e996a5a1f3ca56ae78d8d6f",
+      "localPath": "data/research/sources.jsonl.gz",
+      "localSha256": "90f7d34bfec00d4391322cb3c10bc860de00101e6fb4de3f7aad57d9fe95dbcc",
+      "sourceBytes": 6274,
+      "localBytes": 2086,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/research/statistics.jsonl",
+      "records": 97,
+      "sourceSha256": "8bbf49541b2cb845e6b944a051ccb21ae276d5205072209503b9967c8de329e2",
+      "localPath": "data/research/statistics.jsonl.gz",
+      "localSha256": "ce9e5e13a136e1ed916b02d1f83ef2e4f1014f5ba41519a43e9b7f26bd999c1f",
+      "sourceBytes": 84318,
+      "localBytes": 3834,
+      "compression": "gzip"
+    },
+    {
+      "path": "data/research/summary.json",
+      "records": null,
+      "sourceSha256": "ca119e87ee2eaffca487c47e4244d6a5d5a0cf84a31db5fd64e2591f8cd4c059",
+      "localPath": "data/research/summary.json",
+      "localSha256": "ca119e87ee2eaffca487c47e4244d6a5d5a0cf84a31db5fd64e2591f8cd4c059",
+      "sourceBytes": 20792,
+      "localBytes": 20792,
+      "compression": "none"
+    }
+  ]
+}

@@ -1,0 +1,647 @@
+{
+  "counts": {
+    "by_case_status": {
+      "closed": 22598,
+      "open": 873,
+      "open_blocked": 26
+    },
+    "by_outcome": {
+      "certification_amended": 32,
+      "compliance_with_board_order": 4,
+      "dismissed_adjusted": 14,
+      "dismissed_non_adjusted": 837,
+      "no_representative_certified": 3669,
+      "pending": 909,
+      "representative_certified": 9810,
+      "representative_decertified": 932,
+      "representative_retained": 547,
+      "results_certified": 3,
+      "union_security_deauthorization_result": 153,
+      "unit_clarified": 76,
+      "withdrawn_adjusted": 252,
+      "withdrawn_non_adjusted": 6259
+    },
+    "by_petition_type": {
+      "AC": 47,
+      "RC": 18372,
+      "RD": 2945,
+      "RM": 1176,
+      "UC": 625,
+      "UD": 261,
+      "WH": 71
+    },
+    "duplicate_r_case_rows_removed": 5,
+    "election_tally_rows": 16544,
+    "election_tally_rows_linked_to_included_cases": 16339,
+    "included_cases_with_election_tallies": 15371,
+    "new_representation_attempts_rc": 18372,
+    "raw_r_case_report_rows": 23502,
+    "rc_by_calendar_year": {
+      "2016": 747,
+      "2017": 1876,
+      "2018": 1544,
+      "2019": 1734,
+      "2020": 1310,
+      "2021": 1381,
+      "2022": 2158,
+      "2023": 2158,
+      "2024": 2361,
+      "2025": 1945,
+      "2026": 1158
+    },
+    "rc_by_fiscal_year": {
+      "FY2016": 371,
+      "FY2017": 1854,
+      "FY2018": 1597,
+      "FY2019": 1673,
+      "FY2020": 1440,
+      "FY2021": 1269,
+      "FY2022": 2072,
+      "FY2023": 2115,
+      "FY2024": 2371,
+      "FY2025": 2100,
+      "FY2026": 1510
+    },
+    "rc_by_outcome": {
+      "certification_amended": 3,
+      "compliance_with_board_order": 2,
+      "dismissed_adjusted": 6,
+      "dismissed_non_adjusted": 251,
+      "no_representative_certified": 3464,
+      "pending": 634,
+      "representative_certified": 9444,
+      "unit_clarified": 2,
+      "withdrawn_adjusted": 178,
+      "withdrawn_non_adjusted": 4388
+    },
+    "rc_with_extracted_petitioner_organization": 18183,
+    "rc_without_extracted_petitioner_organization": 189,
+    "reported_petitioner_group_rollups": 5714,
+    "representation_cases": 23497,
+    "unique_election_cases_in_export": 15555
+  },
+  "coverage": {
+    "actual_case_filed_from": "2016-07-25",
+    "actual_case_filed_through": "2026-07-23",
+    "actual_tally_from": "2016-07-25",
+    "actual_tally_through": "2026-07-22",
+    "boundary_years_are_partial": true,
+    "elapsed_days": 3652,
+    "from_date": "2016-07-23",
+    "jurisdiction": "NLRB",
+    "retrieved_at": "2026-07-23",
+    "rolling_years": 10,
+    "scope": "Federal NLRA representation cases. RC is the closest observable measure of a group filing to become a bargaining representative.",
+    "through_date": "2026-07-23"
+  },
+  "dataset": "USUnions NLRB organizing attempts",
+  "input_files": [
+    {
+      "filename": "r-case-report-2016-07-23--2026-07-23.csv",
+      "report": "R Case Report",
+      "sha256": "a755b83d833e8109d8517e356bdd519780ca6160c396291cbae0da919872ea10"
+    },
+    {
+      "filename": "election-results-2016-07-23--2026-07-23.csv",
+      "report": "Election Results",
+      "sha256": "a0ecefa3d28a28e1b20347f243f9570b78a50af2bb76dca93a58da8fcbef3e84"
+    }
+  ],
+  "limitations": [
+    "NLRB coverage excludes federal, state, and local public employees; airline and railroad workers; agricultural workers; supervisors; and other workers outside NLRA jurisdiction.",
+    "An organizing drive that never files an NLRB petition is not observed.",
+    "Voluntary recognition can occur without an RC petition.",
+    "Withdrawal or dismissal does not mean workers voted against representation.",
+    "Election tally rows are reported counts, not final outcomes; final classification uses case status and reason closed.",
+    "Petitioner groups are aggregated by reported-name normalization, not a completed entity-resolution system.",
+    "Calendar years 2016 and 2026 are partial.",
+    "FY2026 is partial through 2026-07-23."
+  ],
+  "rc_decided_representation_outcomes": {
+    "definition": "RC cases closed by Certification of Representative or Certification of Results. Withdrawals and dismissals are excluded.",
+    "labor_organization_certification_share": 0.7316,
+    "labor_organization_certified": 9444,
+    "no_representative_certified": 3464,
+    "warning": "This is not the success rate of all organizing drives. It excludes drives that never filed and treats withdrawals/dismissals separately."
+  },
+  "top_reported_petitioner_groups": [
+    {
+      "attempt_count": 282,
+      "outcomes": {
+        "dismissed_non_adjusted": 6,
+        "no_representative_certified": 36,
+        "pending": 14,
+        "representative_certified": 146,
+        "withdrawn_adjusted": 3,
+        "withdrawn_non_adjusted": 77
+      },
+      "reported_name": "International Union, Security, Police and Fire Professionals of America (SPFPA)"
+    },
+    {
+      "attempt_count": 213,
+      "outcomes": {
+        "no_representative_certified": 32,
+        "pending": 3,
+        "representative_certified": 126,
+        "withdrawn_adjusted": 4,
+        "withdrawn_non_adjusted": 48
+      },
+      "reported_name": "International Association of Machinists and Aerospace Workers, AFL-CIO"
+    },
+    {
+      "attempt_count": 189,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 23,
+        "pending": 11,
+        "representative_certified": 132,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 21
+      },
+      "reported_name": "Workers United a/w Service Employees International Union"
+    },
+    {
+      "attempt_count": 185,
+      "outcomes": {
+        "no_representative_certified": 20,
+        "pending": 4,
+        "representative_certified": 144,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 16
+      },
+      "reported_name": "Chicago and Midwest Regional Joint Board, Workers United/SEIU"
+    },
+    {
+      "attempt_count": 183,
+      "outcomes": {
+        "no_representative_certified": 12,
+        "pending": 7,
+        "representative_certified": 117,
+        "withdrawn_adjusted": 3,
+        "withdrawn_non_adjusted": 44
+      },
+      "reported_name": "1199SEIU United Healthcare Workers East"
+    },
+    {
+      "attempt_count": 170,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 59,
+        "pending": 18,
+        "representative_certified": 74,
+        "withdrawn_non_adjusted": 18
+      },
+      "reported_name": "Service Employees International Union, United Healthcare Workers - West"
+    },
+    {
+      "attempt_count": 145,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 26,
+        "pending": 12,
+        "representative_certified": 95,
+        "withdrawn_non_adjusted": 11
+      },
+      "reported_name": "Workers United"
+    },
+    {
+      "attempt_count": 141,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 42,
+        "pending": 2,
+        "representative_certified": 57,
+        "withdrawn_adjusted": 3,
+        "withdrawn_non_adjusted": 36
+      },
+      "reported_name": "United Steel, Paper and Forestry, Rubber, Manufacturing, Energy, Allied Industrial and Service Workers International Union, AFL-CIO, CLC"
+    },
+    {
+      "attempt_count": 140,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 14,
+        "pending": 6,
+        "representative_certified": 88,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 30
+      },
+      "reported_name": "National Union of Healthcare Workers (NUHW)"
+    },
+    {
+      "attempt_count": 115,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 5,
+        "pending": 1,
+        "representative_certified": 70,
+        "withdrawn_non_adjusted": 38
+      },
+      "reported_name": "Service Employees International Union, Local 32BJ"
+    },
+    {
+      "attempt_count": 97,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 16,
+        "pending": 2,
+        "representative_certified": 51,
+        "withdrawn_non_adjusted": 27
+      },
+      "reported_name": "Communications Workers of America, AFL-CIO"
+    },
+    {
+      "attempt_count": 94,
+      "outcomes": {
+        "no_representative_certified": 8,
+        "pending": 2,
+        "representative_certified": 61,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 22
+      },
+      "reported_name": "1199 SEIU United Healthcare Workers East"
+    },
+    {
+      "attempt_count": 92,
+      "outcomes": {
+        "no_representative_certified": 5,
+        "pending": 4,
+        "representative_certified": 60,
+        "withdrawn_non_adjusted": 23
+      },
+      "reported_name": "International Union of Operating Engineers, Local 399"
+    },
+    {
+      "attempt_count": 86,
+      "outcomes": {
+        "no_representative_certified": 7,
+        "pending": 5,
+        "representative_certified": 47,
+        "withdrawn_non_adjusted": 27
+      },
+      "reported_name": "Communications Workers of America"
+    },
+    {
+      "attempt_count": 86,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 9,
+        "pending": 2,
+        "representative_certified": 68,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 5
+      },
+      "reported_name": "Workers United, affiliated with Service Employees International Union"
+    },
+    {
+      "attempt_count": 82,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 8,
+        "pending": 1,
+        "representative_certified": 58,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 13
+      },
+      "reported_name": "International Union of Operating Engineers, Local 150, AFL-CIO"
+    },
+    {
+      "attempt_count": 75,
+      "outcomes": {
+        "dismissed_non_adjusted": 2,
+        "no_representative_certified": 14,
+        "pending": 5,
+        "representative_certified": 42,
+        "withdrawn_non_adjusted": 12
+      },
+      "reported_name": "International Union of Operating Engineers, Stationary Engineers, Local 39, AFL-CIO"
+    },
+    {
+      "attempt_count": 65,
+      "outcomes": {
+        "no_representative_certified": 9,
+        "pending": 1,
+        "representative_certified": 42,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 12
+      },
+      "reported_name": "International Association of Machinists and Aerospace Workers, District Lodge 725"
+    },
+    {
+      "attempt_count": 62,
+      "outcomes": {
+        "no_representative_certified": 26,
+        "pending": 1,
+        "representative_certified": 23,
+        "withdrawn_non_adjusted": 12
+      },
+      "reported_name": "Oregon Nurses Association"
+    },
+    {
+      "attempt_count": 57,
+      "outcomes": {
+        "dismissed_non_adjusted": 2,
+        "no_representative_certified": 2,
+        "representative_certified": 31,
+        "withdrawn_non_adjusted": 22
+      },
+      "reported_name": "Union Rights for Security Officers (URSO)"
+    },
+    {
+      "attempt_count": 56,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 16,
+        "pending": 6,
+        "representative_certified": 23,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "International Union, United Automobile, Aerospace and Agricultural Implement Workers of America (UAW)"
+    },
+    {
+      "attempt_count": 56,
+      "outcomes": {
+        "no_representative_certified": 13,
+        "pending": 7,
+        "representative_certified": 26,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "International Union, United Automobile, Aerospace and Agricultural Implement Workers of America (UAW), AFL-CIO"
+    },
+    {
+      "attempt_count": 51,
+      "outcomes": {
+        "no_representative_certified": 4,
+        "pending": 2,
+        "representative_certified": 32,
+        "withdrawn_non_adjusted": 13
+      },
+      "reported_name": "International Union of Operating Engineers, Local 99, a/w International Union of Operating Engineers, AFL-CIO"
+    },
+    {
+      "attempt_count": 50,
+      "outcomes": {
+        "no_representative_certified": 16,
+        "pending": 4,
+        "representative_certified": 21,
+        "withdrawn_adjusted": 2,
+        "withdrawn_non_adjusted": 7
+      },
+      "reported_name": "United Steel, Paper and Forestry, Rubber, Manufacturing, Energy, Allied & Industrial Service Workers International Union, AFL-CIO, CLC"
+    },
+    {
+      "attempt_count": 49,
+      "outcomes": {
+        "no_representative_certified": 2,
+        "representative_certified": 39,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 7
+      },
+      "reported_name": "International Association of Machinists & Aerospace Workers, District Lodge 725, AFL-CIO"
+    },
+    {
+      "attempt_count": 48,
+      "outcomes": {
+        "no_representative_certified": 18,
+        "pending": 2,
+        "representative_certified": 23,
+        "withdrawn_non_adjusted": 5
+      },
+      "reported_name": "SEIU Healthcare 1199NW"
+    },
+    {
+      "attempt_count": 48,
+      "outcomes": {
+        "no_representative_certified": 9,
+        "representative_certified": 30,
+        "withdrawn_adjusted": 2,
+        "withdrawn_non_adjusted": 7
+      },
+      "reported_name": "Service Employees International Union, Local 2015"
+    },
+    {
+      "attempt_count": 47,
+      "outcomes": {
+        "no_representative_certified": 3,
+        "pending": 4,
+        "representative_certified": 27,
+        "withdrawn_non_adjusted": 13
+      },
+      "reported_name": "International Brotherhood of Teamsters Local 251"
+    },
+    {
+      "attempt_count": 46,
+      "outcomes": {
+        "no_representative_certified": 5,
+        "representative_certified": 26,
+        "withdrawn_non_adjusted": 15
+      },
+      "reported_name": "International Union of Operating Engineers Local 501, AFL-CIO"
+    },
+    {
+      "attempt_count": 46,
+      "outcomes": {
+        "no_representative_certified": 10,
+        "representative_certified": 34,
+        "withdrawn_non_adjusted": 2
+      },
+      "reported_name": "Workers United, affiliated with Service Employees International Union (SEIU)"
+    },
+    {
+      "attempt_count": 45,
+      "outcomes": {
+        "no_representative_certified": 8,
+        "pending": 2,
+        "representative_certified": 13,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 21
+      },
+      "reported_name": "International Union of Operating Engineers Local 825"
+    },
+    {
+      "attempt_count": 45,
+      "outcomes": {
+        "no_representative_certified": 12,
+        "pending": 2,
+        "representative_certified": 22,
+        "withdrawn_non_adjusted": 9
+      },
+      "reported_name": "Local 324, International Union of Operating Engineers (IUOE), AFL-CIO"
+    },
+    {
+      "attempt_count": 45,
+      "outcomes": {
+        "no_representative_certified": 12,
+        "representative_certified": 21,
+        "withdrawn_non_adjusted": 12
+      },
+      "reported_name": "Local 881, United Food and Commercial Workers"
+    },
+    {
+      "attempt_count": 45,
+      "outcomes": {
+        "no_representative_certified": 15,
+        "representative_certified": 20,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "United Steel, Paper and Forestry, Rubber, Manufacturing, Energy, Allied Industrial and Service Workers International Union"
+    },
+    {
+      "attempt_count": 44,
+      "outcomes": {
+        "no_representative_certified": 13,
+        "representative_certified": 22,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 8
+      },
+      "reported_name": "SEIU Healthcare Michigan"
+    },
+    {
+      "attempt_count": 44,
+      "outcomes": {
+        "no_representative_certified": 7,
+        "pending": 1,
+        "representative_certified": 26,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "Utility Workers Union of America, AFL-CIO"
+    },
+    {
+      "attempt_count": 42,
+      "outcomes": {
+        "no_representative_certified": 7,
+        "representative_certified": 30,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 4
+      },
+      "reported_name": "Workers United, Southern Regional Joint Board"
+    },
+    {
+      "attempt_count": 40,
+      "outcomes": {
+        "dismissed_non_adjusted": 1,
+        "no_representative_certified": 3,
+        "representative_certified": 26,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "UNITE HERE Local 1"
+    },
+    {
+      "attempt_count": 39,
+      "outcomes": {
+        "no_representative_certified": 8,
+        "pending": 1,
+        "representative_certified": 18,
+        "withdrawn_non_adjusted": 12
+      },
+      "reported_name": "District 1199C, National Union of Hospital and Health Care Employees, AFSCME, AFL-CIO"
+    },
+    {
+      "attempt_count": 39,
+      "outcomes": {
+        "dismissed_non_adjusted": 4,
+        "no_representative_certified": 5,
+        "pending": 1,
+        "representative_certified": 19,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "Federal Contract Guards of America (FCGOA)"
+    },
+    {
+      "attempt_count": 39,
+      "outcomes": {
+        "dismissed_non_adjusted": 11,
+        "no_representative_certified": 15,
+        "representative_certified": 7,
+        "withdrawn_non_adjusted": 6
+      },
+      "reported_name": "United Food & Commercial Workers, Local 555"
+    },
+    {
+      "attempt_count": 39,
+      "outcomes": {
+        "no_representative_certified": 6,
+        "pending": 2,
+        "representative_certified": 29,
+        "withdrawn_non_adjusted": 2
+      },
+      "reported_name": "Workers United a/w Service Employees International Union, AFL-CIO"
+    },
+    {
+      "attempt_count": 38,
+      "outcomes": {
+        "no_representative_certified": 11,
+        "pending": 1,
+        "representative_certified": 21,
+        "withdrawn_non_adjusted": 5
+      },
+      "reported_name": "SEIU Healthcare Minnesota and Iowa"
+    },
+    {
+      "attempt_count": 37,
+      "outcomes": {
+        "no_representative_certified": 3,
+        "representative_certified": 27,
+        "withdrawn_non_adjusted": 7
+      },
+      "reported_name": "New England Health Care Employees Union, District 1199, SEIU"
+    },
+    {
+      "attempt_count": 36,
+      "outcomes": {
+        "no_representative_certified": 2,
+        "representative_certified": 24,
+        "withdrawn_non_adjusted": 10
+      },
+      "reported_name": "International Union of Operating Engineers Local 351"
+    },
+    {
+      "attempt_count": 34,
+      "outcomes": {
+        "no_representative_certified": 3,
+        "pending": 2,
+        "representative_certified": 25,
+        "withdrawn_non_adjusted": 4
+      },
+      "reported_name": "INTERNATIONAL BROTHERHOOD OF TEAMSTERS, LOCAL 671"
+    },
+    {
+      "attempt_count": 33,
+      "outcomes": {
+        "no_representative_certified": 10,
+        "representative_certified": 15,
+        "withdrawn_non_adjusted": 8
+      },
+      "reported_name": "International Union of Operating Engineers Local 542"
+    },
+    {
+      "attempt_count": 32,
+      "outcomes": {
+        "no_representative_certified": 1,
+        "pending": 1,
+        "representative_certified": 24,
+        "withdrawn_non_adjusted": 6
+      },
+      "reported_name": "General Teamsters, Airline, Aerospace and Allied Employees, Warehousemen, Drivers, Construction, Rock and Sand, Local 986"
+    },
+    {
+      "attempt_count": 32,
+      "outcomes": {
+        "no_representative_certified": 10,
+        "representative_certified": 16,
+        "withdrawn_adjusted": 1,
+        "withdrawn_non_adjusted": 5
+      },
+      "reported_name": "International Association of Machinists and Aerospace Workers"
+    },
+    {
+      "attempt_count": 31,
+      "outcomes": {
+        "no_representative_certified": 7,
+        "representative_certified": 10,
+        "withdrawn_non_adjusted": 14
+      },
+      "reported_name": "International Association of Machinists and Aerospace Workers, District Lodge 947"
+    }
+  ]
+}

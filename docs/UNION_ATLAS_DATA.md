@@ -1,38 +1,69 @@
-# Union Atlas data provenance
+# Union Atlas data provenance and operation
 
-The Atlas uses a repository-local public filing directory:
+The Atlas is repository-local and source-backed. It contains:
 
-- Canonical source: `Woop91/USUnions`
-- Source grain: one canonical OLMS union record
-- Record count: 20,699
-- Geography: public headquarters city/state/ZIP from OLMS filings
-- Coordinates: 2025 U.S. Census Gazetteer ZCTA representative points
-- Local package: `data/union-atlas.json`
-- Browser package: `docs/union-atlas-data.js`
+- 20,699 canonical OLMS union records.
+- 23,497 NLRB representation cases, including 18,372 RC organizing attempts.
+- 5,714 reported petitioner-group rollups.
+- 64 research articles, 97 verified statistics, and 10 research sources.
+- 15,243 public headquarters matched by the U.S. Census address geocoder.
+- 3,809 additional headquarters using 2025 Census ZCTA representative points.
 
-The exact source commit, source-manifest SHA-256, row coverage, coordinate
-source, and package checksum are stored in `data/manifest.json`.
+The exact `Woop91/USUnions` commit, source hashes, package hashes, coverage
+denominators, Census sources, and synthetic-record count are stored in
+`data/manifest.json`.
 
-## Display rule
+## Runtime packages
 
-The Atlas displays only source fields or values computed directly from source
-rows. Missing values are shown as not reported. It does not invent platform
-groups, campaigns, relationships, activities, membership trends, or engagement
-metrics.
+The hosted Atlas avoids a large main-thread startup:
+
+- `union-atlas-index.js`: small summary and filter index.
+- `union-atlas-data.json.gz`: 1.61 MiB initial directory/search package.
+- `union-atlas-details.json.gz`: lazy record-detail package.
+- `union-atlas-evidence.json.gz`: lazy organizing/research package.
+- `union-atlas-worker.js`: decompression, distance calculation, filtering,
+  sorting, and pagination outside the main UI thread.
+- `union-atlas-standalone.html`: true one-file offline export containing every
+  runtime package.
+
+Directory search is debounced. Nearby, directory, organizing, and research
+results are paginated without a hidden result cap.
+
+## Geography
+
+Public OLMS headquarters street addresses are sent to the official Census
+batch geocoder. The Atlas stores only coordinates, match type, and an address
+fingerprint used to detect changes. Street addresses are not stored.
+
+When Census cannot match an address, the Atlas uses the representative point
+for the filing ZIP's ZCTA. Each record labels its precision as `address`,
+`zcta`, or unavailable.
 
 ## Privacy boundary
 
-The package contains organization-level public filing data. It excludes member
-rosters, grievances, cases, authentication records, private contacts, personal
-identifiers, and street addresses.
+Included data is organization-level public filing, public NLRB case, and
+research evidence. The Atlas excludes:
 
-## Importing a new source snapshot
+- Member rosters and personal identifiers.
+- Grievance, discipline, and case-management records.
+- Private or person-level email addresses and phone numbers.
+- Street addresses after geocoding.
+- Authentication records, tokens, and credentials.
 
-Run the importer against an authenticated local checkout of the private
-USUnions repository and the official Census ZCTA Gazetteer text file:
+Missing values stay missing. No seeded or synthetic replacement is allowed.
+
+## Refresh
+
+Local refresh:
 
 ```text
-node scripts/import-union-atlas-data.mjs --source <USUnions checkout> --zcta <Gazetteer text file>
+npm run data:geocode -- --source <USUnions checkout>
+npm run data:import -- --source <USUnions checkout> --zcta <Gazetteer text file>
 npm run data:build
 npm run data:verify
+npm run data:freshness -- --source <USUnions checkout>
 ```
+
+`.github/workflows/union-atlas-refresh.yml` runs weekly and opens a refresh PR.
+Because `Woop91/USUnions` is private, the SolidBase repository must have a
+fine-grained read-only Actions secret named `USUNIONS_READ_TOKEN`.

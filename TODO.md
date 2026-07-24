@@ -66,6 +66,14 @@ When Husky v10 is released:
 
 ## ✅ Recently Completed (for reference)
 
+- [x] **ATLAS-001** Import complete public-safe USUnions organizing and research datasets.
+- [x] **ATLAS-002** Add weekly source freshness workflow and exact package hashes.
+- [x] **ATLAS-003** Replace eager 9.76 MiB JavaScript payload with 1.61 MiB compressed worker package.
+- [x] **ATLAS-004** Geocode public headquarters through Census; retain explicit ZCTA fallback precision.
+- [x] **ATLAS-005** Surface exact membership, website, and coordinate gaps without synthetic values.
+- [x] **ATLAS-006** Remove hidden 24/50-record result caps through explicit compass labeling and pagination.
+- [x] **ATLAS-007** Generate a true one-file offline export.
+- [x] **ATLAS-008** Add automated mobile, desktop, interaction, theme, and offline browser tests.
 - [x] Restore `.spinner` CSS — was `display:none` since v4.25.11 skeleton migration
 - [x] Replace opacity-pulse skeleton with shimmer sweep (`@keyframes shimmer`)
 - [x] Replace rotating ring spinner with three-dot `dotPulse` animation

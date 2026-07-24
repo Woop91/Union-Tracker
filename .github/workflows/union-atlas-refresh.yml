@@ -1,0 +1,86 @@
+name: Union Atlas data refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 11 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: union-atlas-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required private-repository token
+        env:
+          USUNIONS_READ_TOKEN: ${{ secrets.USUNIONS_READ_TOKEN }}
+        run: |
+          test -n "$USUNIONS_READ_TOKEN" || {
+            echo "::error::Repository secret USUNIONS_READ_TOKEN is required to read private Woop91/USUnions."
+            exit 1
+          }
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Woop91/USUnions
+          path: .atlas-source
+          token: ${{ secrets.USUNIONS_READ_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download official Census ZCTA Gazetteer
+        run: |
+          curl --fail --location --retry 3 \
+            https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_zcta_national.zip \
+            --output /tmp/zcta.zip
+          unzip -q /tmp/zcta.zip -d /tmp/zcta
+
+      - name: Refresh address geocodes
+        run: node scripts/geocode-union-headquarters.mjs --source .atlas-source
+
+      - name: Import and build all public Atlas data
+        run: |
+          node scripts/import-union-atlas-data.mjs \
+            --source .atlas-source \
+            --zcta /tmp/zcta/2025_Gaz_zcta_national.txt
+          npm run data:build
+          npm run data:verify
+          npm run test:atlas -- --runInBand
+
+      - name: Create refresh pull request when data changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "Atlas already current."
+            exit 0
+          fi
+          branch="automation/union-atlas-refresh-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add data docs
+          git commit -m "data: refresh Union Atlas source packages"
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create \
+            --base Main \
+            --head "$branch" \
+            --title "data: refresh Union Atlas source packages" \
+            --body "Automated refresh from the current private USUnions commit, Census address geocoder, and 2025 ZCTA Gazetteer. Data verification and Atlas tests passed."

@@ -1,34 +1,31 @@
-# Source-backed Union Atlas data
+# Repository-local Union Atlas data
 
-`union-atlas.json` is the complete repository-local directory package used by
-the Common Ground Union Atlas.
+`union-atlas.json` is the complete public-safe directory package. Compressed
+source packages under `source/usunions/` retain every real organizing and
+research record required to rebuild the Atlas without the source repository.
 
 ## Included
 
-- 20,699 canonical union records from `Woop91/USUnions`
-- Exact source repository commit and source-manifest checksum
-- OLMS identity, affiliation, level, public headquarters city/state/ZIP,
-  latest reported membership, filing form, public website, and enrichment state
-- 2025 U.S. Census Gazetteer ZCTA representative coordinates
-- Derived affiliation, state, and completeness rollups
-
-Every displayed organization and metric comes from those source records or is
-calculated directly from them. Missing values remain missing.
+- Canonical OLMS identity, hierarchy, sector, headquarters city/state/ZIP.
+- Address or ZCTA coordinate and explicit precision.
+- Full available membership history.
+- Latest filing finances.
+- Public website, background, source citations, and organization-level coverage.
+- Complete NLRB organizing attempts and petitioner-group rollups.
+- Complete research article, source, and verified-statistic datasets.
 
 ## Excluded
 
-- Member rosters and personal identifiers
-- Grievance, discipline, and case-level records
-- Private email addresses or phone numbers
-- Street addresses, session tokens, and authentication data
+- Street addresses after Census geocoding.
+- Names or contact details for members, staff, stewards, and officers.
+- Grievance, discipline, and case-management records.
+- Private contacts, session tokens, credentials, and authentication data.
 
-## Build and verification
+Counts for excluded public-person collections are retained only as coverage
+indicators. Missing source values are not filled.
 
-```text
-npm run data:build
-npm run data:verify
-```
+## Generated files
 
-`data:build` creates the manifest, browser data module, and Atlas HTML.
-`data:verify` checks source identity, uniqueness, completeness, geography,
-privacy boundaries, package parity, and checksums.
+Do not hand-edit `union-atlas.json`, `manifest.json`, the geocode output, source
+packages, or files under `docs/union-atlas-*`. Re-run the import and build
+commands documented in `docs/UNION_ATLAS_DATA.md`.

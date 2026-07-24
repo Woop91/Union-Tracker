@@ -1,31 +1,70 @@
 {
-  "formatVersion": 2,
+  "formatVersion": 3,
   "dataFile": "union-atlas.json",
-  "browserDataFile": "../docs/union-atlas-data.js",
-  "sha256": "cf8b8cc8d95c1dac510fb202c7ec170c21a8a0061382b19385c18c785c4fbd9e",
+  "sha256": "c09962ad05a568c15f3f3c05e2484da21a936dc8d6fb1b3f0754654f2a5c6641",
   "counts": {
     "unions": 20699,
     "uniqueIds": 20699,
     "affiliations": 162,
     "statesAndTerritories": 56,
     "zctaCoordinates": 33791,
-    "geocodedUnions": 18709,
+    "geocodedUnions": 19052,
+    "addressGeocodedUnions": 15243,
+    "zctaGeocodedUnions": 3809,
     "membershipRecords": 19554,
-    "websites": 5276
+    "websites": 5276,
+    "organizingCases": 23497,
+    "organizingGroups": 5714,
+    "researchArticles": 64,
+    "researchStatistics": 97,
+    "researchSources": 10
   },
   "source": {
-    "name": "USUnions canonical directory",
+    "name": "USUnions canonical public-data repository",
     "repository": "Woop91/USUnions",
-    "commit": "c09446b0ceab7af2b95c779cfa5211396b393d61",
-    "path": "data/unions/**/*.json",
+    "commit": "55a20f1433d7a38f7af3077de7464760f1bc188f",
+    "paths": [
+      "data/unions/**/*.json",
+      "data/organizing/**",
+      "data/research/**"
+    ],
     "manifestSha256": "d6a201e0cfe8bfd5d2c6b2d687aa8c213a38f1538cb11610837a3b4a20b05926"
   },
-  "coordinateSource": {
-    "name": "2025 U.S. Census Gazetteer ZIP Code Tabulation Areas",
-    "url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_zcta_national.zip",
-    "path": "2025_Gaz_zcta_national.txt",
-    "purpose": "Representative latitude and longitude for distance and bearing calculations"
+  "coordinateSources": [
+    {
+      "name": "U.S. Census Geocoding Services",
+      "url": "https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html",
+      "benchmark": "Public_AR_Current",
+      "purpose": "Address-range coordinates for public union headquarters; street addresses are not persisted."
+    },
+    {
+      "name": "2025 U.S. Census Gazetteer ZIP Code Tabulation Areas",
+      "url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_zcta_national.zip",
+      "path": "2025_Gaz_zcta_national.txt",
+      "purpose": "Fallback representative coordinates when an address match is unavailable."
+    }
+  ],
+  "browserPackages": {
+    "directory": {
+      "path": "union-atlas-data.json.gz",
+      "bytes": 1684865,
+      "uncompressedBytes": 14663249,
+      "sha256": "243b432d0e5fe8a6bbc9181b5cac40af92f2a52d502b3732588937d91e7fdb06"
+    },
+    "details": {
+      "path": "union-atlas-details.json.gz",
+      "bytes": 1544294,
+      "uncompressedBytes": 13790765,
+      "sha256": "0106df58ff1aa2000ba899fca1dad27973a8d1cbe37e0cfbd27f3b282b254ab0"
+    },
+    "evidence": {
+      "path": "union-atlas-evidence.json.gz",
+      "bytes": 7978699,
+      "uncompressedBytes": 73799388,
+      "sha256": "7301c690b8ef9d98c92965f6014cc617ba9b72a633e1bedcd77676961576faf2"
+    }
   },
-  "selfContained": true,
-  "syntheticRecords": 0
+  "repositoryLocal": true,
+  "syntheticRecords": 0,
+  "privacy": "Organization-level public records only. Street addresses are used transiently for Census geocoding but are not stored. Member, grievance, authentication, private-contact, and personal records remain excluded."
 }
