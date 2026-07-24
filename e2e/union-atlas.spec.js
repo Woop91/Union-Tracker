@@ -24,6 +24,7 @@ for (const viewport of viewports) {
     await page.screenshot({ path: `test-results/atlas-${viewport.name}-dark.png`, fullPage: true });
     await page.getByRole('button', { name: 'Light theme' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.screenshot({ path: `test-results/atlas-${viewport.name}-light.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 }
@@ -38,6 +39,7 @@ test('directory search is debounced, paginated, and opens lazy details', async (
   await page.getByRole('button', { name: 'Open' }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog')).toContainText('Public record coverage');
+  await page.screenshot({ path: 'test-results/atlas-directory-details.png', fullPage: true });
   await page.getByRole('button', { name: 'Close details' }).click();
 });
 
@@ -57,10 +59,15 @@ test('organizing and research views use the complete real evidence packages', as
   await expect(page.locator('#view-organizing')).toContainText('23,497');
   await page.getByPlaceholder('Employer, case, petitioner organization…').fill("Domino's Supply Chain");
   await expect(page.locator('#view-organizing')).toContainText("Domino's Supply Chain");
+  await page.screenshot({ path: 'test-results/atlas-organizing.png', fullPage: true });
   await page.getByRole('tab', { name: 'Research' }).click();
   await expect(page.getByRole('heading', { name: 'Labor research' })).toBeVisible();
   await expect(page.locator('#view-research')).toContainText('64');
   await expect(page.locator('#view-research')).toContainText('Key findings');
+  await expect(page.locator('#view-research .barrow')).toHaveCount(10);
+  await expect(page.locator('#view-research')).toContainText('2016');
+  await expect(page.locator('#view-research')).toContainText('2025');
+  await page.screenshot({ path: 'test-results/atlas-research.png', fullPage: true });
 });
 
 test('single-file export runs without companion runtime files', async ({ page }) => {

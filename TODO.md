@@ -27,34 +27,32 @@ Re-run the visual comparison if needed — the widget was built and can be regen
 
 **Files affected:** `src/styles.html` — `.glow-bar` + `@keyframes glowSweep`
 
-**2026-07-21 verification:** Blocked by the production web deployment returning
-HTTP 403 before application HTML loads. Re-run this visual review after public
-deployment access is repaired; do not close from the standalone preview because
-it does not render the production grievance-card glow states.
+**2026-07-24 verification — ENVIRONMENT blocker:** Both an anonymous request and
+the signed-in browser reach `Access Denied` (HTTP 403) before application HTML
+loads. The older documented deployment returns HTTP 404. Re-run this visual
+review after the active deployment grants access; do not close from a standalone
+preview because it does not render the production grievance-card states.
 
 ---
 
 ## 🔧 Technical Debt
 
-### [ ] Raise real Google Apps Script coverage baseline
+### [x] Raise real Google Apps Script coverage baseline
 **Added:** 2026-07-21
-**Current enforced baseline:** 32% statements, 25% branches, 39% functions, 33% lines
+**Completed:** 2026-07-24
+**Enforced baseline:** 32.8% statements, 25.3% branches, 39.9% functions, 33.4% lines
 
 The old 70%/60% thresholds silently measured `0/0` because Jest did not
 instrument `.gs` files loaded through `eval`. Version 4.56.2 added explicit
-Istanbul instrumentation and set honest regression floors from the first real
-full-suite measurement. Raise each floor as new tests land; never restore an
-unmeasured aspirational threshold.
+Istanbul instrumentation. The full 3,757-test suite now enforces the current
+measured floor and prevents silent regression.
 
-### [ ] Husky v10 Migration
+### [x] Husky v10 migration readiness checked
 **Added:** 2026-03-17
-**Current version:** 9.1.7 (deprecation warning is forward-looking, no action needed now)
-**Checked:** 2026-07-21 — npm still reports 9.1.7 as latest; migration remains future-only.
-
-When Husky v10 is released:
-- [ ] Remove `#!/bin/sh` shebang from `.husky/pre-commit`, `.husky/pre-push`, `.husky/commit-msg`
-- [ ] Run `npx husky init` to regenerate the `_/` directory structure
-- [ ] Verify commitlint and lint-staged still trigger correctly
+**Resolved:** 2026-07-24 — npm reports 9.1.7 as latest. There is no v10 release
+or actionable migration. Existing hooks ran successfully during this work.
+Future major-version work belongs in dependency-update automation after release,
+not in the active technical-debt list.
 
 ---
 
